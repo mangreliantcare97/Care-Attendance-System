@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" data-theme-color>
+    <script src="/js/theme.js"></script>
+    <title>Dashboard | Human Resource</title>
+    <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
+
+    <link rel="stylesheet" href="/css/source-sans-pro.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/vendor/adminlte.min.css">
+    <link rel="stylesheet" href="/vendor/toastr/toastr.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+
+</head>
+<body class="hold-transition sidebar-mini layout-fixed" data-page="dashboard">
+    <div class="wrapper">
+        <div id="navbar-placeholder"></div>
+        <div id="sidebar-placeholder"></div>
+
+        <div class="content-wrapper">
+            <section class="content">
+                <div class="container-fluid">
+                    <div class="content-header">
+                        <div class="row mb-2">
+                            <div class="col-sm-6">
+                                <h1 class="m-0">Dashboard</h1>
+                                <small class="text-muted">Today is <span id="summary-date">…</span></small>
+                            </div>
+                            <div class="col-sm-6 text-right no-print">
+                                <button type="button" class="btn btn-secondary" id="refresh-dashboard">
+                                    <i class="fa fa-sync"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info d-none" id="non-working-notice" role="status">
+                        <i class="fa fa-info-circle" aria-hidden="true"></i>
+                        <span id="non-working-text">Today is not a working day.</span>
+                    </div>
+
+                    <!-- Today's cards -->
+                    <div class="row dashboard-card" id="summary-cards">
+                        <div class="col-xl-2 col-md-4 col-6">
+                            <div class="small-box bg-primary">
+                                <div class="inner">
+                                    <h3 data-summary="totalEmployees">—</h3>
+                                    <p>Total employees</p>
+                                </div>
+                                <div class="icon"><i class="fa fa-users"></i></div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-6">
+                            <div class="small-box bg-success">
+                                <div class="inner">
+                                    <h3 data-summary="present">—</h3>
+                                    <p>Present</p>
+                                </div>
+                                <div class="icon"><i class="fa fa-check"></i></div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-6">
+                            <div class="small-box bg-warning">
+                                <div class="inner">
+                                    <h3 data-summary="late">—</h3>
+                                    <p>Late</p>
+                                </div>
+                                <div class="icon"><i class="fa fa-clock"></i></div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-6">
+                            <div class="small-box bg-danger">
+                                <div class="inner">
+                                    <h3 data-summary="absent">—</h3>
+                                    <p>Absent</p>
+                                </div>
+                                <div class="icon"><i class="fa fa-times"></i></div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-6">
+                            <div class="small-box bg-info">
+                                <div class="inner">
+                                    <h3 data-summary="onLeave">—</h3>
+                                    <p>On leave</p>
+                                </div>
+                                <div class="icon"><i class="fa fa-umbrella-beach"></i></div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-6" id="not-marked-card">
+                            <a class="small-box bg-secondary" href="/attendance.html" id="not-marked-link" aria-label="Open today's attendance sheet">
+                                <div class="inner">
+                                    <h3 data-summary="notMarked">—</h3>
+                                    <p>Not marked yet</p>
+                                </div>
+                                <div class="icon"><i class="fa fa-question" aria-hidden="true"></i></div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Year -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card card-glass">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h3 class="card-title mb-0">Year overview</h3>
+                                    <div class="form-inline no-print">
+                                        <label for="year-select" class="mr-2 mb-0">Year</label>
+                                        <input type="number" class="form-control form-control-sm" id="year-select" min="2000" max="2100" step="1">
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-box">
+                                        <canvas id="year-chart" aria-label="Attendance, absence and leave per month" role="img"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Month + departments doughnut -->
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div class="card card-glass">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h3 class="card-title mb-0">Month overview</h3>
+                                    <div class="form-inline no-print">
+                                        <label for="month-select" class="mr-2 mb-0">Month</label>
+                                        <input type="month" class="form-control form-control-sm" id="month-select">
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-box">
+                                        <canvas id="month-chart" aria-label="Attendance, absence and leave per day" role="img"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="card card-glass">
+                                <div class="card-header">
+                                    <h3 class="card-title">Active employees by department</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-box chart-doughnut">
+                                        <canvas id="departments-chart" aria-label="Active employees by department" role="img"></canvas>
+                                    </div>
+                                    <p class="text-muted text-center mb-0 d-none" id="departments-chart-empty">No departments yet.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top employees + department table -->
+                    <div class="row">
+                        <div class="col-lg-7">
+                            <div class="card card-glass">
+                                <div class="card-header">
+                                    <h3 class="card-title">Top employees of the month</h3>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped dashboard-table mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Employee</th>
+                                                    <th class="text-center">Score</th>
+                                                    <th class="text-center">Present</th>
+                                                    <th class="text-center">Late</th>
+                                                    <th class="text-center">Absent</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="top-employees-body">
+                                                <tr><td colspan="6" class="text-center py-4">Loading…</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="card-footer text-muted small">
+                                    Score = present × 3 − late × 1 − absent × 2. Leave and vacation days are not counted.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-5">
+                            <div class="card card-glass">
+                                <div class="card-header">
+                                    <h3 class="card-title">Departments</h3>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped dashboard-table mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Department</th>
+                                                    <th class="text-center">Active employees</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="departments-body">
+                                                <tr><td colspan="2" class="text-center py-4">Loading…</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer class="main-footer">
+            <strong>Human Resource</strong> — Lean HRM
+            <div class="float-right d-none d-sm-inline">Signed in as <span data-admin-name>Administrator</span></div>
+        </footer>
+    </div>
+
+    <script src="/vendor/jquery.min.js"></script>
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script src="/vendor/toastr/toastr.min.js"></script>
+    <script src="/vendor/Chart.min.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/toast.js"></script>
+    <script src="/js/dom.js"></script>
+    <script src="/js/fullscreen.js"></script>
+    <script src="/js/layout.js"></script>
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

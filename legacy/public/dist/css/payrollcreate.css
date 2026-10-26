@@ -1,0 +1,202 @@
+ /* Default light mode */
+ body {
+    background-color: #ffffff;
+    color: #000000;
+}
+
+/* Dark mode */
+body.dark-mode {
+    background-color: #121212;
+    color: #ffffff;
+}
+
+/* Content wrapper with background image and darker gray overlay */
+.content-wrapper {
+    position: relative;
+    background-size: cover;
+    background-position: center;
+}
+
+/* Darker gray background color for light mode */
+.content-wrapper.light-mode {
+    background-color: #a9a9a9;
+}
+
+/* Dark gray background for dark mode */
+.dark-mode .content-wrapper {
+    background-color: #2e2e2e;
+}
+
+/* Ensures the darker gray overlay is applied over the background image */
+.dark-mode .content-wrapper::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1;
+}
+
+.content-wrapper > * {
+    position: relative;
+    z-index: 2;
+}
+
+/* Improved styling for container box */
+.checkbox-box {
+    border: 1px solid #ddd;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    background-color: #fff;
+    max-height: 250px;
+    overflow-y: auto;
+    width: 100%;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode styling for container box */
+.dark-mode .checkbox-box {
+    background-color: #333333;
+    border: 1px solid #555;
+}
+
+/* Style for the "Select All" checkbox */
+.checkbox-item:first-child {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+/* Dark mode styling for "Select All" checkbox */
+.dark-mode .checkbox-item:first-child {
+    background-color: #444;
+}
+
+/* Styling for each checkbox item */
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s;
+}
+
+/* Dark mode styling for each checkbox item */
+.dark-mode .checkbox-item {
+    border-bottom: 1px solid #666;
+}
+
+/* Remove border from the last item */
+.checkbox-item:last-child {
+    border-bottom: none;
+}
+
+/* Style the checkbox input */
+.checkbox-item input[type="checkbox"] {
+    margin-right: 0.75rem;
+}
+
+/* Dark mode styling for the checkbox input */
+.dark-mode .checkbox-item input[type="checkbox"] {
+    accent-color: #ffffff;
+}
+
+/* Style the label */
+.checkbox-item label {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #333;
+}
+
+/* Dark mode styling for the label */
+.dark-mode .checkbox-item label {
+    color: #ffffff;
+}
+
+/* Hover effect for checkbox items */
+.checkbox-item:hover {
+    background-color: #e9ecef;
+}
+
+/* Dark mode hover effect for checkbox items */
+.dark-mode .checkbox-item:hover {
+    background-color: #555;
+}
+
+/* Style for the form */
+.form-horizontal {
+    background-color: #fff;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode styling for the form */
+.dark-mode .form-horizontal {
+    background-color: rgba(0, 0, 0, 0.8);
+    color: #ffffff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Style for the buttons */
+.btn {
+    border-radius: 0.25rem;
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+}
+
+.btn-white {
+    background-color: #ffffff;
+    color: #333;
+    border: 1px solid #ccc;
+}
+
+.btn-white:hover {
+    background-color: #f1f1f1;
+}
+
+.btn-default {
+    background-color: #98999a;
+    color: #ffffff;
+}
+
+.btn-default:hover {
+    background-color: #5a6268;
+}
+
+/* Dark mode button styles */
+.dark-mode .btn-white {
+    background-color: #333;
+    color: #ffffff;
+    border: 1px solid #444;
+}
+
+.dark-mode .btn-white:hover {
+    background-color: #444;
+}
+
+.dark-mode .btn-default {
+    background-color: #555;
+}
+
+.dark-mode .btn-default:hover {
+    background-color: #666;
+}
+
+
+    /* Style for the form */
+    .form-horizontal {
+    background-color: #fff;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode styling for the form */
+.dark-mode .form-horizontal {
+    background-color: #3a3a3a; /* Light gray background */
+    color: #000000; /* Ensures text is readable */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+

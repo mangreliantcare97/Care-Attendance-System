@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" data-theme-color>
+    <script src="/js/theme.js"></script>
+    <title>Add Admin | Human Resource</title>
+    <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
+
+    <link rel="stylesheet" href="/css/source-sans-pro.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/vendor/adminlte.min.css">
+    <link rel="stylesheet" href="/vendor/toastr/toastr.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+
+</head>
+<body class="hold-transition sidebar-mini layout-fixed page-admins" data-page="admins">
+    <div class="wrapper">
+        <div id="navbar-placeholder"></div>
+        <div id="sidebar-placeholder"></div>
+
+        <div class="content-wrapper">
+            <section class="content">
+                <div class="admin-shell admin-form-shell">
+                    <header class="admin-page-head admin-form-head">
+                        <a href="/admins.html" class="admin-back-link">
+                            <i class="fa fa-arrow-left" aria-hidden="true"></i>
+                            Back to admins
+                        </a>
+                        <p class="admin-eyebrow">Settings</p>
+                        <h1 id="admin-form-title">Add Admin</h1>
+                        <p class="admin-subtitle" id="admin-form-subtitle">Create another administrator account with full access.</p>
+                    </header>
+
+                    <section class="admin-card admin-form-card" aria-labelledby="admin-form-title">
+                        <div class="admin-form-state" id="admin-form-state" role="status" aria-live="polite">
+                            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                            <p id="admin-form-state-message">Loading admin…</p>
+                            <div class="admin-state-actions">
+                                <button type="button" class="admin-btn admin-btn-outline" id="admin-form-retry" hidden>Retry</button>
+                                <a href="/admins.html" class="admin-btn admin-btn-outline" id="admin-form-state-back" hidden>Back to admins</a>
+                            </div>
+                        </div>
+
+                        <form id="admin-form" hidden>
+                            <div class="admin-form-error" id="admin-form-error" role="alert" hidden></div>
+
+                            <div class="admin-form-grid">
+                                <div class="form-group admin-field">
+                                    <label for="admin-name">
+                                        Name <span class="admin-required" aria-hidden="true">*</span>
+                                    </label>
+                                    <input type="text" class="admin-input" id="admin-name" name="name"
+                                           maxlength="120" autocomplete="name" required>
+                                </div>
+
+                                <div class="form-group admin-field">
+                                    <label for="admin-email">
+                                        Email <span class="admin-required" aria-hidden="true">*</span>
+                                    </label>
+                                    <input type="email" class="admin-input" id="admin-email" name="email"
+                                           maxlength="255" autocomplete="email" aria-describedby="email-help" required>
+                                    <p class="admin-help" id="email-help">
+                                        This address must be verified in Cloudflare (Email Routing &gt; Destination addresses)
+                                        before it can receive password reset emails.
+                                    </p>
+                                </div>
+
+                                <div class="form-group admin-field">
+                                    <label for="admin-status">Status</label>
+                                    <div class="admin-select">
+                                        <select class="admin-input admin-select-input" id="admin-status" name="status"
+                                                aria-describedby="status-help">
+                                            <option value="enabled" selected>Enabled</option>
+                                            <option value="disabled">Disabled</option>
+                                        </select>
+                                        <span class="admin-select-chip" aria-hidden="true">
+                                            <i class="fa fa-chevron-down"></i>
+                                        </span>
+                                    </div>
+                                    <p class="admin-help" id="status-help">Disabled admins keep their history but cannot sign in.</p>
+                                </div>
+                            </div>
+
+                            <div class="admin-password-section" id="admin-password-section">
+                                <label class="admin-check-row" id="change-password-row">
+                                    <span class="admin-check">
+                                        <input type="checkbox" id="change-password" name="changePassword">
+                                        <span aria-hidden="true"></span>
+                                    </span>
+                                    <span>Change password</span>
+                                </label>
+
+                                <p class="admin-own-account-note" id="own-account-note" hidden>
+                                    You cannot change your own password here.
+                                    <a href="/my-account.html">Go to My Account</a>.
+                                </p>
+
+                                <div class="admin-password-panel" id="admin-password-panel">
+                                    <div class="admin-panel-heading">
+                                        <h2>Password</h2>
+                                        <p>Choose a password for this administrator.</p>
+                                    </div>
+
+                                    <div class="admin-password-grid">
+                                        <div class="form-group admin-field">
+                                            <label for="admin-password">
+                                                Password <span class="admin-required" aria-hidden="true">*</span>
+                                            </label>
+                                            <div class="admin-password-control">
+                                                <input type="password" class="admin-input" id="admin-password"
+                                                       name="password" autocomplete="new-password" minlength="8" maxlength="200"
+                                                       aria-describedby="password-help password-strength-text">
+                                                <button type="button" class="admin-password-toggle" data-password-toggle
+                                                        aria-label="Show password" aria-pressed="false">
+                                                    <i class="fa fa-eye" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group admin-field">
+                                            <label for="admin-confirm-password">
+                                                Confirm Password <span class="admin-required" aria-hidden="true">*</span>
+                                            </label>
+                                            <div class="admin-password-control">
+                                                <input type="password" class="admin-input" id="admin-confirm-password"
+                                                       name="confirmPassword" autocomplete="new-password" minlength="8" maxlength="200"
+                                                       aria-describedby="password-help">
+                                                <button type="button" class="admin-password-toggle" data-password-toggle
+                                                        aria-label="Show password confirmation" aria-pressed="false">
+                                                    <i class="fa fa-eye" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <p class="admin-help" id="password-help">
+                                        For a strong password, please use a hard to guess combination of text with upper
+                                        and lower case characters, symbols and numbers
+                                    </p>
+
+                                    <div class="admin-strength">
+                                        <div class="admin-strength-heading">
+                                            <span>Password strength</span>
+                                            <strong id="password-strength-text" aria-live="polite">Enter a password to see its strength.</strong>
+                                        </div>
+                                        <div class="admin-strength-meter" id="password-strength-meter" role="progressbar"
+                                             aria-label="Password strength" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0">
+                                            <span id="password-strength-bar"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <footer class="admin-form-footer">
+                                <p class="admin-required-note"><span aria-hidden="true">*</span> Required</p>
+                                <div class="admin-form-actions">
+                                    <button type="button" class="admin-btn admin-btn-outline" id="admin-form-cancel">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" class="admin-btn admin-btn-primary" id="admin-form-save">
+                                        Save
+                                    </button>
+                                </div>
+                            </footer>
+                        </form>
+                    </section>
+                </div>
+            </section>
+        </div>
+
+        <footer class="main-footer">
+            <strong>Human Resource</strong> — Lean HRM
+            <div class="float-right d-none d-sm-inline">Signed in as <span data-admin-name>Administrator</span></div>
+        </footer>
+    </div>
+
+    <script src="/vendor/jquery.min.js"></script>
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script src="/vendor/toastr/toastr.min.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/toast.js"></script>
+    <script src="/js/dom.js"></script>
+    <script src="/js/admin-ui.js"></script>
+    <script src="/js/fullscreen.js"></script>
+    <script src="/js/layout.js"></script>
+    <script src="/js/admin-form.js"></script>
+</body>
+</html>

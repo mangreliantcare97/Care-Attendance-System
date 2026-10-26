@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" data-theme-color>
+    <script src="/js/theme.js"></script>
+    <title>Employee Profile | Human Resource</title>
+    <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
+
+    <link rel="stylesheet" href="/css/source-sans-pro.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/vendor/adminlte.min.css">
+    <link rel="stylesheet" href="/vendor/toastr/toastr.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+
+</head>
+<body class="hold-transition sidebar-mini layout-fixed" data-page="employees">
+    <div class="wrapper">
+        <div id="navbar-placeholder"></div>
+        <div id="sidebar-placeholder"></div>
+
+        <div class="content-wrapper">
+            <section class="content">
+                <div class="container-fluid">
+                    <div class="content-header">
+                        <div class="row mb-2">
+                            <div class="col-sm-6">
+                                <h1 class="m-0" id="profile-title">Employee</h1>
+                            </div>
+                            <div class="col-sm-6 text-right no-print">
+                                <a href="/employees.html" class="btn btn-default"><i class="fa fa-arrow-left"></i> Back to the list</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personal record -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card card-glass">
+                                <div class="card-header">
+                                    <h3 class="card-title">Personal record</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3 text-center">
+                                            <img id="profile-photo" src="/assets/img/admin.jpg" alt="Photo"
+                                                 class="img-circle elevation-2 mb-2" style="width: 160px; height: 160px; object-fit: cover;">
+                                        </div>
+                                        <div class="col-md-9">
+                                            <dl class="row mb-0" id="profile-details"></dl>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Attendance -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card card-glass">
+                                <div class="card-header">
+                                    <h3 class="card-title">Attendance</h3>
+                                    <div class="card-tools no-print">
+                                        <input type="month" class="form-control form-control-sm" id="profile-month">
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row" id="profile-counts"></div>
+                                    <div class="table-responsive mt-3">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Status</th>
+                                                    <th>Check in</th>
+                                                    <th>Check out</th>
+                                                    <th>Note</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="profile-attendance-body">
+                                                <tr><td colspan="5" class="text-center py-4">Loading…</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Holiday allowance -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card card-glass allowance-card" id="allowance-card">
+                                <div class="card-header d-flex flex-wrap align-items-center justify-content-between">
+                                    <h3 class="card-title mb-0">Holiday allowance</h3>
+                                    <div class="card-tools no-print d-flex flex-wrap align-items-center">
+                                        <label class="mb-0 mr-2" for="allowance-year">Year</label>
+                                        <select class="custom-select custom-select-sm mr-2 mb-1 allowance-year-select" id="allowance-year"></select>
+                                        <button type="button" class="btn btn-sm btn-outline-primary mb-1" id="allowance-edit" disabled>
+                                            <i class="fa fa-pen" aria-hidden="true"></i> Edit allowance
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <p class="sr-only" id="allowance-live" role="status" aria-live="polite"></p>
+                                    <div class="alert alert-danger d-none" id="allowance-error" role="alert"></div>
+                                    <div id="allowance-content">
+                                        <div class="row" id="allowance-stats"></div>
+                                        <div class="mt-3" id="allowance-progress-wrap">
+                                            <div class="d-flex justify-content-between small text-muted mb-1">
+                                                <span id="allowance-progress-label">Holiday used</span>
+                                                <span id="allowance-progress-value">0 of 28 days</span>
+                                            </div>
+                                            <div class="progress allowance-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="allowance-progress-label" id="allowance-progress">
+                                                <div class="progress-bar" id="allowance-progress-bar" style="width: 0%;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4">
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between">
+                                            <label for="allowance-month" class="mb-2 mr-2">Show holiday used in</label>
+                                            <select class="custom-select custom-select-sm mb-2 no-print allowance-month-select" id="allowance-month"></select>
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped mb-0 allowance-month-table">
+                                                <caption class="sr-only">Holiday days counted in the selected month</caption>
+                                                <thead>
+                                                    <tr>
+                                                        <th scope="col">From</th>
+                                                        <th scope="col">To</th>
+                                                        <th scope="col">Weekday</th>
+                                                        <th scope="col">Category</th>
+                                                        <th scope="col" class="text-center">Days counted</th>
+                                                        <th scope="col">Reason</th>
+                                                        <th scope="col">Leave</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="allowance-month-body">
+                                                    <tr><td colspan="7" class="text-center py-4">Loading…</td></tr>
+                                                </tbody>
+                                                <tfoot id="allowance-month-foot"></tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Leave history -->
+                    <div class="row mt-3 mb-3">
+                        <div class="col-12">
+                            <div class="card card-glass">
+                                <div class="card-header">
+                                    <h3 class="card-title">Leave history</h3>
+                                </div>
+                                <div class="card-body border-bottom">
+                                    <h6 class="text-muted text-uppercase mb-2">Approved days by year</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Year</th>
+                                                    <th class="text-center">Leave</th>
+                                                    <th class="text-center">Vacation</th>
+                                                    <th class="text-center">Time off</th>
+                                                    <th class="text-center">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="profile-leave-totals-body">
+                                                <tr><td colspan="5" class="text-center py-3">Loading…</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Type</th>
+                                                    <th>Category</th>
+                                                    <th>From</th>
+                                                    <th>To</th>
+                                                    <th>Days</th>
+                                                    <th>Status</th>
+                                                    <th>Reason</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="profile-leaves-body">
+                                                <tr><td colspan="7" class="text-center py-4">Loading…</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer class="main-footer">
+            <strong>Human Resource</strong> — Lean HRM
+            <div class="float-right d-none d-sm-inline">Signed in as <span data-admin-name>Administrator</span></div>
+        </footer>
+    </div>
+
+    <!-- Edit the holiday allowance -->
+    <div class="modal fade" id="allowance-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="allowance-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="allowance-modal-title">Edit holiday allowance</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="allowance-form">
+                    <div class="modal-body">
+                        <p class="text-muted" id="allowance-modal-subtitle"></p>
+                        <div class="form-group">
+                            <label for="allowance-input">Holiday allowance (days)</label>
+                            <input type="number" class="form-control" id="allowance-input" name="allowance" min="0" max="100" step="0.5" required>
+                            <small class="form-text text-muted">Unused days do not carry over to the next year.</small>
+                            <small class="form-text text-muted" id="allowance-prorata"></small>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label for="allowance-note">Note <small class="text-muted">(optional)</small></label>
+                            <textarea class="form-control" id="allowance-note" name="note" rows="2" maxlength="500"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="allowance-save">Save allowance</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/vendor/jquery.min.js"></script>
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script src="/vendor/toastr/toastr.min.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/toast.js"></script>
+    <script src="/js/dom.js"></script>
+    <script src="/js/fullscreen.js"></script>
+    <script src="/js/layout.js"></script>
+    <script src="/js/employee.js"></script>
+</body>
+</html>

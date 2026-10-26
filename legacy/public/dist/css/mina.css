@@ -1,0 +1,23 @@
+body.login-page {
+    background: none; /* Remove the default background */
+  }
+
+  .login-page::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('../img/bc4.jpg') no-repeat center center fixed;
+    background-size: cover;
+    filter: blur(8px); /* Apply blur effect */
+    z-index: -1; /* Ensure it's behind the content */
+  }
+
+  .login-box {
+    position: relative;
+    z-index: 1; /* Ensure it's above the blurred background */
+    background: rgba(255, 255, 255, 0.8); /* Optional: make the login box semi-transparent */
+    border-radius: 8px;
+  }

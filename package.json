@@ -1,0 +1,50 @@
+{
+  "name": "lean-hrm",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Lean HR management system — Express + MongoDB rebuild of the Laravel AdminLTE HRM",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node server.ts",
+    "dev": "node --watch server.ts",
+    "typecheck": "tsc --noEmit",
+    "seed": "node seed/seed.ts",
+    "seed:history": "node seed/seed-history.ts",
+    "seed:2025": "node seed/seed-history.ts",
+    "seed:demo": "node seed/seed-demo.ts",
+    "seed:photos": "node seed/attach-photos.ts",
+    "migrate:allowances": "node seed/migrate-allowances.ts",
+    "resync-leaves": "node seed/resync-leaves.ts",
+    "reset-admin-password": "node seed/reset-admin-password.ts",
+    "test": "node --test --test-force-exit --test-concurrency=1 tests/",
+    "test:watch": "node --test --test-force-exit --watch --test-concurrency=1 tests/"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "connect-mongo": "^6.0.0",
+    "dotenv": "^17.0.0",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "express-session": "^1.19.0",
+    "helmet": "^8.3.0",
+    "mongoose": "^9.11.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/express-session": "^1.18.0",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^6.0.2",
+    "jsdom": "^30.1.3",
+    "mongodb-memory-server": "^11.3.0",
+    "supertest": "^7.3.1",
+    "typescript": "^5.9.0"
+  },
+  "allowScripts": {
+    "mongodb-memory-server@11.3.0": true
+  }
+}

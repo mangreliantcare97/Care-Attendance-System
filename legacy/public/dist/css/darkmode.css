@@ -1,0 +1,209 @@
+/* Default light mode */
+body {
+  background-color: #ffffff; /*for light background */
+  color: #000000;
+}
+
+/* Dark mode */
+body.dark-mode {
+  background-color: #121212;
+  color: #ffffff;
+}
+
+/* Content wrapper with background image and darker gray overlay */
+.content-wrapper {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Darker gray background color for light mode */
+.content-wrapper.light-mode {
+  background-color: #a9a9a9; /* Darker gray background */
+}
+
+/* Dark gray background for dark mode */
+.dark-mode .content-wrapper {
+  background-color: #2e2e2e; /* Dark gray background color for dark mode */
+}
+
+/* Ensures the darker gray overlay is applied over the background image */
+.dark-mode .content-wrapper::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7); /* Darker overlay with more opacity */
+  z-index: 1;
+}
+
+.content-wrapper > * {
+  position: relative;
+  z-index: 2; /* Ensure content appears above the overlay */
+}
+
+
+
+
+
+
+/* Table styles */
+table {
+  background-color: #ffffff !important; /* for light background */
+  color: #000000 !important;
+}
+
+/* Dark mode for table header */
+body.dark-mode thead {
+  background-color: #363535; /* Black background for the table header */
+}
+
+body.dark-mode thead th {
+  color: #ffffff !important; /* White text color for table headers in dark mode */
+}
+
+/* Dark mode for table body */
+body.dark-mode tbody td {
+  background-color: #4c4b4b !important; /* Dark gray background for table body cells */
+  color: #ffffff !important; /* White text color for table body cells */
+}
+
+/* Header font colors */
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode h5,
+body.dark-mode h6 {
+  color: #ffffff !important; /* White headers in dark mode */
+}
+
+/* Semi-light background for navbar <li> items */
+.dark-mode .navbar-nav .nav-item {
+  background-color: #4d4c4c; /* Darker background for nav items */
+}
+
+.dark-mode .navbar-nav .nav-link {
+  color: #ffffff; /* Light color for nav links */
+}
+
+.dark-mode .navbar-nav .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.5); /* Slightly lighter on hover */
+}
+
+/* Navbar black background for dark mode */
+body.dark-mode .navbar {
+  background-color: #4d4c4c; /* Dark gray navbar background */
+}
+
+/* Navbar link colors */
+body.dark-mode .navbar-nav .nav-link {
+  color: #ffffff; /* White color for icons in navbar */
+}
+
+/* Navbar link hover effect */
+body.dark-mode .navbar-nav .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.2); /* Subtle light hover effect */
+}
+
+/* Button styles in navbar */
+body.dark-mode .navbar .btn {
+  background-color: #4f4f4f; /* Gray background for buttons */
+  color: #ffffff; /* White text for visibility */
+  border: none; /* No border */
+}
+
+/* Button hover effect */
+body.dark-mode .navbar .btn:hover {
+  background-color: #6f6f6f; /* Slightly lighter gray on hover */
+  color: #ffffff;
+}
+
+/* Form control adjustments for dark mode */
+body.dark-mode .form-control {
+  background-color: #2e2e2e; /* Dark background for inputs */
+  color: #ffffff; /* White text for inputs */
+  border: 1px solid #6f6f6f; /* Lighter border for form controls */
+}
+
+/* Dark mode labels */
+body.dark-mode label {
+  color: #ffffff; /* White text for form labels */
+}
+
+/* Button styles in table for dark mode */
+body.dark-mode .btn-info {
+  background-color: #5bc0de; /* Info button in dark mode */
+  color: #ffffff;
+}
+
+body.dark-mode .btn-primary {
+  background-color: #007bff; /* Primary button */
+  color: #ffffff;
+}
+
+body.dark-mode .btn-danger {
+  background-color: #dc3545; /* Danger (delete) button */
+  color: #ffffff;
+}
+
+
+
+
+
+
+
+
+
+/* Dark mode for card headers and card body */
+.dark-mode .card {
+  background-color: rgba(50, 50, 50, 0.9); /* Slightly darker background for cards */
+  border: 1px solid #3a3a3a; /* Dark border for cards */
+}
+
+/* Card header styles */
+.dark-mode .card-header {
+  background-color: #333333; /* Dark background for card header */
+  color: #ffffff; /* White text color for card header */
+}
+
+/* Card title styles */
+.dark-mode .card-title {
+  color: #ffffff; /* White color for card titles */
+}
+
+/* Search div styles */
+.dark-mode .card-body {
+  background-color: rgba(50, 50, 50, 0.7); /* Darker background for card body */
+  color: #ffffff; /* White text color for card body */
+}
+
+/* Form control adjustments within the card in dark mode */
+.dark-mode .card .form-control {
+  background-color: #2e2e2e; /* Dark background for inputs */
+  color: #ffffff; /* White text for inputs */
+  border: 1px solid #6f6f6f; /* Lighter border for form controls */
+}
+
+/* Button styles within the card for dark mode */
+.dark-mode .card .btn-primary {
+  background-color: #007bff; /* Primary button background */
+  color: #ffffff; /* White text color */
+}
+
+.dark-mode .card .btn-success {
+  background-color: #28a745; /* Success button background */
+  color: #ffffff; /* White text color */
+}
+
+.dark-mode .card .btn-info {
+  background-color: #17a2b8; /* Info button background */
+  color: #ffffff; /* White text color */
+}
+
+.dark-mode .card .btn-danger {
+  background-color: #dc3545; /* Danger button background */
+  color: #ffffff; /* White text color */
+}

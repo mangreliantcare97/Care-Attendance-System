@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" data-theme-color>
+    <script src="/js/theme.js"></script>
+    <title>My Account | Human Resource</title>
+    <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
+
+    <link rel="stylesheet" href="/css/source-sans-pro.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/vendor/adminlte.min.css">
+    <link rel="stylesheet" href="/vendor/toastr/toastr.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+
+</head>
+<body class="hold-transition sidebar-mini layout-fixed page-admins page-my-account" data-page="admins">
+    <div class="wrapper">
+        <div id="navbar-placeholder"></div>
+        <div id="sidebar-placeholder"></div>
+
+        <div class="content-wrapper">
+            <section class="content">
+                <div class="admin-shell admin-account-shell">
+                    <header class="admin-page-head">
+                        <a href="/admins.html" class="admin-back-link">
+                            <i class="fa fa-arrow-left" aria-hidden="true"></i>
+                            Back to admins
+                        </a>
+                        <p class="admin-eyebrow">Account</p>
+                        <h1>My Account</h1>
+                        <p class="admin-subtitle">Change the password you use to sign in.</p>
+                    </header>
+
+                    <section class="admin-card admin-account-card" aria-labelledby="my-account-title">
+                        <div class="admin-account-summary">
+                            <span class="admin-account-avatar" aria-hidden="true">
+                                <i class="fa fa-user-shield"></i>
+                            </span>
+                            <div>
+                                <strong data-admin-name>Administrator</strong>
+                                <span data-admin-email></span>
+                            </div>
+                        </div>
+
+                        <div class="admin-divider" role="presentation"></div>
+
+                        <h2 id="my-account-title">Change my password</h2>
+
+                        <form id="my-account-form" class="admin-account-form">
+                            <div class="form-group admin-field">
+                                <label for="current-password">Current password</label>
+                                <div class="admin-password-control">
+                                    <input type="password" class="admin-input" id="current-password" name="currentPassword"
+                                           autocomplete="current-password" maxlength="200" required>
+                                    <button type="button" class="admin-password-toggle" data-password-toggle
+                                            aria-label="Show current password" aria-pressed="false">
+                                        <i class="fa fa-eye" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="form-group admin-field">
+                                <label for="new-password">New password</label>
+                                <div class="admin-password-control">
+                                    <input type="password" class="admin-input" id="new-password" name="newPassword"
+                                           autocomplete="new-password" minlength="8" maxlength="200"
+                                           aria-describedby="new-password-help password-strength-text" required>
+                                    <button type="button" class="admin-password-toggle" data-password-toggle
+                                            aria-label="Show new password" aria-pressed="false">
+                                        <i class="fa fa-eye" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <p class="admin-help" id="new-password-help">Use at least 8 characters.</p>
+                            </div>
+
+                            <div class="admin-strength">
+                                <div class="admin-strength-heading">
+                                    <span>Password strength</span>
+                                    <strong id="password-strength-text" aria-live="polite">Enter a password to see its strength.</strong>
+                                </div>
+                                <div class="admin-strength-meter" id="password-strength-meter" role="progressbar"
+                                     aria-label="Password strength" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0">
+                                    <span id="password-strength-bar"></span>
+                                </div>
+                            </div>
+
+                            <div class="admin-account-actions">
+                                <button type="submit" class="admin-btn admin-btn-primary" id="update-password">
+                                    Update password
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
+            </section>
+        </div>
+
+        <footer class="main-footer">
+            <strong>Human Resource</strong> — Lean HRM
+            <div class="float-right d-none d-sm-inline">Signed in as <span data-admin-name>Administrator</span></div>
+        </footer>
+    </div>
+
+    <script src="/vendor/jquery.min.js"></script>
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script src="/vendor/toastr/toastr.min.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/toast.js"></script>
+    <script src="/js/dom.js"></script>
+    <script src="/js/admin-ui.js"></script>
+    <script src="/js/fullscreen.js"></script>
+    <script src="/js/layout.js"></script>
+    <script src="/js/my-account.js"></script>
+</body>
+</html>

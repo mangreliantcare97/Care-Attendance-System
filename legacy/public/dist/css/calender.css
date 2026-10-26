@@ -1,0 +1,84 @@
+/* General Table Styles */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+
+th {
+    background-color: #f2f2f2;
+}
+
+.empty {
+    background-color: #eaeaea;
+}
+
+.weekend {
+    background-color: #e4e4e4;
+}
+
+.event {
+    background-color: #e6f7ff;
+}
+
+.current {
+    background-color: #007bff; /* Red background for current day */
+    color: #ffffff; /* White text for contrast */
+}
+
+/* Card Header Styles */
+.card-header {
+    background-color: #007bff; /* Blue background */
+    color: #ffffff; /* White text */
+    text-align: center; /* Center-align text */
+}
+
+.card-header .card-title {
+    color: #ffffff; /* Ensure the title text is white */
+    margin: 0; /* Remove default margin */
+}
+
+
+
+/* Dark mode styles */
+body.dark-mode {
+    background-color: #e0e0e0; /* Light gray background for dark mode */
+    color: #000000; /* Ensures text is still readable */
+}
+
+.dark-mode .content-wrapper {
+    background-color: #b0b0b0; /* Gray background for content wrapper */
+}
+
+.dark-mode .card-body {
+    background-color: #4b4b4b; /* Light gray background for card body */
+}
+
+
+
+.dark-mode th {
+    background-color: #373737; /* Gray background for table headers in dark mode */
+}
+
+.dark-mode td.empty {
+    background-color: #ffffff; /* Gray background for empty cells */
+}
+
+.dark-mode td.weekend {
+    background-color: #c0c0c0; /* Darker gray for weekends */
+}
+
+.dark-mode td.event {
+    background-color: #b0d9f2; /* Light blue background for events */
+}
+
+/* Updated style for current day in dark mode */
+.dark-mode table td.current {
+    background-color: #0e0e0f; /*  background for current day */
+    color: #ffffff; /* White text */
+}

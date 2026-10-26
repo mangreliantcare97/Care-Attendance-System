@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" data-theme-color>
+    <script src="/js/theme.js"></script>
+    <title>Employees | Human Resource</title>
+    <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
+
+    <link rel="stylesheet" href="/css/source-sans-pro.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/vendor/adminlte.min.css">
+    <link rel="stylesheet" href="/vendor/toastr/toastr.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+
+</head>
+<body class="hold-transition sidebar-mini layout-fixed" data-page="employees">
+    <div class="wrapper">
+        <div id="navbar-placeholder"></div>
+        <div id="sidebar-placeholder"></div>
+
+        <div class="content-wrapper">
+            <section class="content">
+                <div class="container-fluid">
+                    <div class="content-header">
+                        <div class="row mb-2">
+                            <div class="col-sm-6">
+                                <h1 class="m-0">Employees</h1>
+                            </div>
+                            <div class="col-sm-6 text-right no-print">
+                                <button type="button" class="btn btn-primary" id="add-employee">
+                                    <i class="fa fa-plus"></i> Add Employee
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Search -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card card-glass no-print">
+                                <div class="card-header">
+                                    <h3 class="card-title">Search employees</h3>
+                                </div>
+                                <div class="card-body">
+                                    <form id="search-form">
+                                        <div class="row">
+                                            <div class="form-group col-md-4">
+                                                <label for="filter-search">Name, email or position</label>
+                                                <input type="text" class="form-control" id="filter-search" placeholder="Search">
+                                            </div>
+                                            <div class="form-group col-md-3">
+                                                <label for="filter-department">Department</label>
+                                                <select class="custom-select" id="filter-department">
+                                                    <option value="all">All departments</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group col-md-3">
+                                                <label for="filter-status">Status</label>
+                                                <select class="custom-select" id="filter-status">
+                                                    <option value="all">All statuses</option>
+                                                    <option value="active">Active</option>
+                                                    <option value="inactive">Inactive</option>
+                                                    <option value="terminated">Terminated</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group col-md-2 d-flex align-items-end">
+                                                <button class="btn btn-primary mr-2" type="submit">Search</button>
+                                                <button class="btn btn-success" type="reset" id="reset-filters">Reset</button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- List -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card card-glass">
+                                <div class="card-header">
+                                    <h3 class="card-title">Employees</h3>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped employees-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Photo</th>
+                                                    <th>Name</th>
+                                                    <th>Email</th>
+                                                    <th>Phone</th>
+                                                    <th>Department</th>
+                                                    <th>Position</th>
+                                                    <th>Status</th>
+                                                    <th class="no-print">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="employees-body">
+                                                <tr><td colspan="8" class="text-center py-4">Loading…</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="card-footer d-flex justify-content-between align-items-center">
+                                    <span class="text-muted" id="employees-count"></span>
+                                    <div id="employees-pagination"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer class="main-footer">
+            <strong>Human Resource</strong> — Lean HRM
+            <div class="float-right d-none d-sm-inline">Signed in as <span data-admin-name>Administrator</span></div>
+        </footer>
+    </div>
+
+    <!-- Add / edit employee -->
+    <div class="modal fade" id="employee-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="employee-modal-title">Add employee</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form id="employee-form">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-3 text-center">
+                                <img id="employee-photo-preview" src="/assets/img/admin.jpg" alt="Photo"
+                                     class="img-circle elevation-2 mb-2" style="width: 128px; height: 128px; object-fit: cover;">
+                                <input type="file" id="employee-photo-input" accept="image/jpeg,image/png,image/webp" class="form-control-file">
+                                <small class="form-text text-muted">JPEG, PNG or WebP — scaled down in your browser.</small>
+                                <button type="button" class="btn btn-sm btn-link p-0" id="employee-photo-clear">Remove photo</button>
+                            </div>
+                            <div class="col-md-9">
+                                <div class="form-group">
+                                    <label for="employee-name">Name</label>
+                                    <input type="text" class="form-control" id="employee-name" required maxlength="120">
+                                </div>
+                                <div class="form-group">
+                                    <label for="employee-email">Email <small class="text-muted">(optional)</small></label>
+                                    <input type="email" class="form-control" id="employee-email" maxlength="255">
+                                </div>
+                                <div class="form-group">
+                                    <label for="employee-phone">Phone</label>
+                                    <input type="text" class="form-control" id="employee-phone" maxlength="40">
+                                </div>
+                                <div class="form-group">
+                                    <label for="employee-department">Department</label>
+                                    <select class="custom-select" id="employee-department">
+                                        <option value="">No department</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="employee-position">Position</label>
+                                    <input type="text" class="form-control" id="employee-position" maxlength="120">
+                                </div>
+                                <div class="form-group">
+                                    <label for="employee-hire-date">Hire date</label>
+                                    <input type="date" class="form-control" id="employee-hire-date">
+                                </div>
+                                <div class="form-group">
+                                    <label for="employee-status">Status</label>
+                                    <select class="custom-select" id="employee-status">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive — not counted in the attendance sheet</option>
+                                        <option value="terminated">Terminated</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/vendor/jquery.min.js"></script>
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script src="/vendor/toastr/toastr.min.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/toast.js"></script>
+    <script src="/js/dom.js"></script>
+    <script src="/js/photo.js"></script>
+    <script src="/js/fullscreen.js"></script>
+    <script src="/js/layout.js"></script>
+    <script src="/js/employees.js"></script>
+</body>
+</html>

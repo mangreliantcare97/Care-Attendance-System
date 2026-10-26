@@ -1,0 +1,40 @@
+# Dependencies
+/node_modules
+
+# Environment / secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Test artefacts
+/coverage
+/.nyc_output
+
+# Editors
+/.vscode/*
+!/.vscode/extensions.json
+/.idea
+/.fleet
+
+# Legacy Laravel tree is reference-only: dependencies are never committed
+/legacy/vendor
+/legacy/node_modules
+/legacy/storage/logs
+/legacy/public/build
+/legacy/public/hot
+/legacy/public/storage
+/legacy/.env
+/legacy/.env.*
+!/legacy/.env.example
+/legacy/storage/*.key
+/legacy/.phpunit.cache
+/legacy/.phpunit.result.cache
+
+# OS
+.DS_Store
+Thumbs.db

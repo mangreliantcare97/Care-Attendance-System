@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" data-theme-color>
+    <script src="/js/theme.js"></script>
+    <title>Admins &amp; Settings | Human Resource</title>
+    <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
+
+    <link rel="stylesheet" href="/css/source-sans-pro.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/vendor/adminlte.min.css">
+    <link rel="stylesheet" href="/vendor/toastr/toastr.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+
+</head>
+<body class="hold-transition sidebar-mini layout-fixed page-admins" data-page="admins">
+    <div class="wrapper">
+        <div id="navbar-placeholder"></div>
+        <div id="sidebar-placeholder"></div>
+
+        <div class="content-wrapper">
+            <section class="content">
+                <div class="admin-shell">
+                    <header class="admin-page-head">
+                        <p class="admin-eyebrow">Settings</p>
+                        <h1>Admins &amp; Settings</h1>
+                        <p class="admin-subtitle">Manage the administrators who can sign in, reset their access and keep the audit trail intact.</p>
+                    </header>
+
+                    <section class="admin-card admin-filter-card" aria-labelledby="admin-filter-title">
+                        <div class="admin-card-heading">
+                            <h2 id="admin-filter-title">System Admins</h2>
+                            <button type="button" class="admin-collapse" id="admin-filter-toggle"
+                                    aria-expanded="true" aria-controls="admin-filter-panel">
+                                <span class="visually-hidden" data-filter-toggle-label>Hide filters</span>
+                                <i class="fa fa-chevron-up" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+                        <div id="admin-filter-panel">
+                            <form id="admin-filter-form" class="admin-filter-grid">
+                                <div class="form-group admin-field">
+                                    <label for="filter-name">Name</label>
+                                    <input type="text" class="admin-input" id="filter-name" name="name"
+                                           maxlength="120" autocomplete="off" placeholder="Enter name">
+                                </div>
+                                <div class="form-group admin-field">
+                                    <label for="filter-email">Email</label>
+                                    <input type="email" class="admin-input" id="filter-email" name="email"
+                                           maxlength="255" autocomplete="off" placeholder="Enter email">
+                                </div>
+                                <div class="form-group admin-field">
+                                    <label for="filter-status">Status</label>
+                                    <div class="admin-select">
+                                        <select class="admin-input admin-select-input" id="filter-status" name="status">
+                                            <option value="">-- Select --</option>
+                                            <option value="enabled">Enabled</option>
+                                            <option value="disabled">Disabled</option>
+                                        </select>
+                                        <span class="admin-select-chip" aria-hidden="true">
+                                            <i class="fa fa-chevron-down"></i>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="admin-filter-actions">
+                                    <button type="button" class="admin-btn admin-btn-outline" id="reset-filters">
+                                        Reset
+                                    </button>
+                                    <button type="submit" class="admin-btn admin-btn-primary" id="search-admins">
+                                        <i class="fa fa-search" aria-hidden="true"></i>
+                                        Search
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </section>
+
+                    <section class="admin-card admin-list-card" aria-labelledby="admin-list-title">
+                        <div class="admin-list-heading">
+                            <a href="/admin-form.html" class="admin-btn admin-btn-primary admin-btn-add">
+                                <i class="fa fa-plus" aria-hidden="true"></i>
+                                Add
+                            </a>
+                            <h2 id="admin-list-title" class="visually-hidden">Administrator records</h2>
+                        </div>
+
+                        <div class="admin-divider" role="presentation"></div>
+
+                        <div class="admin-list-meta">
+                            <p class="admin-count" id="admin-records-count" aria-live="polite" aria-atomic="true">(0) Records Found</p>
+                        </div>
+
+                        <div class="admin-bulk-error" id="admin-bulk-error" role="alert" hidden></div>
+
+                        <div class="admin-selection-bar" id="admin-selection-bar" hidden>
+                            <p class="admin-selection-count" id="admin-selection-count" aria-live="polite" aria-atomic="true">0 selected</p>
+                            <div class="admin-selection-actions">
+                                <button type="button" class="admin-btn admin-btn-outline" id="admin-disable-selected">
+                                    Disable selected
+                                </button>
+                                <button type="button" class="admin-btn admin-btn-danger-outline" id="admin-delete-selected">
+                                    Delete selected
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="admin-table-wrap">
+                            <table class="admin-table" aria-describedby="admin-records-count">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="admin-check-column">
+                                            <label class="admin-check">
+                                                <input type="checkbox" id="admin-select-all" aria-label="Select all administrators on this page">
+                                                <span aria-hidden="true"></span>
+                                            </label>
+                                        </th>
+                                        <th scope="col">
+                                            <button type="button" class="admin-sort" data-sort="name">
+                                                Name <i class="fa fa-sort" aria-hidden="true"></i>
+                                            </button>
+                                        </th>
+                                        <th scope="col">
+                                            <button type="button" class="admin-sort" data-sort="email">
+                                                Email (login) <i class="fa fa-sort" aria-hidden="true"></i>
+                                            </button>
+                                        </th>
+                                        <th scope="col">User Role</th>
+                                        <th scope="col">
+                                            <button type="button" class="admin-sort" data-sort="status">
+                                                Status <i class="fa fa-sort" aria-hidden="true"></i>
+                                            </button>
+                                        </th>
+                                        <th scope="col">
+                                            <button type="button" class="admin-sort" data-sort="lastLogin">
+                                                Last login <i class="fa fa-sort" aria-hidden="true"></i>
+                                            </button>
+                                        </th>
+                                        <th scope="col" class="admin-actions-column">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-list-body"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="admin-list-footer">
+                            <div id="admin-pagination"></div>
+                            <span class="visually-hidden" id="admin-list-status" role="status" aria-live="polite"></span>
+                        </div>
+                    </section>
+                </div>
+            </section>
+        </div>
+
+        <footer class="main-footer">
+            <strong>Human Resource</strong> — Lean HRM
+            <div class="float-right d-none d-sm-inline">Signed in as <span data-admin-name>Administrator</span></div>
+        </footer>
+    </div>
+
+    <script src="/vendor/jquery.min.js"></script>
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script src="/vendor/toastr/toastr.min.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/toast.js"></script>
+    <script src="/js/dom.js"></script>
+    <script src="/js/admin-ui.js"></script>
+    <script src="/js/fullscreen.js"></script>
+    <script src="/js/layout.js"></script>
+    <script src="/js/admins.js"></script>
+</body>
+</html>
