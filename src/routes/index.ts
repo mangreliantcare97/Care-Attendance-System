@@ -1,14 +1,6 @@
 import { Router, type RequestHandler } from 'express';
 import { createAuthRouter, type AuthRouterOptions } from './auth.ts';
 import { adminsRouter } from './admins.ts';
-import { departmentsRouter } from './departments.ts';
-import { employeesRouter } from './employees.ts';
-import { attendanceRouter } from './attendance.ts';
-import { overtimeRouter } from './overtime.ts';
-import { leavesRouter } from './leaves.ts';
-import { calendarRouter, eventsRouter } from './calendar.ts';
-import { dashboardRouter } from './dashboard.ts';
-import { reportsRouter } from './reports.ts';
 import { entriesRouter } from './entries.ts';
 import { locationsRouter } from './locations.ts';
 import { publicRouter } from './public.ts';
@@ -88,15 +80,6 @@ export function createApiRouter(options: ApiRouterOptions = {}): Router {
   router.use('/admins', adminsRouter);
   router.use('/entries', entriesRouter);
   router.use('/locations', locationsRouter);
-  router.use('/departments', departmentsRouter);
-  router.use('/employees', employeesRouter);
-  router.use('/attendance', attendanceRouter);
-  router.use('/overtime', overtimeRouter);
-  router.use('/leaves', leavesRouter);
-  router.use('/calendar', calendarRouter);
-  router.use('/events', eventsRouter);
-  router.use('/dashboard', dashboardRouter);
-  router.use('/reports', reportsRouter);
 
   return router;
 }

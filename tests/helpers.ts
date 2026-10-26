@@ -99,20 +99,3 @@ export async function signIn(
     csrf: response.body?.meta?.csrfToken as string,
   };
 }
-
-/** Create an employee directly in the database. */
-export async function createEmployee(input: {
-  name: string;
-  email?: string | null;
-  status?: 'active' | 'inactive' | 'terminated';
-  departmentId?: string | null;
-}) {
-  const { EmployeeModel } = await import('../src/models/Employee.ts');
-
-  return EmployeeModel.create({
-    name: input.name,
-    email: input.email ?? null,
-    status: input.status ?? 'active',
-    departmentId: input.departmentId ?? null,
-  });
-}

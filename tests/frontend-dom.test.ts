@@ -18,10 +18,6 @@ const myAccountSource = readFileSync(new URL('../public/js/my-account.js', impor
 const adminsPage = readFileSync(new URL('../public/admins.html', import.meta.url), 'utf8');
 const adminFormPage = readFileSync(new URL('../public/admin-form.html', import.meta.url), 'utf8');
 const myAccountPage = readFileSync(new URL('../public/my-account.html', import.meta.url), 'utf8');
-const employeePage = readFileSync(new URL('../public/employee.html', import.meta.url), 'utf8');
-const leavesPage = readFileSync(new URL('../public/leaves.html', import.meta.url), 'utf8');
-const employeeSource = readFileSync(new URL('../public/js/employee.js', import.meta.url), 'utf8');
-const leavesSource = readFileSync(new URL('../public/js/leaves.js', import.meta.url), 'utf8');
 
 const strayTemplateText = /\$\{|undefined|NaN|\[object Object\]/;
 
@@ -135,59 +131,6 @@ test('renderRows uses the same escaping rules for every cell', () => {
   assert.equal(document.querySelectorAll('script').length, 0);
   assert.equal(document.querySelector('.badge-soft')?.textContent, 'Opened');
   assert.equal(document.body.textContent?.includes('<span'), false);
-});
-
-test('the employee profile allowance card has every scripted element and no stray text', () => {
-  const doc = parsePage(employeePage, 'http://localhost/employee.html?id=1');
-  const card = doc.getElementById('allowance-card');
-
-  assert.ok(card, 'employee.html must contain the allowance card');
-  assert.match(card.textContent || '', /Holiday allowance/);
-  assert.match(card.textContent || '', /Holiday used/);
-  assert.match(employeePage, /Unused days do not carry over to the next year\./);
-  assert.match(employeeSource, /Holiday remaining/);
-  assert.match(employeeSource, /summary\.remainingLabel/);
-  assert.match(employeeSource, /summary\.expiredNote/);
-  assert.equal(employeePage.includes('allowance-carry'), false);
-  assert.equal(employeePage.includes('carryOver'), false);
-  assert.equal(employeeSource.includes('carryOver'), false);
-  assert.equal(strayTemplateText.test(card.textContent || ''), false);
-
-  for (const id of referencedIds(employeeSource)) {
-    assert.ok(doc.getElementById(id), `employee.html is missing #${id}`);
-  }
-
-  assert.equal(card.querySelectorAll('[onclick], [onchange], [onsubmit]').length, 0);
-});
-
-test('the Allowances tab has every scripted element and no stray text', () => {
-  const doc = parsePage(leavesPage, 'http://localhost/leaves.html');
-  const pane = doc.getElementById('allowance-list-tab');
-
-  assert.ok(pane, 'leaves.html must contain the allowances tab pane');
-  assert.match(pane.textContent || '', /Holiday allowance/i);
-  assert.match(pane.textContent || '', /Approved vacation/i);
-  assert.match(leavesPage, /Unused days do not carry over to the next year\./);
-  assert.match(pane.textContent || '', /Holiday remaining/);
-  assert.equal(leavesPage.includes('allowance-carry'), false);
-  assert.equal(leavesPage.includes('carryOver'), false);
-  assert.equal(leavesSource.includes('carryOver'), false);
-  assert.equal(strayTemplateText.test(pane.textContent || ''), false);
-
-  const tab = doc.getElementById('allowance-list-tab-link');
-  assert.equal(tab?.getAttribute('role'), 'tab');
-  assert.equal(tab?.getAttribute('aria-controls'), 'allowance-list-tab');
-
-  for (const id of referencedIds(leavesSource)) {
-    assert.ok(doc.getElementById(id), `leaves.html is missing #${id}`);
-  }
-
-  const monthColumn = doc.getElementById('allowance-month-column');
-  assert.equal(monthColumn?.classList.contains('d-none'), true);
-
-  const remainingColumn = doc.getElementById('allowance-remaining-column');
-  assert.equal(remainingColumn?.textContent, 'Holiday remaining');
-  assert.ok(doc.getElementById('allowances-expired-note'));
 });
 
 function normalisedText(node: Element | null): string {

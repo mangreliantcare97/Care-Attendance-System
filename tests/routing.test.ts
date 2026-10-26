@@ -300,8 +300,8 @@ describe('post-login next allowlist', () => {
       '/dashboard.html',
       '/entries.html?page=2&locationId=abc',
       '/locations.html',
-      '/employees.html?status=active',
-      '/attendance.html?date=2026-10-26',
+      '/admins.html?status=enabled',
+      '/my-account.html',
     ]) {
       const { response, agent } = loginAgent(next);
       const login = await response;

@@ -83,26 +83,6 @@ export function eachDate(start: string, end: string): string[] {
   return dates;
 }
 
-/** ISO weekday of a calendar day: 1 = Monday … 7 = Sunday. */
-export function isoWeekday(date: string): number {
-  const day = parseDate(date).getUTCDay();
-  return ((day + 6) % 7) + 1;
-}
-
-/** Is the given calendar day a working day? */
-export function isWorkingDay(date: string, workingWeek: number[] = env.workingWeek): boolean {
-  return workingWeek.includes(isoWeekday(date));
-}
-
-/** Every working day in an inclusive range, according to `WORKING_WEEK`. */
-export function workingDaysBetween(
-  start: string,
-  end: string,
-  workingWeek: number[] = env.workingWeek,
-): string[] {
-  return eachDate(start, end).filter((date) => isWorkingDay(date, workingWeek));
-}
-
 /**
  * Is `date` after "today" in the application timezone?
  *

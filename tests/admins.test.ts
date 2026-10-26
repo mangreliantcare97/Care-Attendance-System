@@ -8,19 +8,14 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
-import type { Types } from 'mongoose';
 import {
   createAdmin,
-  createEmployee,
   OWNER_EMAIL,
   OWNER_PASSWORD,
   signIn,
   startTestApp,
   type TestContext,
 } from './helpers.ts';
-
-const ADMIN_RECORD_MESSAGE =
-  'This admin has history and cannot be deleted. Disable the account instead.';
 
 let context: TestContext;
 let app: TestContext['app'];
@@ -466,91 +461,6 @@ describe('DELETE /api/admins/:id', () => {
     assert.equal(await AdminModel.findById(target._id), null);
   });
 
-  it('refuses to delete an admin with calendar history', async () => {
-    const target = await makeAdmin('History Event');
-    const { EventModel } = await import('../src/models/Event.ts');
-    await EventModel.create({
-      title: 'History event',
-      startDate: '2040-01-01',
-      endDate: '2040-01-01',
-      createdBy: target._id,
-    });
-
-    const { agent, csrf } = await ownerSession();
-    const response = await agent.delete(`/api/admins/${target._id}`).set('X-CSRF-Token', csrf);
-
-    assert.equal(response.status, 409);
-    assert.equal(response.body.error.code, 'admin_has_records');
-    assert.equal(response.body.error.message, ADMIN_RECORD_MESSAGE);
-
-    const { AdminModel } = await import('../src/models/Admin.ts');
-    assert.ok(await AdminModel.findById(target._id));
-  });
-
-  it('guards every collection that can contain an admin author', async () => {
-    const { AttendanceModel } = await import('../src/models/Attendance.ts');
-    const { EventModel } = await import('../src/models/Event.ts');
-    const { LeaveModel } = await import('../src/models/Leave.ts');
-    const { LeaveAllowanceModel } = await import('../src/models/LeaveAllowance.ts');
-    const { OvertimeModel } = await import('../src/models/Overtime.ts');
-    const { deleteAdmin } = await import('../src/services/admins.ts');
-
-    const cases = [
-      async (targetId: Types.ObjectId, employeeId: Types.ObjectId) =>
-        AttendanceModel.create({
-          employeeId,
-          date: '2041-01-01',
-          status: 'present',
-          createdBy: targetId,
-        }),
-      async (targetId: Types.ObjectId, employeeId: Types.ObjectId) =>
-        OvertimeModel.create({
-          employeeId,
-          date: '2041-01-02',
-          hours: 1,
-          updatedBy: targetId,
-        }),
-      async (targetId: Types.ObjectId, employeeId: Types.ObjectId) =>
-        LeaveModel.create({
-          employeeId,
-          startDate: '2041-01-03',
-          endDate: '2041-01-03',
-          days: 1,
-          decidedBy: targetId,
-        }),
-      async (targetId: Types.ObjectId, employeeId: Types.ObjectId) =>
-        LeaveAllowanceModel.create({
-          employeeId,
-          year: 2041,
-          allowance: 20,
-          createdBy: targetId,
-        }),
-      async (targetId: Types.ObjectId, employeeId: Types.ObjectId) =>
-        EventModel.create({
-          title: 'History guard event',
-          startDate: '2041-01-04',
-          endDate: '2041-01-04',
-          createdBy: targetId,
-        }),
-    ];
-
-    for (const [index, createRecord] of cases.entries()) {
-      const target = await makeAdmin(`History Table ${index}`);
-      const employee = await createEmployee({ name: `History Table Employee ${index}` });
-      await createRecord(target._id, employee._id);
-
-      await assert.rejects(
-        () => deleteAdmin(String(target._id), ownerId),
-        (error: { status?: number; code?: string; message?: string }) => {
-          assert.equal(error.status, 409);
-          assert.equal(error.code, 'admin_has_records');
-          assert.equal(error.message, ADMIN_RECORD_MESSAGE);
-          return true;
-        },
-      );
-    }
-  });
-
   it('refuses to delete the last active admin at the service boundary', async () => {
     const { AdminModel } = await import('../src/models/Admin.ts');
     const { deleteAdmin } = await import('../src/services/admins.ts');
@@ -603,41 +513,6 @@ describe('POST /api/admins/bulk', () => {
       { _id: { $in: [first._id, second._id] } },
       { $set: { isActive: true } },
     );
-  });
-
-  it('is all-or-nothing when one selected admin has history', async () => {
-    const clean = await makeAdmin('Bulk Clean Target');
-    const historic = await makeAdmin('Bulk Historic Target');
-    const { EventModel } = await import('../src/models/Event.ts');
-    const { AdminModel } = await import('../src/models/Admin.ts');
-    await EventModel.create({
-      title: 'Bulk history event',
-      startDate: '2042-01-01',
-      endDate: '2042-01-01',
-      createdBy: historic._id,
-    });
-
-    const { agent, csrf } = await ownerSession();
-    const response = await agent
-      .post('/api/admins/bulk')
-      .set('X-CSRF-Token', csrf)
-      .send({ action: 'delete', ids: [String(clean._id), String(historic._id)] });
-
-    assert.equal(response.status, 409);
-    assert.equal(response.body.error.code, 'bulk_rejected');
-    assert.deepEqual(
-      response.body.error.details,
-      [
-        {
-          id: String(historic._id),
-          code: 'admin_has_records',
-          message: ADMIN_RECORD_MESSAGE,
-        },
-      ],
-    );
-
-    assert.ok(await AdminModel.findById(clean._id));
-    assert.ok(await AdminModel.findById(historic._id));
   });
 
   it('never lets a bulk action remove the signed-in or last active admin', async () => {

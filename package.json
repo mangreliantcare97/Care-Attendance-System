@@ -12,12 +12,6 @@
     "dev": "node --watch server.ts",
     "typecheck": "tsc --noEmit",
     "seed": "node seed/seed.ts",
-    "seed:history": "node seed/seed-history.ts",
-    "seed:2025": "node seed/seed-history.ts",
-    "seed:demo": "node seed/seed-demo.ts",
-    "seed:photos": "node seed/attach-photos.ts",
-    "migrate:allowances": "node seed/migrate-allowances.ts",
-    "resync-leaves": "node seed/resync-leaves.ts",
     "reset-admin-password": "node seed/reset-admin-password.ts",
     "test": "node --test --test-force-exit --test-concurrency=1 tests/",
     "test:watch": "node --test --test-force-exit --watch --test-concurrency=1 tests/"

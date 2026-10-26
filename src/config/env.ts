@@ -33,21 +33,6 @@ function positiveInt(name: string, fallback: number): number {
   return value;
 }
 
-/**
- * Parse the working-week configuration into ISO weekday numbers (1 = Monday .. 7 = Sunday).
- * Defaults to Monday-Friday.
- */
-function parseWorkingWeek(raw: string): number[] {
-  const days = raw
-    .split(',')
-    .map((part) => Number.parseInt(part.trim(), 10))
-    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 7);
-  if (days.length === 0) {
-    throw new Error(`WORKING_WEEK must list at least one ISO weekday (1-7), got "${raw}"`);
-  }
-  return [...new Set(days)].sort((a, b) => a - b);
-}
-
 const nodeEnv = str('NODE_ENV', 'development');
 const isProduction = nodeEnv === 'production';
 const isTest = nodeEnv === 'test';
@@ -86,19 +71,6 @@ export const env = {
 
   trustProxy: int('TRUST_PROXY', 1),
 
-  /** ISO weekday numbers (1 = Monday .. 7 = Sunday) that count as working days. */
-  workingWeek: parseWorkingWeek(str('WORKING_WEEK', '1,2,3,4,5')),
-
-  /**
-   * Holiday allowance in working days per employee and calendar year.
-   *
-   * A missing `leaveAllowances` row uses this value. Unused days expire on
-   * 31 December; there is no carry-over.
-   * Holiday events are excluded from the counted days, so the allowance is
-   * deliberately on top of bank/company holidays.
-   */
-  annualAllowanceDefault: Number(str('ANNUAL_ALLOWANCE_DEFAULT', '28')),
-
   loginRateLimit: {
     windowMs: int('LOGIN_RATE_LIMIT_WINDOW_MINUTES', 15) * 60 * 1000,
     max: int('LOGIN_RATE_LIMIT_MAX', 10),
@@ -132,8 +104,6 @@ export const env = {
     email: str('SEED_ADMIN_EMAIL', ''),
     password: str('SEED_ADMIN_PASSWORD', ''),
   },
-
-  employeePhotoMaxBytes: int('EMPLOYEE_PHOTO_MAX_BYTES', 256 * 1024),
 } as const;
 
 export type Env = typeof env;

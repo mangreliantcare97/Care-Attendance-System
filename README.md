@@ -6,9 +6,10 @@ AdminLTE 3.2 / Bootstrap 4 shell, fully vendored. The public form is
 cookie-free and does not require an account.
 
 This branch (`care-attendance-system`) is being converted from the earlier HRM
-application. The HRM modules described below are still present while Phase 1
-clean-up is under review and will be removed before the Care Attendance
-features are built.
+application. Phase 1 removed the HRM modules (employees, attendance, leave,
+overtime, reports, calendar and departments) and the reference copy of the old
+Laravel tree. The Dashboard, Entries and Locations admin pages are Phase 1
+placeholders until Phase 2 builds them.
 
 ---
 
@@ -53,11 +54,9 @@ to run when they are missing.
 | `/api/public/locations`, `/api/public/entries` | The public form | Cookie-free JSON endpoints. Only active locations are exposed, and only their id and name. |
 | `/api/*` (everything else) | Administrators | A signed-out request always gets JSON `401 { "success": false, "error": { "code": "unauthenticated", … } }`, never an HTML page or application data. |
 
-The public link is intentionally stable and safe to print. The dashboard shows
-the link built from `APP_BASE_URL`; the Locations page copies
-`${APP_BASE_URL}/?location=<id>` for each location. Neither link is built from
-the current browser origin or the request `Host` header, so a proxy or preview
-host cannot poison a printed QR code.
+The public link is intentionally stable and safe to print. Links are built from
+`APP_BASE_URL`, never from the current browser origin or the request `Host`
+header, so a proxy or preview host cannot poison a printed QR code.
 
 ### Shared-device warning
 
@@ -69,6 +68,22 @@ expire after `SESSION_MAX_HOURS` of inactivity (12 hours by default); the
 cookie is `httpOnly`, `SameSite=Lax`, and `Secure` when
 `NODE_ENV=production`.
 
+### Phase 1 placeholders
+
+Three protected pages are deliberately empty shells in Phase 1:
+
+| Page | Phase 1 state |
+|---|---|
+| `/dashboard.html` | Heading plus “Coming in Phase 2” |
+| `/entries.html` | Heading plus “Coming in Phase 2” |
+| `/locations.html` | Heading plus “Coming in Phase 2” |
+
+They sit behind the administrator login like every other protected page, show
+no data, and call no endpoint except the shared session check in
+`public/js/layout.js`. The sidebar links to all three; Phase 2 replaces each
+file with the real dashboard, entries table and locations CRUD. The public
+check-in page is not a placeholder.
+
 ### Scripts
 
 | Command | What it does |
@@ -78,12 +93,6 @@ cookie is `httpOnly`, `SameSite=Lax`, and `Secure` when
 | `npm test` | Run the test suite (in-memory MongoDB) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed` | Create/update the administrator from the environment |
-| `npm run seed:history` | Local/test only: deterministic 2025-2026 HR history |
-| `npm run seed:2025` | Alias for `seed:history` (the same two-year dataset) |
-| `npm run seed:demo` | Local/demo only: departments, employees and three months of data |
-| `npm run seed:photos` | Attach the local portraits in `public/images/employees/` to matching employees |
-| `npm run migrate:allowances` | Remove the retired `carryOver` field (idempotent, no other data touched) |
-| `npm run resync-leaves` | Recompute leave days and reconcile every leave after a `WORKING_WEEK` change |
 | `npm run reset-admin-password -- <email>` | Emergency password recovery (see below) |
 
 ## Configuration
@@ -93,21 +102,18 @@ Everything is read from the environment (see `.env.example`):
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `3000` | HTTP port |
-| `APP_TIMEZONE` | `Europe/London` | Timezone used for "today" and month boundaries |
+| `APP_TIMEZONE` | `Europe/London` | Timezone used to decide the date of an entry |
 | `MONGODB_URI` | `mongodb://127.0.0.1:27017/care-attendance` | Database connection |
 | `SESSION_SECRET` | — | **Required in every environment**; use a new long random value |
 | `SESSION_COOKIE_NAME` | `care.sid` | Name of the session cookie |
 | `SESSION_MAX_HOURS` | `12` | Rolling session lifetime in hours; every request refreshes it |
 | `TRUST_PROXY` | `1` | Number of reverse proxies in front of the app |
-| `WORKING_WEEK` | `1,2,3,4,5` | ISO weekdays (1 = Monday) that count as working days |
-| `ANNUAL_ALLOWANCE_DEFAULT` | `28` | Default holiday allowance per employee and calendar year |
 | `LOGIN_RATE_LIMIT_MAX` | `10` | Login attempts per window and IP |
-| `EMPLOYEE_PHOTO_MAX_BYTES` | `262144` | Maximum accepted photo size |
 | `MAIL_PROVIDER` | `none` | `none`, `console` or `cloudflare` |
 | `MAIL_FROM` | — | The sender, e.g. `Care Attendance <noreply@example.com>` |
 | `CLOUDFLARE_ACCOUNT_ID` | — | Cloudflare account id (email sending) |
 | `CLOUDFLARE_EMAIL_API_TOKEN` | — | Cloudflare API token with email sending permission |
-| `APP_BASE_URL` | `APP_URL` | The public address used for reset links and the public check-in links |
+| `APP_BASE_URL` | `APP_URL` | The public address used for reset links and printed check-in links |
 | `PASSWORD_RESET_TTL_MINUTES` | `30` | How long a reset link is valid |
 | `PASSWORD_RESET_RATE_LIMIT_MAX` | `5` | Reset requests per window, per IP and per address |
 
@@ -176,10 +182,9 @@ MAIL_PROVIDER=cloudflare npm start
 ```
 
 With `MAIL_PROVIDER=console` the whole mail — including the reset link — is
-printed to the server log, which is the quickest way to check that the link
-points at the right host. With `cloudflare` the mail is delivered to the
-administrator; the response of the API is the same either way, so the log of
-the Cloudflare dashboard is the place to look when a mail does not arrive.
+printed to the server log. With `cloudflare` the mail is delivered to the
+administrator; the API response is the same either way, so the Cloudflare
+dashboard log is the place to look when a mail does not arrive.
 
 ### If an administrator is locked out
 
@@ -198,36 +203,30 @@ server.ts              entry point — connects to MongoDB and starts the HTTP s
 src/
   app.ts               the express application (middleware, routes, static files)
   config/              env, database, session store, page list, post-login redirect allowlist
-  models/              mongoose models (Admin, Location, Entry, Employee, Department, Attendance, …)
+  models/              mongoose models (Admin, PasswordReset, Location, Entry)
   middleware/          requireAuth, requireAdmin, requireAuthPage, CSRF, rate limit, errors
   routes/              API routers
   controllers/         request handlers
-  services/            business rules (admins, safety rails, departments, employees, attendance, leave sync, leaves, overtime, calendar, dashboard, reports, mailer)
+  services/            business rules (admins and safety rails, locations, entries, mailer)
   utils/               dates, validation, responses, pagination, CSV, escaping
 public/
-  *.html               one file per module (multi page, not an SPA)
+  *.html               one file per page (multi page, not an SPA)
   checkin.html         public, cookie-free check-in page (also served at / and /checkin)
   partials/            sidebar + navbar, injected by layout.js
   css/theme.css        design tokens, dark mode, print stylesheet
   css/checkin.css      standalone styles for the public page
-  js/                  theme, layout, api client, clipboard, fullscreen, toast, DOM helpers
-  vendor/              AdminLTE, Bootstrap, jQuery, Font Awesome, Chart.js, FullCalendar, Toastr
+  js/                  theme, layout, api client, fullscreen, toast, DOM helpers
+  vendor/              AdminLTE, Bootstrap, jQuery, Font Awesome, Chart.js, Toastr
   assets/fonts/        self-hosted Source Sans Pro
 seed/seed.ts           creates the first administrator
-seed/seed-history.ts   guarded CLI for the 2025-2026 local/test history
-seed/seed-history-data.ts deterministic two-year generator, checksum and assertions
-seed/seed-demo.ts      local/demo data (departments, employees, attendance, leaves, overtime, events)
-seed/resync-leaves.ts  recomputes leave days and reconciles every leave after a WORKING_WEEK change
 seed/reset-admin-password.ts   emergency password recovery
 tests/                 node:test suites (in-memory MongoDB)
-legacy/                the previous Laravel application (reference only)
-docs/                  the phase 1 audit, the phase 2 report and the phase 3A/3B/3C reports
 ```
 
 ## How the app is put together
 
-* **Multi page, not an SPA.** Every module is its own HTML file. The sidebar
-  and the navbar live in `public/partials/` and are injected by
+* **Multi page, not an SPA.** Every page is its own HTML file. The sidebar and
+  the navbar live in `public/partials/` and are injected by
   `public/js/layout.js`, so the navigation is defined exactly once.
 * **The pages are protected.** The server checks the session before it serves
   a page and redirects anonymous visitors to `/login.html?next=<path and query>`.
@@ -248,389 +247,6 @@ docs/                  the phase 1 audit, the phase 2 report and the phase 3A/3B
 * **User data is never put into the page as markup.** The client builds its
   tables with a tagged template (`HrmDom.html`) that escapes every value.
 
-### Working days and leave days
-
-`WORKING_WEEK` (default `1,2,3,4,5`, Monday–Friday) defines the working week.
-A leave's `days` is the number of **working days** in the inclusive
-`startDate`–`endDate` range — not the number of calendar days. A Saturday–Sunday
-request has `days: 0`; a Monday–Friday week has `days: 5`. A leave may cover at
-most 366 calendar days.
-
-A date covered by a calendar **bank / company holiday** (`type: 'holiday'`)
-never counts, even when it is a working day. The stored `days`, the attendance
-sync, the leave preview and the holiday allowance all use the same pure counting
-rules in `src/services/leaveCounting.ts`, so they cannot disagree.
-
-A range that crosses a year boundary is allowed. Its counted dates belong to
-their **actual calendar year and month**, not to the leave's start date. With a
-Monday–Friday week, 30 December 2026 to 2 January 2027 counts two days in 2026
-and two in 2027, unless a bank holiday removes one of them. Leave totals, the
-month breakdown and the allowance check use the same split. The 366-day limit
-still applies.
-
-Creating, editing or deleting a holiday event recomputes the stored `days` for
-every leave that overlaps the old and the new event range, reconciles their
-attendance rows, and therefore updates the allowance usage too. If
-`WORKING_WEEK` changes, the stored `days` and attendance rows are stale. Run:
-
-```bash
-npm run resync-leaves
-```
-
-It recomputes `days` for every leave from its inclusive range, skips holiday
-dates, and reconciles every leave through the same code path as a normal edit.
-It is idempotent, safe to run repeatedly, and never touches a manual attendance
-row.
-
-Only approved leaves count in the employee totals (per actual calendar year and
-type), and only approved leaves produce attendance entries. Two approved leaves
-of the same employee may not overlap (`409 leave_overlap`). A pending request may
-overlap provisionally; approval is refused while the overlap exists.
-
-### Holiday allowance
-
-Every employee has a holiday allowance per calendar year:
-
-* The default is `ANNUAL_ALLOWANCE_DEFAULT` (28 working days). A missing
-  `leaveAllowances` row is not an error: the employee just gets the default.
-* **No carry-over; the balance resets every 1 January.** Unused days expire on
-  31 December and never move to another year. Days used in one year never affect
-  another year's balance, in either direction.
-* An administrator can edit the allowance per employee and year on the employee
-  profile or in the **Allowances** tab on `/leaves.html`. The value is a day
-  count from 0 to 100 in half-day steps; the available total is always the
-  allowance. The edit modal states that unused days do not carry over.
-* Only **approved vacation** consumes the allowance. `leave` and `time_off`
-  never do. Pending vacation is shown separately and does not reduce the
-  remaining days; rejected requests are ignored.
-* **Remaining** is `allowance − approved vacation used`, so it may legitimately
-  be negative after an over-allowance booking is confirmed.
-* In a **past year** the third balance is labelled **Holiday unused (expired)**
-  and shown in neutral grey, with the note *These days expired on 31 December
-  <year>.* A negative past balance is shown in red as **Over allowance**. The
-  current and future years keep **Holiday remaining** with the red/amber rules.
-  The **Allowances** tab and its CSV use the same wording for the selected year.
-* The 28 days are **on top of** bank / company holidays, because holiday dates
-  never count as vacation. If your 28 days are meant to include the bank
-  holidays, set `ANNUAL_ALLOWANCE_DEFAULT=20`.
-* Creating or editing approved vacation that would go below zero returns
-  `409 allowance_exceeded` for the actual calendar year that is over. A
-  vacation spanning 31 December is checked against each year separately; the
-  client can retry the same request with `confirmOverAllowance: true`, and the
-  cross-year preview shows both balances. Unused days from the earlier year
-  never rescue the later year.
-* The edit modal shows a pro-rata hint for a mid-year hire (allowance × full
-  months ÷ 12, rounded to the nearest half day). It is only a suggestion and is
-  never applied automatically.
-* If an older database still has the retired `carryOver` field, remove it with
-  the idempotent migration (it touches no other field or collection):
-
-```bash
-npm run migrate:allowances
-```
-
-### Leave → attendance sync
-
-`src/services/attendanceSync.ts` keeps attendance in step with leaves:
-
-* Only an **approved** leave produces rows. `vacation` becomes the attendance
-  status `vacation`; `leave` and `time_off` become `on_leave`.
-* Only working days are written. Every generated row carries `source:
-  'leave_sync'` and the `leaveId` that created it.
-* Only missing `(employeeId, date)` rows are inserted. An existing row is never
-  overwritten — in particular a `source: 'manual'` row wins, and the unique
-  `(employeeId, date)` index turns that race into a duplicate-key conflict that
-  the sync ignores.
-* A leave only ever deletes rows with its own `leaveId`. Editing a generated
-  row by hand flips it to `source: 'manual'` and clears `leaveId`, so the leave
-  can no longer touch it.
-* Saving the daily sheet does **not** rewrite rows whose values did not change.
-  The server compares the submitted status, check-in, check-out and note with
-  the stored row and skips an identical one, so merely opening and saving the
-  sheet leaves every `leave_sync` row attached to its leave. The response says
-  how many rows were written and how many were left alone:
-  `{ "saved": 0, "unchanged": 3 }`. A real change still turns the row into a
-  manual one.
-* Every mutation reconciles: create, edit (dates, type, status, employee),
-  approve, reject, set back to pending and delete. Pending, rejected and
-  deleted leaves end with zero rows of their own.
-* The reconcile uses `bulkWrite` and no multi-document transaction, so it works
-  on a standalone MongoDB. It is idempotent; if a run fails halfway, the next
-  mutation repairs the difference.
-* Consequence: a generated row that is deleted by hand comes back the next
-  time that leave is reconciled. That is intentional — the leave is still the
-  source of truth.
-
-Manual attendance can only be marked for today or a past day in
-`APP_TIMEZONE`; a future date is refused with `400 date_in_future`. Leave sync
-is exempt, because an approved leave for next month legitimately creates
-future rows.
-
-### Overtime
-
-Overtime records hours only — there is no money, rate or bonus anywhere.
-Entries are booked in quarter-hour steps between 0.25 and 24 hours. Several
-entries per employee and day are allowed, but their sum may not exceed 24
-hours for that day (`422 overtime_day_limit`). The monthly summary groups the
-entries per employee; both the list and the summary can be exported as CSV,
-with the same formula-injection escaping as the attendance export.
-
-### Calendar
-
-The calendar page (`/calendar.html`) uses the vendored **FullCalendar 5.10.1**
-directly, without jQuery for the calendar itself. HR events live in the
-`events` collection:
-
-| Field | Meaning |
-|---|---|
-| `type` | `holiday`, `deadline`, `meeting` or `event` |
-| `title`, `description` | What the event is |
-| `startDate`, `endDate` | Inclusive `YYYY-MM-DD` dates; a one-day event has the same value in both |
-| `createdBy`, `updatedBy` | The administrator who wrote it |
-
-There is deliberately no colour field: the colour is derived from `type` in
-CSS, so it follows light/dark mode. Clicking a date opens the add modal with
-that date; clicking an HR event opens the edit modal with a delete button.
-Approved leaves are **not** events — they stay in the `leaves` collection.
-
-`GET /api/calendar?start=YYYY-MM-DD&end=YYYY-MM-DD` merges the two sources at
-query time:
-
-* only **approved** leaves appear; pending and rejected requests are excluded;
-* a leave is titled with the employee's name and its type, and links to
-  `/leaves.html`;
-* the range is validated (`start <= end`) and capped at 400 inclusive days;
-* HR events and leaves are filtered by overlap with the requested range.
-
-Everything stays date-only. The API stores an inclusive `endDate`, while
-FullCalendar wants an **exclusive** end, so the feed adds exactly one day to
-produce its `start`/`end` values. Because no timestamps or timezones are
-involved, an all-day event cannot shift when the clocks change for BST.
-
-`holiday` events are bank / company holidays. They are excluded from leave
-`days`, from the leave balance and from the attendance rows generated by the
-leave sync. Editing or deleting one recomputes every affected leave.
-
-### Dashboard
-
-`/dashboard.html` keeps the AdminLTE look and uses **Chart.js 2.9.4**. The six
-cards are for **today in `APP_TIMEZONE`** and count **active employees only**:
-total employees, present, late, absent, on leave (`on_leave` + `vacation`) and
-not marked yet. On a non-working day the page shows a notice and hides the
-"not marked yet" card, because that number has no meaning there.
-
-The month selector drives both the daily chart and Top Employees; the year
-selector drives the twelve-month chart. Chart colours are read from the same
-CSS custom properties as the rest of the theme and every chart is rebuilt on a
-theme change, so dark mode has no stale palette.
-
-Top Employees uses `present × 3 − late × 1 − absent × 2` over the selected
-month. Leave and vacation days do not appear in the score at all. Only active
-employees with at least one counted day are eligible; ties are broken by fewer
-absences, then more present days, then name. The aggregation projects only
-name, position and department — never the photo — so the table cannot leak a
-photo into a page or API response.
-
-Departments are shown as a doughnut and a table of **active** employee counts.
-Both come from aggregation pipelines using the existing indexes, not from one
-query per department.
-
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/dashboard/summary` | Today's cards plus active employees per department |
-| `GET /api/dashboard/year?year=YYYY` | Twelve month buckets with attendance, absence and leave |
-| `GET /api/dashboard/month?month=YYYY-MM` | Daily series plus Top Employees |
-
-### Reports
-
-`/reports.html` has three tabs:
-
-1. **Attendance summary** — per employee present, late, absent, on leave and
-   vacation for a date range, filterable by department or employee. The
-   attendance rate is `(present + late) / (present + late + absent)`; leave and
-   vacation days are excluded from the denominator. The table is paginated and
-   carries a totals row. The CSV export contains every filtered row (not just
-   the current page) and uses the same formula-injection escaping as the other
-   exports.
-2. **Overtime** — reuses `GET /api/overtime/summary` for a month and department,
-   with the same CSV export.
-3. **Leave activity** — reuses `GET /api/leaves` and
-   `GET /api/employees/:id/leave-totals`. Choosing an employee shows their
-   approved leave totals by year and type.
-
-Detailed attendance records stay on the existing attendance report page; the
-summary links to it. The print stylesheet expands all three tabs, so one print
-job covers the whole reports page.
-
-### Demo data (local/demo only)
-
-```bash
-MONGODB_URI=mongodb://127.0.0.1:27017/care-attendance-demo npm run seed:demo
-```
-
-`seed:demo` refuses to run when `NODE_ENV=production` and refuses to touch a
-database that already contains employees. It creates five departments, 25 fake
-employees, roughly three months of attendance up to yesterday (mostly present,
-with some late, absent and unmarked days), six approved leaves through the real
-leave reconcile, 30 overtime entries and a few calendar events. The random
-generator has a fixed seed, so an empty database produces the same demo data
-again. It does not create a login; run `npm run seed` with the `SEED_ADMIN_*`
-variables if the database has no administrator yet.
-
-Never point it at a production database: the employee check is a safety rail,
-not a backup. Use a dedicated local or demo database URI.
-
-### 2025-2026 history dataset (local/test only)
-
-`seed:history` produces a deterministic 22-month HR history from **1 January
-2025 to 20 October 2026** for reviewing the dashboard, reports, calendar and
-Top Employees against realistic records. `seed:2025` is an alias for the same
-command and the same two-year dataset.
-
-The marked period ends on **20 October 2026**. Three approved future leaves
-create `leave_sync` rows after that date: two employees are on leave on 21
-October 2026 and one has a December 2026 vacation. No manual attendance is
-written after 20 October, and 21 October has no manual rows at all.
-
-Use a **dedicated** database, and create the administrator first:
-
-```bash
-# 1. Create the administrator in the same dedicated database.
-MONGODB_URI=mongodb://127.0.0.1:27017/care-attendance-2025-test \
-SEED_ADMIN_NAME="2025 Test Admin" \
-SEED_ADMIN_EMAIL=admin@example.com \
-SEED_ADMIN_PASSWORD='choose-a-local-password' \
-npm run seed
-
-# 2. Generate the history. On an existing seed database, add --reset.
-MONGODB_URI=mongodb://127.0.0.1:27017/care-attendance-2025-test \
-SEED_ADMIN_EMAIL=admin@example.com \
-npm run seed:history -- --reset
-
-# 3. Run the app against the same database.
-MONGODB_URI=mongodb://127.0.0.1:27017/care-attendance-2025-test \
-npm start
-```
-
-The command prints a full verification report: the 22-month attendance table,
-yearly totals and shares, the partial October 2026 working-day count, event
-counts by type and month, multi-day and edge-case events, Top Employees hand
-checks, the fixed 21 October dashboard/sheet checks, both bank-holiday leave
-cases, a per-employee holiday allowance table for 2025 and 2026 (allowance,
-used, pending and remaining) and every assertion.
-
-#### Profile photos
-
-`seed:history` deliberately creates employees **without** photos, and asserts
-that none were written. A re-seed therefore clears them. To review the UI with
-portraits, the repository ships 26 local headshots in
-`public/images/employees/` (one JPEG per employee name, sourced from
-[randomuser.me](https://randomuser.me) for local demo use):
-
-```bash
-MONGODB_URI=mongodb://127.0.0.1:27017/care-attendance-2025-test npm run seed:photos
-```
-
-The script matches `amelia-bennett.jpg` to employee "Amelia Bennett", stores the
-bytes on the employee document and skips anything it cannot match. Photos are
-served by `GET /api/employees/:id/photo`; the `/images` folder is also served
-statically for local reference.
-
-#### Safety rails
-
-* It refuses when `NODE_ENV=production`, before it connects.
-* It refuses unless the database part of `MONGODB_URI` contains `test` or
-  `demo`. The error states that rule. This is a name check, not a substitute
-  for using a dedicated database and database user.
-* It requires an existing **active** administrator. It prefers
-  `SEED_ADMIN_EMAIL` when that active administrator exists, otherwise it uses
-  the oldest active administrator and prints a warning. The script never
-  creates, updates or deletes an administrator.
-* It refuses when employees already exist unless `-- --reset` is supplied.
-* `--reset` deletes only `attendance`, `overtime`, `leaves`, `events`,
-  `employees` and `departments`. Administrators and sessions are never touched.
-* It forces `APP_TIMEZONE=Europe/London` and `WORKING_WEEK=1,2,3,4,5` for its own
-  process. Every date is a fixed `YYYY-MM-DD` value; the system clock is never
-  used to choose history dates.
-
-Two runs against a fresh test database print the same SHA-256 checksum. The
-checksum canonicalises business rows and includes events; database-generated
-ObjectIds and `createdAt`/`updatedAt` values are excluded. The in-memory test in
-`tests/seed-history.test.ts` runs the generator twice and checks this, plus the
-calendar, dashboard and attendance-sheet cases.
-
-#### What is generated
-
-| Area | Data |
-|---|---|
-| Departments | 5: Operations, Finance, Human Resources, Sales and IT, with unequal employee counts (7 / 5 / 4 / 6 / 4) |
-| Employees | 26: 23 active, 1 inactive on 31 March 2026, 1 terminated on 30 June 2025 and 1 terminated on 14 August 2026; 3 hired during 2025, 2 during 2026; 5 without an email; no photos |
-| Attendance | 10,414 rows: 10,216 manual and 198 `leave_sync`. One manual row per employee per Mon–Fri working day inside employment up to 20 October 2026, excluding the England bank holidays and 31 deliberately unmarked days (0.3% of 10,435 expected slots) |
-| Attendance mix | About 90% present, 7% late and 3% absent among counted days, close to the requested 88 / 7 / 3. Present check-in is 08:30–09:00 and checkout 17:00–18:15; late check-in is 09:10–10:30. Absences form runs of 1–3 working days and are heavier in January–February |
-| Leaves | 73 approved (40 in 2025, 30 in 2026 through 20 October and 3 future), 10 pending and 6 rejected, created through the real leave/reconcile service. Types are `leave` (casual/sick/personal), `vacation` (annual) and `time_off`. The 73 leaves contain 200 approved working days; 198 `leave_sync` rows remain because 2 leave days were manually overridden with `present` |
-| Overtime | 260 entries: 150 in 2025 and 110 in 2026 through 20 October, spread across all 22 months. 0.5–4 hours in 0.25-hour steps, only on days the employee actually worked |
-| Events | 148: 75 in 2025 and 73 in 2026. 2025 has 9 holiday, 21 deadline, 29 meeting and 16 event entries; 2026 has 9 holiday, 20 deadline, 29 meeting and 15 event entries. No leave/vacation event types and no payroll/salary/bonus wording |
-
-Leave rules: approved leaves never overlap for the same employee, every leave
-is within one calendar year, and no leave starts before hire or ends after the
-employee's leaving/deactivation date. Pending and rejected leaves create no
-attendance rows. Two approved leave days are deliberately overridden by a
-manual `present` row, so they demonstrate the real sheet behaviour where an
-edit detaches a `leave_sync` row from its leave.
-
-The two documented bank-holiday leave cases are:
-
-* **Harry Nelson, 5–7 May 2025** — three working days including the Early May
-  bank holiday on 5 May.
-* **Grace Morgan, 4–6 May 2026** — three working days including the Early May
-  bank holiday on 4 May.
-
-In both cases the leave service counts the bank holiday as a leave day and the
-reconcile creates a real `leave_sync` row on it. Holiday events are
-informational only: they do not change a leave's `days` or the leave totals.
-
-The three future leaves are Amelia Bennett (21–23 October 2026, vacation), Noah
-Carter (21–22 October 2026, time off) and Isla Dawson (21–23 December 2026,
-vacation). On **21 October 2026** the dashboard therefore shows 23 active
-employees, 2 on leave and 21 not marked; the attendance sheet for that date has
-only those two `leave_sync` rows.
-
-October 2026 is partial: **14 working days** through 20 October, out of 22
-working days in the full month. The full 2026 year has no manual attendance or
-absence after October; the only later rows are the approved December leave
-sync.
-
-#### Calendar and report edge cases
-
-* At least three events cross a month boundary in both years: the Q2–Q4
-  `Leave plan submission` deadline windows (31 March → 2 April, 30 June →
-  2 July, 30 September → 2 October).
-* Christmas office closures run 29–31 December in both 2025 and 2026; the last
-  day is included and the feed gives FullCalendar an exclusive `end` of
-  1 January.
-* A Saturday `Summer company day` exists in both years (19 July 2025 and
-  18 July 2026).
-* 12 December 2025 and 11 December 2026 each have two events (`Health & safety
-  training` and `Christmas party`). 18 September 2025 also has two.
-* Date-only clock-change events stay on 30 March and 26 October 2025 and on
-  29 March and 25 October 2026 through the BST changes.
-* `Year-end review` on 19 December 2025 appears beside approved leave for
-  Harry Nelson, and the 21 October 2026 `Autumn away day` appears beside the
-  two future approved leaves.
-* Pending and rejected leaves never appear in the calendar feed.
-* The two terminated employees have no attendance after their leaving dates;
-  the inactive employee has none after 31 March 2026; the 2025 and 2026 hires
-  have no attendance before their hire dates.
-* The clock-change, month-crossing, multi-day, crowded-day, Christmas-closure
-  and leave-day cases are all included in the printed edge-case report and in
-  the browser audit.
-
-To inspect the history, choose 2025 or 2026 in the dashboard year selector,
-open the attendance sheet for 20 October and 21 October 2026, run the attendance
-report across 2025–2026, and step through the calendar in month, week and list
-views for March, May, July, October and December in both years. Maya Patel and
-Oliver Grant are the 2026 hires to open from the employee list.
-
 ## API
 
 | Method | Endpoint | Purpose |
@@ -645,59 +261,15 @@ Oliver Grant are the 2026 hires to open from the employee list.
 | `POST` | `/api/admins` | Create an administrator |
 | `GET` | `/api/admins/:id` | One administrator (used by the edit form) |
 | `PATCH` | `/api/admins/:id` | Update name, email, status or another admin's password |
-| `DELETE` | `/api/admins/:id` | Delete an administrator (guarded by history and safety rails) |
+| `DELETE` | `/api/admins/:id` | Delete an administrator (guarded by the safety rails) |
 | `POST` | `/api/admins/bulk` | Disable or delete several administrators atomically |
 | `POST` | `/api/admins/:id/activate` | Activate an administrator (kept for compatibility) |
 | `POST` | `/api/admins/:id/deactivate` | Deactivate an administrator (kept for compatibility) |
 | `POST` | `/api/admins/me/password` | Change your own password |
-| `GET` | `/api/departments` | Departments with the number of employees |
-| `POST` | `/api/departments` | Create a department |
-| `PATCH` | `/api/departments/:id` | Rename a department |
-| `DELETE` | `/api/departments/:id` | Delete a department (only when it is empty) |
-| `GET` | `/api/employees` | Employees — paginated, searchable, filterable |
-| `POST` | `/api/employees` | Create an employee |
-| `GET` | `/api/employees/:id` | One employee |
-| `PATCH` | `/api/employees/:id` | Change an employee |
-| `DELETE` | `/api/employees/:id` | Delete an employee (only without any records) |
-| `GET` | `/api/employees/:id/photo` | The photo (never part of a list) |
-| `GET` | `/api/employees/:id/attendance` | The attendance of one employee, per month |
-| `GET` | `/api/employees/:id/leaves` | The leave history of one employee |
-| `GET` | `/api/employees/:id/leave-totals` | Approved leave days per actual year and type |
-| `GET` | `/api/employees/:id/allowance?year=YYYY` | Holiday allowance summary and month breakdown |
-| `GET` | `/api/employees/:id/allowance/month?year=YYYY&month=M` | Approved vacation days counted in one month |
-| `PUT` | `/api/employees/:id/allowance/:year` | Set the allowance and note for one year |
-| `GET` | `/api/attendance/sheet` | The daily sheet for a date |
-| `POST` | `/api/attendance/sheet` | Save the whole sheet in one request |
-| `GET` | `/api/attendance` | The report — filtered, paginated, with counts |
-| `GET` | `/api/attendance/export.csv` | The report as a CSV file |
-| `POST` | `/api/attendance` | Add a single record |
-| `PATCH` | `/api/attendance/:id` | Change a record |
-| `DELETE` | `/api/attendance/:id` | Delete a record |
-| `GET` | `/api/overtime` | Overtime entries — date range, employee, department |
-| `POST` | `/api/overtime` | Add an overtime entry |
-| `PATCH` | `/api/overtime/:id` | Change an overtime entry |
-| `DELETE` | `/api/overtime/:id` | Delete an overtime entry |
-| `GET` | `/api/overtime/summary` | Per employee hours and entries for a month |
-| `GET` | `/api/overtime/export.csv` | The entries as a CSV file |
-| `GET` | `/api/overtime/summary.csv` | The monthly summary as a CSV file |
-| `GET` | `/api/leaves` | Leave records — employee, department, type, status, dates |
-| `POST` | `/api/leaves` | Create a leave |
-| `GET` | `/api/leaves/:id` | One leave |
-| `PATCH` | `/api/leaves/:id` | Change a leave (including approve/reject) |
-| `DELETE` | `/api/leaves/:id` | Delete a leave and its generated attendance |
-| `GET` | `/api/leaves/export.csv` | The leave records as a CSV file |
-| `GET` | `/api/leaves/preview` | Counted days, skipped dates and allowance impact for a proposed leave |
-| `GET` | `/api/leaves/allowances` | Per-employee allowance overview (year, department, search, month) |
-| `GET` | `/api/leaves/allowances/export.csv` | Every filtered allowance row as a CSV file |
-| `GET` | `/api/calendar` | HR events + approved leaves for a date range |
-| `POST` | `/api/events` | Create an HR calendar event |
-| `PATCH` | `/api/events/:id` | Change an HR calendar event |
-| `DELETE` | `/api/events/:id` | Delete an HR calendar event |
-| `GET` | `/api/dashboard/summary` | Today's cards and active employees per department |
-| `GET` | `/api/dashboard/year?year=YYYY` | Twelve month attendance/absence/leave series |
-| `GET` | `/api/dashboard/month?month=YYYY-MM` | Daily series and Top Employees |
-| `GET` | `/api/reports/attendance-summary` | Per-employee summary with rate and totals |
-| `GET` | `/api/reports/attendance-summary.csv` | The summary as a CSV file |
+| `GET` | `/api/public/locations` | Active locations for the public form (`id` and `name` only) |
+| `POST` | `/api/public/entries` | Record one public check-in or check-out |
+| `GET` | `/api/entries` | Newest entries for the admin panel (Phase 2 columns) |
+| `GET` | `/api/locations` | Locations with entry counts (Phase 2 columns) |
 
 Responses always use the same envelope:
 
@@ -729,31 +301,28 @@ Deletion is deliberately guarded:
 
 * An administrator cannot delete themselves — `409 cannot_delete_self`.
 * The last active administrator cannot be deleted — `409 last_active_admin`.
-* An administrator who is referenced as `createdBy`, `updatedBy` or
-  `decidedBy` in attendance, overtime, leaves, leave allowances or calendar
-  events cannot be deleted — `409 admin_has_records` with the message:
-  “This admin has history and cannot be deleted. Disable the account instead.”
-  Disable the account instead so the audit trail stays intact.
+* Disable the account instead of deleting it when the audit trail matters.
+
+The author-reference guard (“an admin recorded as `createdBy` / `updatedBy` /
+`deletedBy` cannot be deleted”) returns in Phase 2, when locations and entries
+start recording the acting administrator. The Phase 1 clean-up deliberately
+removed the HRM collections that guard used to query.
 
 `POST /api/admins/bulk` accepts `{ "action": "disable" | "delete", "ids": [...] }`.
 Every target is checked before the first write, so the operation is
-all-or-nothing: it can never remove the signed-in admin, leave zero active
-administrators, or delete someone with history. A refusal returns `409
-bulk_rejected` with a `details` array containing one `{ id, code, message }` per
-offending id. The single-admin disable rails remain `400
-cannot_deactivate_self` and `400 cannot_deactivate_last_admin` for compatibility
-with the activate/deactivate endpoints.
+all-or-nothing: it can never remove the signed-in admin or leave zero active
+administrators. A refusal returns `409 bulk_rejected` with a `details` array
+containing one `{ id, code, message }` per offending id. The single-admin
+disable rails remain `400 cannot_deactivate_self` and `400
+cannot_deactivate_last_admin` for compatibility with the activate/deactivate
+endpoints.
 
 ## Status
 
-* **Phase 1** — audit and decisions: [`docs/PHASE-1-AUDIT.md`](docs/PHASE-1-AUDIT.md)
-* **Phase 2** — foundation, shell and authentication:
-  [`docs/PHASE-2-REPORT.md`](docs/PHASE-2-REPORT.md)
-* **Phase 3A** — departments, employees, attendance and the administrator
-  password reset: [`docs/PHASE-3A-REPORT.md`](docs/PHASE-3A-REPORT.md)
-* **Phase 3B** — overtime, leave & vacation, and the leave → attendance sync:
-  [`docs/PHASE-3B-REPORT.md`](docs/PHASE-3B-REPORT.md)
-* **Phase 3C** — calendar, dashboard, reports and demo data:
-  [`docs/PHASE-3C-REPORT.md`](docs/PHASE-3C-REPORT.md)
-* **Next** — owner review of phase 3C.
-# Care-Attendance-System
+* **Phase 1** — clean-up complete: HRM modules and the reference `legacy/`
+  tree removed, sidebar reduced to Dashboard, Entries, Locations and Admins &
+  Settings, three placeholder pages in place, README updated.
+* **Next** — Phase 2: the locations CRUD, the entries model and API, the public
+  form, the admin pages, the dashboard and the tests.
+* The earlier HRM reports remain in `docs/` for reference only; the features
+  they describe are no longer part of this application.

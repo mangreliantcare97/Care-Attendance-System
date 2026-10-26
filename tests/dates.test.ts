@@ -16,11 +16,9 @@ import {
   monthBounds,
   resolveMonth,
   today,
-  workingDaysBetween,
 } from '../src/utils/dates.ts';
 
 const LONDON = 'Europe/London';
-const MON_FRI = [1, 2, 3, 4, 5];
 
 describe('dates', () => {
   it('shifts a late UTC instant to the next London day during BST', () => {
@@ -80,22 +78,6 @@ describe('dates', () => {
     assert.equal(isAfterToday('2026-06-16', LONDON, instant), false);
     assert.equal(isAfterToday('2026-06-17', LONDON, instant), true);
     assert.equal(isAfterToday('2026-06-15', LONDON, instant), false);
-  });
-
-  it('counts working days and never includes the weekend', () => {
-    // 2026-06-01 is a Monday, 2026-06-07 a Sunday.
-    const week = workingDaysBetween('2026-06-01', '2026-06-07', MON_FRI);
-
-    assert.deepEqual(week, [
-      '2026-06-01',
-      '2026-06-02',
-      '2026-06-03',
-      '2026-06-04',
-      '2026-06-05',
-    ]);
-
-    const weekend = workingDaysBetween('2026-06-06', '2026-06-07', MON_FRI);
-    assert.deepEqual(weekend, []);
   });
 
   it('handles leap days and month boundaries in date arithmetic', () => {

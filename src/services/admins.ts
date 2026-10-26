@@ -1,10 +1,5 @@
 import { AdminModel, findAdminWithPassword, hashPassword, verifyPassword } from '../models/Admin.ts';
 import { destroySessionsForAdmin, destroySessionsForAdmins } from '../config/session.ts';
-import { AttendanceModel } from '../models/Attendance.ts';
-import { EventModel } from '../models/Event.ts';
-import { LeaveModel } from '../models/Leave.ts';
-import { LeaveAllowanceModel } from '../models/LeaveAllowance.ts';
-import { OvertimeModel } from '../models/Overtime.ts';
 import { getMailer, sendQuietly } from './mailer.ts';
 import { HttpError } from '../utils/response.ts';
 import { escapeHtml } from '../utils/escape.ts';
@@ -86,9 +81,6 @@ const SORT_FIELDS: Record<AdminSortField, string> = {
   status: 'isActive',
   lastLogin: 'lastLoginAt',
 };
-
-const ADMIN_RECORD_MESSAGE =
-  'This admin has history and cannot be deleted. Disable the account instead.';
 
 function toRecord(admin: AdminLike): AdminRecord {
   return {
@@ -312,11 +304,8 @@ export async function deleteAdmin(
     });
   }
 
-  const referenced = await findReferencedAdminIds([String(admin._id)]);
-  if (referenced.size) {
-    throw new HttpError(409, 'admin_has_records', ADMIN_RECORD_MESSAGE);
-  }
-
+  // Author-reference guard: locations and entries record the acting admin from
+  // Phase 2, so the "disable instead of delete" rule is re-enabled there.
   await admin.deleteOne();
   const revokedSessions = await destroySessionsForAdmin(String(admin._id));
 
@@ -373,13 +362,6 @@ export async function bulkAdmins(
         'last_active_admin',
         'This is the last active administrator — another administrator has to be created first.',
       );
-    }
-  }
-
-  if (action === 'delete' && byId.size) {
-    const referenced = await findReferencedAdminIds([...byId.keys()]);
-    for (const id of referenced) {
-      addIssue(id, 'admin_has_records', ADMIN_RECORD_MESSAGE);
     }
   }
 
@@ -450,66 +432,6 @@ async function assertNotLastActiveAdmin(
   if (stillActive === 0) {
     throw new HttpError(options.status, options.code, options.message);
   }
-}
-
-/** All administrator ids referenced as an author or decision maker. */
-async function findReferencedAdminIds(ids: string[]): Promise<Set<string>> {
-  if (!ids.length) return new Set();
-  const idSet = new Set(ids);
-  const referenced = new Set<string>();
-
-  const [attendance, overtime, leaves, allowances, events] = await Promise.all([
-    AttendanceModel.find({
-      $or: [{ createdBy: { $in: ids } }, { updatedBy: { $in: ids } }],
-    })
-      .select('createdBy updatedBy')
-      .lean(),
-    OvertimeModel.find({
-      $or: [{ createdBy: { $in: ids } }, { updatedBy: { $in: ids } }],
-    })
-      .select('createdBy updatedBy')
-      .lean(),
-    LeaveModel.find({
-      $or: [
-        { decidedBy: { $in: ids } },
-        { createdBy: { $in: ids } },
-        { updatedBy: { $in: ids } },
-      ],
-    })
-      .select('decidedBy createdBy updatedBy')
-      .lean(),
-    LeaveAllowanceModel.find({
-      $or: [{ createdBy: { $in: ids } }, { updatedBy: { $in: ids } }],
-    })
-      .select('createdBy updatedBy')
-      .lean(),
-    EventModel.find({
-      $or: [{ createdBy: { $in: ids } }, { updatedBy: { $in: ids } }],
-    })
-      .select('createdBy updatedBy')
-      .lean(),
-  ]);
-
-  const collect = (documents: Array<Record<string, unknown>>, fields: string[]) => {
-    for (const document of documents) {
-      for (const field of fields) {
-        const value = document[field];
-        if (value && idSet.has(String(value))) referenced.add(String(value));
-      }
-    }
-  };
-
-  collect(attendance as unknown as Array<Record<string, unknown>>, ['createdBy', 'updatedBy']);
-  collect(overtime as unknown as Array<Record<string, unknown>>, ['createdBy', 'updatedBy']);
-  collect(leaves as unknown as Array<Record<string, unknown>>, [
-    'decidedBy',
-    'createdBy',
-    'updatedBy',
-  ]);
-  collect(allowances as unknown as Array<Record<string, unknown>>, ['createdBy', 'updatedBy']);
-  collect(events as unknown as Array<Record<string, unknown>>, ['createdBy', 'updatedBy']);
-
-  return referenced;
 }
 
 function sendPasswordChangedNotice(admin: AdminLike): void {
