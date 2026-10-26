@@ -9,6 +9,7 @@
   var form = document.getElementById('checkin-form');
   var nameInput = document.getElementById('checkin-name');
   var locationSelect = document.getElementById('checkin-location');
+  var locationFull = document.getElementById('checkin-location-full');
   var submitButton = document.getElementById('checkin-submit');
   var alertBox = document.getElementById('checkin-alert');
   var successBox = document.getElementById('checkin-success');
@@ -33,6 +34,11 @@
     successBox.textContent = '';
   }
 
+  function updateLocationLabel() {
+    var option = locationSelect.options[locationSelect.selectedIndex];
+    locationFull.textContent = locationSelect.value && option ? option.textContent : '';
+  }
+
   function selectedDirection() {
     var checked = form.querySelector('input[name="direction"]:checked');
     return checked ? checked.value : 'in';
@@ -52,6 +58,7 @@
       locationSelect.appendChild(none);
       locationSelect.disabled = true;
       submitButton.disabled = true;
+      locationFull.textContent = '';
       showError('No active check-in locations are available. Please ask an administrator.');
       return;
     }
@@ -78,6 +85,8 @@
     } else {
       locationSelect.value = '';
     }
+
+    updateLocationLabel();
   }
 
   async function loadLocations() {
@@ -105,11 +114,15 @@
       locationSelect.appendChild(failed);
       locationSelect.disabled = true;
       submitButton.disabled = true;
+      locationFull.textContent = '';
       showError(error.message || 'The locations could not be loaded. Please try again.');
     }
   }
 
   form.addEventListener('change', function (event) {
+    if (event.target === locationSelect) {
+      updateLocationLabel();
+    }
     if (event.target && event.target.name === 'direction') {
       updateSubmitLabel();
     }

@@ -10,6 +10,7 @@
 
 .checkin-shell {
   width: min(100% - 2rem, 34rem);
+  min-width: 0;
   margin: 0 auto;
   padding: 2rem 0 3rem;
 }
@@ -41,6 +42,7 @@
 }
 
 .checkin-card {
+  min-width: 0;
   padding: clamp(1.25rem, 4vw, 2rem);
   background: var(--hrm-surface);
   border: 1px solid var(--hrm-border);
@@ -73,6 +75,8 @@
 .checkin-field select {
   box-sizing: border-box;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 3rem;
   padding: 0.65rem 0.75rem;
   color: var(--hrm-text);
@@ -94,6 +98,19 @@
 .checkin-field input[aria-invalid='true'],
 .checkin-field select[aria-invalid='true'] {
   border-color: var(--hrm-danger);
+}
+
+/* The native closed control truncates a long address; show the whole label
+   underneath so it wraps and stays readable on a 360px screen. */
+.checkin-location-full {
+  margin: 0.4rem 0 0;
+  color: var(--hrm-text-muted);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.checkin-location-full:empty {
+  display: none;
 }
 
 .checkin-direction {

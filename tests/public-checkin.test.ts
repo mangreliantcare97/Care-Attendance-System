@@ -28,18 +28,26 @@ function publicEntry(name: string, locationId: string, direction = 'in') {
 before(async () => {
   context = await startTestApp();
   app = context.app;
-  await createAdmin({ name: 'Owner', email: OWNER_EMAIL, password: OWNER_PASSWORD });
+  const owner = await createAdmin({
+    name: 'Owner',
+    email: OWNER_EMAIL,
+    password: OWNER_PASSWORD,
+  });
 
   const { LocationModel } = await import('../src/models/Location.ts');
   const active = await LocationModel.create({
     name: 'Main Office',
+    postcode: 'AB1 2CD',
     isActive: true,
-    note: 'Reception desk',
+    sortOrder: 1,
+    createdBy: owner._id,
   });
   const inactive = await LocationModel.create({
     name: 'Closed Site',
+    postcode: 'AB1 2CE',
     isActive: false,
-    note: 'Do not publish this note',
+    sortOrder: 2,
+    createdBy: owner._id,
   });
 
   activeLocation = { id: String(active._id), name: active.name };
@@ -69,8 +77,8 @@ describe('GET /api/public/locations', () => {
       assert.equal(typeof location.name, 'string');
     }
 
-    const names = locations.map((location) => location.name);
-    assert.deepEqual(names, [...names].sort((a, b) => String(a).localeCompare(String(b))));
+    assert.equal(locations[0]?.name, 'Main Office');
+    assert.equal(JSON.stringify(response.body).includes('postcode'), false);
   });
 });
 
@@ -156,12 +164,14 @@ describe('admin locations and entries', () => {
     const created = await agent
       .post('/api/locations')
       .set('X-CSRF-Token', csrf)
-      .send({ name: 'North Clinic', isActive: true, note: 'Upstairs' });
+      .send({ name: 'North Clinic', postcode: 'zz11zz', isActive: true, sortOrder: 3 });
 
     assert.equal(created.status, 200);
     assert.equal(created.body.data.location.name, 'North Clinic');
+    assert.equal(created.body.data.location.postcode, 'ZZ1 1ZZ');
     assert.equal(created.body.data.location.isActive, true);
     assert.equal(created.body.data.location.entryCount, 0);
+    assert.equal(created.body.data.location.sortOrder, 3);
 
     const publicList = await request(app).get('/api/public/locations');
     const publicIds = publicList.body.data.locations.map((location: { id: string }) => location.id);

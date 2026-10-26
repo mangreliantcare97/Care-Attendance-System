@@ -84,6 +84,39 @@ no data, and call no endpoint except the shared session check in
 file with the real dashboard, entries table and locations CRUD. The public
 check-in page is not a placeholder.
 
+### Locations
+
+`npm run seed:locations` inserts the 18 real sites from `seed/locations.json`:
+
+* It needs an existing active administrator (run `npm run seed` first), because
+  every row records `createdBy`. Without one it stops and says so.
+* It is idempotent and insert-only. The key is the normalised name plus the
+  postcode, and `$setOnInsert` means a location an administrator has edited or
+  deactivated is never overwritten. Entries are never touched.
+* `sortOrder` is the position in the file, every row is active, and the address
+  text is kept exactly as supplied — including “Saftesbury”, “Ecronwald” and
+  “Sailsbury”.
+* Postcodes are normalised to uppercase with one space before the final three
+  characters and checked leniently. A postcode that fails is printed in the run
+  summary but the row is still inserted; no address text is corrected.
+* It prints the database name (never credentials) and the counts:
+
+```
+[seed:locations] database: care-attendance-demo
+[seed:locations] administrator: demo-admin@example.com
+[seed:locations] inserted 18, already existed 0 (18 in seed/locations.json, 18 in this database).
+```
+
+Running it a second time prints `inserted 0, already existed 18`.
+
+A postcode may hold more than one label: 33 and 35 Chandos Road share
+`HA1 4QX`, and 178 and 180 Church Road share `UB3 2LS`. The unique rule is the
+pair (name, postcode), never the postcode alone.
+
+The public form loads `GET /api/public/locations`, which returns only
+`{ id, name }` for active locations ordered by `sortOrder` and then name. The
+postcode and entry counts stay behind the authenticated admin API.
+
 ### Scripts
 
 | Command | What it does |
@@ -93,6 +126,7 @@ check-in page is not a placeholder.
 | `npm test` | Run the test suite (in-memory MongoDB) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed` | Create/update the administrator from the environment |
+| `npm run seed:locations` | Insert the 18 locations from `seed/locations.json` (idempotent) |
 | `npm run reset-admin-password -- <email>` | Emergency password recovery (see below) |
 
 ## Configuration
@@ -219,6 +253,8 @@ public/
   vendor/              AdminLTE, Bootstrap, jQuery, Font Awesome, Chart.js, Toastr
   assets/fonts/        self-hosted Source Sans Pro
 seed/seed.ts           creates the first administrator
+seed/seed-locations.ts inserts the 18 locations (idempotent, needs an admin)
+seed/locations.json    the real address labels and postcodes
 seed/reset-admin-password.ts   emergency password recovery
 tests/                 node:test suites (in-memory MongoDB)
 ```
@@ -266,10 +302,10 @@ tests/                 node:test suites (in-memory MongoDB)
 | `POST` | `/api/admins/:id/activate` | Activate an administrator (kept for compatibility) |
 | `POST` | `/api/admins/:id/deactivate` | Deactivate an administrator (kept for compatibility) |
 | `POST` | `/api/admins/me/password` | Change your own password |
-| `GET` | `/api/public/locations` | Active locations for the public form (`id` and `name` only) |
+| `GET` | `/api/public/locations` | Active locations for the public form (`id` and `name` only, in sort order) |
 | `POST` | `/api/public/entries` | Record one public check-in or check-out |
 | `GET` | `/api/entries` | Newest entries for the admin panel (Phase 2 columns) |
-| `GET` | `/api/locations` | Locations with entry counts (Phase 2 columns) |
+| `GET` | `/api/locations` | Locations with postcode, sort order and entry counts |
 
 Responses always use the same envelope:
 

@@ -12,6 +12,7 @@
     "dev": "node --watch server.ts",
     "typecheck": "tsc --noEmit",
     "seed": "node seed/seed.ts",
+    "seed:locations": "node seed/seed-locations.ts",
     "reset-admin-password": "node seed/reset-admin-password.ts",
     "test": "node --test --test-force-exit --test-concurrency=1 tests/",
     "test:watch": "node --test --test-force-exit --watch --test-concurrency=1 tests/"
