@@ -13,6 +13,10 @@
   var notMarkedCard = document.getElementById('not-marked-card');
   var notMarkedLink = document.getElementById('not-marked-link');
   var notice = document.getElementById('non-working-notice');
+  var checkInUrlInput = document.getElementById('public-checkin-url');
+  var checkInCopyButton = document.getElementById('copy-public-checkin');
+  var checkInOpenLink = document.getElementById('open-public-checkin');
+  var checkInCopyStatus = document.getElementById('public-checkin-copy-status');
 
   var charts = { year: null, month: null, departments: null };
   var lastData = { year: null, month: null, departments: [] };
@@ -338,6 +342,42 @@
       window.HrmToast.error(error.message);
     }
   }
+
+  function renderPublicCheckInLink() {
+    var url = window.HrmCheckInUrl || '';
+    checkInUrlInput.value = url;
+
+    if (!url) {
+      checkInCopyButton.disabled = true;
+      checkInOpenLink.removeAttribute('href');
+      checkInOpenLink.setAttribute('aria-disabled', 'true');
+      checkInCopyStatus.textContent = 'The public link is not configured.';
+      return;
+    }
+
+    checkInCopyButton.disabled = false;
+    checkInOpenLink.href = url;
+    checkInOpenLink.removeAttribute('aria-disabled');
+    checkInCopyStatus.textContent = '';
+  }
+
+  async function copyPublicCheckInLink() {
+    var url = checkInUrlInput.value;
+    try {
+      await window.HrmClipboard.copy(url);
+      checkInCopyStatus.textContent = 'Copied.';
+      window.HrmToast.success('The public check-in link was copied.');
+    } catch (error) {
+      checkInCopyStatus.textContent = url;
+      window.HrmToast.error(error.message || 'The link could not be copied.');
+    }
+  }
+
+  if (checkInCopyButton) {
+    checkInCopyButton.addEventListener('click', copyPublicCheckInLink);
+  }
+
+  document.addEventListener('hrm:layout-ready', renderPublicCheckInLink);
 
   yearSelect.addEventListener('change', function () {
     loadYear().catch(function (error) {

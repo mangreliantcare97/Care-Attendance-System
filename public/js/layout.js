@@ -133,7 +133,7 @@
     } catch (error) {
       /* signing out locally is enough */
     }
-    window.location.href = '/login.html';
+    window.location.href = '/login.html?signedOut=1';
   }
 
   async function init() {
@@ -160,6 +160,8 @@
       window.HrmApi.setCsrfToken(response.meta && response.meta.csrfToken);
       window.HrmCurrentAdmin = response.data.admin;
       window.HrmAppTimezone = response.data.timezone;
+      window.HrmCheckInBaseUrl = response.data.checkInBaseUrl;
+      window.HrmCheckInUrl = response.data.checkInUrl;
       fillAdmin(response.data.admin);
     } catch (error) {
       redirectToLogin();

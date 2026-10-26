@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { AdminModel } from '../models/Admin.ts';
-import { destroySession } from './requireAuth.ts';
+import { destroySession, findSessionAdmin } from './requireAuth.ts';
 
 /**
  * Guard for the static HTML pages.
@@ -22,12 +21,13 @@ export async function requireAuthPage(req: Request, res: Response, next: NextFun
   }
 
   try {
-    const admin = await AdminModel.findById(adminId).lean();
-    if (!admin || !admin.isActive) {
+    const admin = await findSessionAdmin(req);
+    if (!admin) {
       await destroySession(req);
       redirect();
       return;
     }
+    req.admin = admin;
     next();
   } catch (error) {
     next(error);

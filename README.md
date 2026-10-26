@@ -1,11 +1,14 @@
-# Lean HRM
+# Care Attendance
 
-A lean rewrite of the Laravel **Human Resource Management** system as an
-Express + MongoDB application. The UI keeps the original design (AdminLTE 3.2
-on Bootstrap 4, fully vendored), the backend is a small TypeScript service.
+Care Attendance is a public check-in / check-out page plus a login-protected
+admin panel, built with Express, TypeScript and MongoDB. The admin UI keeps the
+AdminLTE 3.2 / Bootstrap 4 shell, fully vendored. The public form is
+cookie-free and does not require an account.
 
-The old Laravel application is kept in [`/legacy`](legacy) for reference only —
-it is not executed and not built.
+This branch (`care-attendance-system`) is being converted from the earlier HRM
+application. The HRM modules described below are still present while Phase 1
+clean-up is under review and will be removed before the Care Attendance
+features are built.
 
 ---
 
@@ -20,14 +23,51 @@ it is not executed and not built.
 
 ```bash
 npm install
-cp .env.example .env          # then fill in SESSION_SECRET and MONGODB_URI
+cp .env.example .env          # set a new SESSION_SECRET and MONGODB_URI
 npm run seed                  # creates the first admin from the environment
 npm start                     # http://localhost:3000
 ```
 
+`SESSION_SECRET` is required in every environment. Generate a new value for
+this project and never reuse the old HRM secret:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+The default database is `mongodb://127.0.0.1:27017/care-attendance`. Do not
+point Care Attendance at the old HRM database.
+
 `npm run seed` **never** uses a hardcoded password: it reads
 `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` from the environment and refuses
 to run when they are missing.
+
+### Who uses which link
+
+| Link | Audience | What happens |
+|---|---|---|
+| `/`, `/checkin`, `/checkin.html` | Staff, on any shared or personal device | The same public check-in page. No login, no session cookie, no admin navigation, and `noindex`. An optional `?location=<id>` preselects an **active** location; unknown and inactive ids are ignored. |
+| `/admin` | Administrators | A signed-in administrator is sent to `/dashboard.html`; everyone else is sent to `/login.html?next=/dashboard.html`. |
+| `/login.html` | Administrators | Signs in and then follows a validated local `next` path, or the dashboard. A signed-in administrator is sent straight to `/dashboard.html`. |
+| `/dashboard.html`, `/entries.html`, `/locations.html`, and the other module pages | Administrators | Protected HTML pages. Signed-out requests are sent to `/login.html?next=<path and query>`. |
+| `/api/public/locations`, `/api/public/entries` | The public form | Cookie-free JSON endpoints. Only active locations are exposed, and only their id and name. |
+| `/api/*` (everything else) | Administrators | A signed-out request always gets JSON `401 { "success": false, "error": { "code": "unauthenticated", … } }`, never an HTML page or application data. |
+
+The public link is intentionally stable and safe to print. The dashboard shows
+the link built from `APP_BASE_URL`; the Locations page copies
+`${APP_BASE_URL}/?location=<id>` for each location. Neither link is built from
+the current browser origin or the request `Host` header, so a proxy or preview
+host cannot poison a printed QR code.
+
+### Shared-device warning
+
+The public check-in page is designed for a shared kiosk or staff tablet. If an
+administrator signs in on that device, the next person can use the admin panel
+until the session is ended. Use the **Log out** action when finished and never
+save the administrator password in the kiosk browser. Sessions are rolling and
+expire after `SESSION_MAX_HOURS` of inactivity (12 hours by default); the
+cookie is `httpOnly`, `SameSite=Lax`, and `Secure` when
+`NODE_ENV=production`.
 
 ### Scripts
 
@@ -54,20 +94,43 @@ Everything is read from the environment (see `.env.example`):
 |---|---|---|
 | `PORT` | `3000` | HTTP port |
 | `APP_TIMEZONE` | `Europe/London` | Timezone used for "today" and month boundaries |
-| `MONGODB_URI` | `mongodb://127.0.0.1:27017/lean-hrm` | Database connection |
-| `SESSION_SECRET` | — | **Required in production** |
+| `MONGODB_URI` | `mongodb://127.0.0.1:27017/care-attendance` | Database connection |
+| `SESSION_SECRET` | — | **Required in every environment**; use a new long random value |
+| `SESSION_COOKIE_NAME` | `care.sid` | Name of the session cookie |
+| `SESSION_MAX_HOURS` | `12` | Rolling session lifetime in hours; every request refreshes it |
 | `TRUST_PROXY` | `1` | Number of reverse proxies in front of the app |
 | `WORKING_WEEK` | `1,2,3,4,5` | ISO weekdays (1 = Monday) that count as working days |
 | `ANNUAL_ALLOWANCE_DEFAULT` | `28` | Default holiday allowance per employee and calendar year |
 | `LOGIN_RATE_LIMIT_MAX` | `10` | Login attempts per window and IP |
 | `EMPLOYEE_PHOTO_MAX_BYTES` | `262144` | Maximum accepted photo size |
 | `MAIL_PROVIDER` | `none` | `none`, `console` or `cloudflare` |
-| `MAIL_FROM` | — | The sender, e.g. `Human Resource <noreply@example.com>` |
+| `MAIL_FROM` | — | The sender, e.g. `Care Attendance <noreply@example.com>` |
 | `CLOUDFLARE_ACCOUNT_ID` | — | Cloudflare account id (email sending) |
 | `CLOUDFLARE_EMAIL_API_TOKEN` | — | Cloudflare API token with email sending permission |
-| `APP_BASE_URL` | `APP_URL` | The public address — the reset links are built from it |
+| `APP_BASE_URL` | `APP_URL` | The public address used for reset links and the public check-in links |
 | `PASSWORD_RESET_TTL_MINUTES` | `30` | How long a reset link is valid |
 | `PASSWORD_RESET_RATE_LIMIT_MAX` | `5` | Reset requests per window, per IP and per address |
+
+### Render deployment
+
+Use a new Render Web Service named `care-attendance` and a new MongoDB Atlas
+database named `care-attendance`; never reuse the old HRM service or database.
+The service starts with `npm install` and `npm start`, and the health check is
+`GET /api/health`. Set at least:
+
+```
+NODE_ENV=production
+MONGODB_URI=<new Atlas care-attendance connection string>
+SESSION_SECRET=<new long random value>
+SESSION_MAX_HOURS=12
+APP_URL=https://care-attendance.onrender.com
+APP_BASE_URL=https://care-attendance.onrender.com
+TRUST_PROXY=1
+```
+
+There is no `render.yaml` in this repository, so the service name is configured
+in the Render dashboard. Free services sleep after inactivity; Atlas M0 has no
+backups.
 
 ## Password reset (Cloudflare Email Service)
 
@@ -90,10 +153,10 @@ SMTP is never used.
 
    ```
    MAIL_PROVIDER=cloudflare
-   MAIL_FROM="Human Resource <noreply@yourdomain.com>"
+   MAIL_FROM="Care Attendance <noreply@yourdomain.com>"
    CLOUDFLARE_ACCOUNT_ID=<your account id>
    CLOUDFLARE_EMAIL_API_TOKEN=<the token>
-   APP_BASE_URL=https://your-app.onrender.com
+   APP_BASE_URL=https://care-attendance.onrender.com
    ```
 
    `APP_BASE_URL` is the only source for the reset link — the request headers
@@ -134,8 +197,8 @@ Every session of that administrator is signed out afterwards.
 server.ts              entry point — connects to MongoDB and starts the HTTP server
 src/
   app.ts               the express application (middleware, routes, static files)
-  config/              env, database, session store, page list
-  models/              mongoose models (Admin, Employee, Department, Attendance, …)
+  config/              env, database, session store, page list, post-login redirect allowlist
+  models/              mongoose models (Admin, Location, Entry, Employee, Department, Attendance, …)
   middleware/          requireAuth, requireAdmin, requireAuthPage, CSRF, rate limit, errors
   routes/              API routers
   controllers/         request handlers
@@ -143,9 +206,11 @@ src/
   utils/               dates, validation, responses, pagination, CSV, escaping
 public/
   *.html               one file per module (multi page, not an SPA)
+  checkin.html         public, cookie-free check-in page (also served at / and /checkin)
   partials/            sidebar + navbar, injected by layout.js
   css/theme.css        design tokens, dark mode, print stylesheet
-  js/                  theme, layout, api client, fullscreen, toast, DOM helpers
+  css/checkin.css      standalone styles for the public page
+  js/                  theme, layout, api client, clipboard, fullscreen, toast, DOM helpers
   vendor/              AdminLTE, Bootstrap, jQuery, Font Awesome, Chart.js, FullCalendar, Toastr
   assets/fonts/        self-hosted Source Sans Pro
 seed/seed.ts           creates the first administrator
@@ -165,9 +230,11 @@ docs/                  the phase 1 audit, the phase 2 report and the phase 3A/3B
   and the navbar live in `public/partials/` and are injected by
   `public/js/layout.js`, so the navigation is defined exactly once.
 * **The pages are protected.** The server checks the session before it serves
-  a page and redirects anonymous visitors to `/login.html`.
-* **Sessions** live in MongoDB (`connect-mongo`), the cookie is httpOnly,
-  `SameSite=Lax` and `secure` in production. `trust proxy` is set to 1.
+  a page and redirects anonymous visitors to `/login.html?next=<path and query>`.
+  Only the protected page allowlist can be used as a post-login `next` target.
+* **Sessions** live in MongoDB (`connect-mongo`) and are rolling. The cookie is
+  httpOnly, `SameSite=Lax` and `Secure` in production, and expires after
+  `SESSION_MAX_HOURS` of inactivity. `trust proxy` is set to 1.
 * **CSRF** uses a double submit token: it is issued at login, handed out by
   `GET /api/auth/me` and has to be echoed in the `X-CSRF-Token` header.
 * **Login** is rate limited per IP and never reveals whether an email exists.
@@ -398,7 +465,7 @@ job covers the whole reports page.
 ### Demo data (local/demo only)
 
 ```bash
-MONGODB_URI=mongodb://127.0.0.1:27017/lean-hrm-demo npm run seed:demo
+MONGODB_URI=mongodb://127.0.0.1:27017/care-attendance-demo npm run seed:demo
 ```
 
 `seed:demo` refuses to run when `NODE_ENV=production` and refuses to touch a
@@ -429,19 +496,19 @@ Use a **dedicated** database, and create the administrator first:
 
 ```bash
 # 1. Create the administrator in the same dedicated database.
-MONGODB_URI=mongodb://127.0.0.1:27017/lean-hrm-2025-test \
+MONGODB_URI=mongodb://127.0.0.1:27017/care-attendance-2025-test \
 SEED_ADMIN_NAME="2025 Test Admin" \
 SEED_ADMIN_EMAIL=admin@example.com \
 SEED_ADMIN_PASSWORD='choose-a-local-password' \
 npm run seed
 
 # 2. Generate the history. On an existing seed database, add --reset.
-MONGODB_URI=mongodb://127.0.0.1:27017/lean-hrm-2025-test \
+MONGODB_URI=mongodb://127.0.0.1:27017/care-attendance-2025-test \
 SEED_ADMIN_EMAIL=admin@example.com \
 npm run seed:history -- --reset
 
 # 3. Run the app against the same database.
-MONGODB_URI=mongodb://127.0.0.1:27017/lean-hrm-2025-test \
+MONGODB_URI=mongodb://127.0.0.1:27017/care-attendance-2025-test \
 npm start
 ```
 
@@ -461,7 +528,7 @@ portraits, the repository ships 26 local headshots in
 [randomuser.me](https://randomuser.me) for local demo use):
 
 ```bash
-MONGODB_URI=mongodb://127.0.0.1:27017/lean-hrm-2025-test npm run seed:photos
+MONGODB_URI=mongodb://127.0.0.1:27017/care-attendance-2025-test npm run seed:photos
 ```
 
 The script matches `amelia-bennett.jpg` to employee "Amelia Bennett", stores the

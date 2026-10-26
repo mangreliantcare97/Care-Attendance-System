@@ -7,13 +7,23 @@ import { createSessionMiddleware } from './config/session.ts';
 import { createApiRouter } from './routes/index.ts';
 import { errorHandler, notFound } from './middleware/errorHandler.ts';
 import { requireAuthPage } from './middleware/requireAuthPage.ts';
-import { PAGES } from './config/pages.ts';
+import { destroySession, findSessionAdmin } from './middleware/requireAuth.ts';
+import { NOINDEX_PAGE_PATHS, PAGES } from './config/pages.ts';
 import { loginRateLimiter } from './middleware/rateLimit.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 /** Root of the served `public/` directory. */
 export const PUBLIC_DIR = path.resolve(here, '..', 'public');
+
+const NOINDEX_PATHS = new Set<string>(NOINDEX_PAGE_PATHS);
+
+function setNoIndex(req: Request, res: Response, next: NextFunction): void {
+  if (NOINDEX_PATHS.has(req.path)) {
+    res.set('X-Robots-Tag', 'noindex, nofollow');
+  }
+  next();
+}
 
 export interface AppOptions {
   /** Override the login rate limiter (used by the tests). */
@@ -83,6 +93,9 @@ export function createApp(options: AppOptions = {}): Express {
 
   app.use(options.sessionMiddleware ?? createSessionMiddleware());
 
+  // Pages that must never be indexed: the public form and the sign-in flow.
+  app.use(setNoIndex);
+
   app.use(
     '/api',
     createApiRouter({
@@ -92,19 +105,72 @@ export function createApp(options: AppOptions = {}): Express {
     }),
   );
 
-  // ---- static pages -------------------------------------------------------
-  app.get('/login.html', (_req, res) => {
-    res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
+  app.get('/robots.txt', (_req, res) => {
+    res.type('text/plain').send(
+      [
+        'User-agent: *',
+        'Disallow: /',
+        'Disallow: /checkin',
+        'Disallow: /checkin.html',
+        'Disallow: /login.html',
+        'Disallow: /forgot-password.html',
+        'Disallow: /reset-password.html',
+        'Disallow: /admin',
+        '',
+      ].join('\n'),
+    );
   });
 
-  app.get('/', (_req, res) => {
-    res.redirect(302, '/dashboard.html');
+  // ---- public entry point ------------------------------------------------
+  // The check-in form is the root of the site. It never redirects and never
+  // needs a session, so a bookmark or printed QR code keeps working forever.
+  const sendCheckin = (_req: Request, res: Response): void => {
+    res.sendFile(path.join(PUBLIC_DIR, 'checkin.html'));
+  };
+  app.get('/', sendCheckin);
+  app.get('/checkin', sendCheckin);
+  app.get('/checkin.html', sendCheckin);
+
+  // ---- admin entry point -------------------------------------------------
+  app.get('/admin', async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.session?.adminId) {
+      res.redirect(302, '/login.html?next=/dashboard.html');
+      return;
+    }
+
+    try {
+      const admin = await findSessionAdmin(req);
+      if (!admin) {
+        await destroySession(req);
+        res.redirect(302, '/login.html?next=/dashboard.html');
+        return;
+      }
+      res.redirect(302, '/dashboard.html');
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/login.html', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (req.session?.adminId) {
+        const admin = await findSessionAdmin(req);
+        if (admin) {
+          res.redirect(302, '/dashboard.html');
+          return;
+        }
+        await destroySession(req);
+      }
+      res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
+    } catch (error) {
+      next(error);
+    }
   });
 
   for (const page of PAGES) {
     // Public pages (password reset) are served without a session, everything
     // else is behind the session check.
-    const guard = page.public ? (_req: Request, res: Response, next: NextFunction) => next() : requireAuthPage;
+    const guard = page.public ? (_req: Request, _res: Response, next: NextFunction) => next() : requireAuthPage;
     app.get(`/${page.file}`, guard, (_req, res) => {
       for (const [name, value] of Object.entries(page.headers ?? {})) {
         res.set(name, value);

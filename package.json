@@ -1,9 +1,9 @@
 {
-  "name": "lean-hrm",
+  "name": "care-attendance",
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Lean HR management system — Express + MongoDB rebuild of the Laravel AdminLTE HRM",
+  "description": "Care Attendance — public check-in/check-out and admin panel (Express + MongoDB)",
   "engines": {
     "node": ">=22.18"
   },

@@ -10,7 +10,7 @@ import request from 'supertest';
 
 process.env.NODE_ENV = 'test';
 process.env.SESSION_SECRET = 'test-session-secret';
-process.env.SESSION_COOKIE_NAME = 'hrm.test.sid';
+process.env.SESSION_COOKIE_NAME = 'care.test.sid';
 process.env.TRUST_PROXY = '1';
 // The tests must not depend on a local .env file — dotenv never overrides a
 // value that is already set.

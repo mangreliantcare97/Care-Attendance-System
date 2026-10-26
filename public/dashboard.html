@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#ffffff" data-theme-color>
     <script src="/js/theme.js"></script>
-    <title>Dashboard | Human Resource</title>
+    <title>Dashboard | Care Attendance</title>
     <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
 
     <link rel="stylesheet" href="/css/source-sans-pro.css">
@@ -98,6 +98,42 @@
                                 </div>
                                 <div class="icon"><i class="fa fa-question" aria-hidden="true"></i></div>
                             </a>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card card-glass" id="public-checkin-card">
+                                <div class="card-header">
+                                    <h3 class="card-title mb-0">
+                                        <i class="fa fa-qrcode mr-1" aria-hidden="true"></i>
+                                        Public check-in link
+                                    </h3>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted mb-2">
+                                        Share this link with staff. Print one QR code per location from the
+                                        <a href="/locations.html">Locations</a> page. The link is built from
+                                        <code>APP_BASE_URL</code> and never from request headers.
+                                    </p>
+                                    <div class="input-group">
+                                        <label class="sr-only" for="public-checkin-url">Public check-in URL</label>
+                                        <input type="text" class="form-control" id="public-checkin-url" readonly
+                                               autocomplete="off" spellcheck="false" aria-describedby="public-checkin-copy-status">
+                                        <div class="input-group-append">
+                                            <button type="button" class="btn btn-primary" id="copy-public-checkin"
+                                                    aria-label="Copy public check-in link">
+                                                <i class="fa fa-copy mr-1" aria-hidden="true"></i>Copy
+                                            </button>
+                                            <a class="btn btn-outline-primary" id="open-public-checkin"
+                                               href="/" target="_blank" rel="noopener">
+                                                <i class="fa fa-external-link-alt mr-1" aria-hidden="true"></i>Open in new tab
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted d-block mt-2" id="public-checkin-copy-status" role="status" aria-live="polite"></small>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -213,7 +249,7 @@
         </div>
 
         <footer class="main-footer">
-            <strong>Human Resource</strong> — Lean HRM
+            <strong>Care Attendance</strong>
             <div class="float-right d-none d-sm-inline">Signed in as <span data-admin-name>Administrator</span></div>
         </footer>
     </div>
@@ -225,6 +261,7 @@
     <script src="/js/api.js"></script>
     <script src="/js/toast.js"></script>
     <script src="/js/dom.js"></script>
+    <script src="/js/clipboard.js"></script>
     <script src="/js/fullscreen.js"></script>
     <script src="/js/layout.js"></script>
     <script src="/js/dashboard.js"></script>

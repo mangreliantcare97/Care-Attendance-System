@@ -427,7 +427,7 @@ describe('page guard', () => {
 
     assert.equal(response.status, 200);
     assert.match(response.headers['content-type'], /text\/html/);
-    assert.match(response.text, /Human Resource/);
+    assert.match(response.text, /Care Attendance/);
   });
 
   it('serves the login page to anyone', async () => {

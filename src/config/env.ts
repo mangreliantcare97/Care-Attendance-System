@@ -24,6 +24,15 @@ function int(name: string, fallback: number): number {
   return parsed;
 }
 
+/** Read a required positive integer. */
+function positiveInt(name: string, fallback: number): number {
+  const value = int(name, fallback);
+  if (value <= 0) {
+    throw new Error(`Environment variable ${name} must be greater than zero, got "${value}"`);
+  }
+  return value;
+}
+
 /**
  * Parse the working-week configuration into ISO weekday numbers (1 = Monday .. 7 = Sunday).
  * Defaults to Monday-Friday.
@@ -64,11 +73,16 @@ export const env = {
   /** IANA timezone used for every calendar-day calculation. */
   appTimezone: str('APP_TIMEZONE', 'Europe/London'),
 
-  mongodbUri: str('MONGODB_URI', 'mongodb://127.0.0.1:27017/lean-hrm'),
+  mongodbUri: str('MONGODB_URI', 'mongodb://127.0.0.1:27017/care-attendance'),
 
-  sessionSecret: isProduction ? required('SESSION_SECRET') : str('SESSION_SECRET', 'dev-only-insecure-session-secret'),
-  sessionCookieName: str('SESSION_COOKIE_NAME', 'hrm.sid'),
-  sessionTtlMinutes: int('SESSION_TTL_MINUTES', 480),
+  /** Required in every environment. Generate a new value for this project. */
+  sessionSecret: required('SESSION_SECRET'),
+  sessionCookieName: str('SESSION_COOKIE_NAME', 'care.sid'),
+  /**
+   * Session lifetime. The session is rolling, so every request refreshes the
+   * window; a session that stays unused for this many hours expires.
+   */
+  sessionMaxHours: positiveInt('SESSION_MAX_HOURS', 12),
 
   trustProxy: int('TRUST_PROXY', 1),
 

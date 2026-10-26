@@ -78,7 +78,7 @@
     if (mode === 'add') {
       title.textContent = 'Add Admin';
       subtitle.textContent = 'Create another administrator account with full access.';
-      document.title = 'Add Admin | Human Resource';
+      document.title = 'Add Admin | Care Attendance';
       return;
     }
 
@@ -86,7 +86,7 @@
     subtitle.textContent = own
       ? 'Update your own profile. Use My Account to change your password.'
       : 'Update this administrator’s profile and access.';
-    document.title = 'Edit Admin | Human Resource';
+    document.title = 'Edit Admin | Care Attendance';
   }
 
   function refreshStrength() {

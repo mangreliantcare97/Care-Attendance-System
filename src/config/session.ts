@@ -15,7 +15,7 @@ export function createSessionStore(): MongoStore {
   store = MongoStore.create({
     client: mongoose.connection.getClient(),
     collectionName: 'sessions',
-    ttl: env.sessionTtlMinutes * 60,
+    ttl: env.sessionMaxHours * 60 * 60,
     touchAfter: 60,
     stringify: false,
     autoRemove: 'native',
@@ -44,7 +44,7 @@ export function createSessionMiddleware() {
       httpOnly: true,
       sameSite: 'lax',
       secure: env.isProduction,
-      maxAge: env.sessionTtlMinutes * 60 * 1000,
+      maxAge: env.sessionMaxHours * 60 * 60 * 1000,
     },
   });
 }

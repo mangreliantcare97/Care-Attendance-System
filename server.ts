@@ -7,12 +7,12 @@ async function main(): Promise<void> {
 
   const app = createApp();
   const server = app.listen(env.port, () => {
-    console.log(`[hrm] listening on http://localhost:${env.port}`);
-    console.log(`[hrm] environment: ${env.nodeEnv} | timezone: ${env.appTimezone}`);
+    console.log(`[care-attendance] listening on http://localhost:${env.port}`);
+    console.log(`[care-attendance] environment: ${env.nodeEnv} | timezone: ${env.appTimezone}`);
   });
 
   const shutdown = (signal: string): void => {
-    console.log(`[hrm] ${signal} received — shutting down`);
+    console.log(`[care-attendance] ${signal} received — shutting down`);
     server.close(() => {
       void disconnectDatabase().finally(() => process.exit(0));
     });
@@ -23,6 +23,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error('[hrm] failed to start:', error);
+  console.error('[care-attendance] failed to start:', error);
   process.exit(1);
 });

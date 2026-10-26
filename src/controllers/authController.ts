@@ -4,11 +4,14 @@ import { AdminModel, findAdminWithPassword, publicAdmin, verifyPassword } from '
 import { createCsrfToken } from '../middleware/csrf.ts';
 import { destroySession } from '../middleware/requireAuth.ts';
 import { env } from '../config/env.ts';
+import { safeNextPath } from '../config/redirects.ts';
 import { HttpError, ok } from '../utils/response.ts';
 
 export const loginSchema = z.object({
   email: z.email('Enter a valid email address').max(255),
   password: z.string().min(1, 'Enter your password').max(200),
+  /** Where to go after signing in. Validated server-side below. */
+  next: z.string().optional(),
 });
 
 /**
@@ -19,7 +22,7 @@ export const loginSchema = z.object({
 const DUMMY_HASH = '$2b$12$C6UzMDM.H6dfI/f/IKcEe.fKlQTFVXqL4i4jJkjL1zO3wqNJkD9hPC';
 
 export async function login(req: Request, res: Response): Promise<void> {
-  const { email, password } = req.valid.body as z.infer<typeof loginSchema>;
+  const { email, password, next: nextPath } = req.valid.body as z.infer<typeof loginSchema>;
 
   const admin = await findAdminWithPassword(email);
   if (!admin) {
@@ -57,7 +60,11 @@ export async function login(req: Request, res: Response): Promise<void> {
   admin.lastLoginAt = new Date();
   await admin.save();
 
-  ok(res, { admin: publicAdmin(admin) }, { csrfToken: req.session.csrfToken });
+  ok(
+    res,
+    { admin: publicAdmin(admin), redirectTo: safeNextPath(nextPath) },
+    { csrfToken: req.session.csrfToken },
+  );
 }
 
 /**
@@ -85,7 +92,14 @@ export async function me(req: Request, res: Response): Promise<void> {
 
   ok(
     res,
-    { admin: publicAdmin(admin), timezone: env.appTimezone },
+    {
+      admin: publicAdmin(admin),
+      timezone: env.appTimezone,
+      // Built from APP_BASE_URL — never from the Host header. The admin pages
+      // use this for the dashboard card and the per-location copy buttons.
+      checkInBaseUrl: env.appBaseUrl,
+      checkInUrl: `${env.appBaseUrl}/`,
+    },
     { csrfToken: req.session.csrfToken },
   );
 }

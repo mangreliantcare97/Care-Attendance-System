@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" data-theme-color>
+    <meta name="robots" content="noindex, nofollow">
+    <script src="/js/theme.js"></script>
+    <title>Check in | Care Attendance</title>
+    <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
+
+    <link rel="stylesheet" href="/css/source-sans-pro.css">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/checkin.css">
+</head>
+<body class="checkin-page">
+    <main class="checkin-shell">
+        <header class="checkin-brand">
+            <img src="/assets/img/hr_logo.png" alt="" width="51" height="39">
+            <div>
+                <h1>Care Attendance</h1>
+                <p>Staff check-in</p>
+            </div>
+        </header>
+
+        <section class="checkin-card" aria-labelledby="checkin-heading">
+            <h2 id="checkin-heading">Check in or out</h2>
+            <p class="checkin-intro">
+                Enter your name, choose your location and record your arrival or departure.
+                No account is needed.
+            </p>
+
+            <div id="checkin-alert" class="checkin-alert d-none" role="alert"></div>
+            <div id="checkin-success" class="checkin-success d-none" role="status" aria-live="polite"></div>
+
+            <form id="checkin-form" novalidate>
+                <div class="checkin-field">
+                    <label for="checkin-name">Your name</label>
+                    <input type="text" id="checkin-name" name="name" maxlength="120"
+                           autocomplete="name" autocapitalize="words" required>
+                </div>
+
+                <div class="checkin-field">
+                    <label for="checkin-location">Location</label>
+                    <select id="checkin-location" name="locationId" required disabled>
+                        <option value="">Loading locations…</option>
+                    </select>
+                </div>
+
+                <fieldset class="checkin-direction">
+                    <legend>I am</legend>
+                    <label class="checkin-radio">
+                        <input type="radio" name="direction" value="in" checked>
+                        <span>Checking in</span>
+                    </label>
+                    <label class="checkin-radio">
+                        <input type="radio" name="direction" value="out">
+                        <span>Checking out</span>
+                    </label>
+                </fieldset>
+
+                <button type="submit" class="checkin-submit" id="checkin-submit" disabled>
+                    Check in
+                </button>
+            </form>
+
+            <p class="checkin-note">
+                This device is shared. Never sign in to the admin panel on it.
+            </p>
+        </section>
+    </main>
+
+    <script src="/js/checkin.js"></script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" data-theme-color>
+    <script src="/js/theme.js"></script>
+    <title>Entries | Care Attendance</title>
+    <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
+
+    <link rel="stylesheet" href="/css/source-sans-pro.css">
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="/vendor/adminlte.min.css">
+    <link rel="stylesheet" href="/vendor/toastr/toastr.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+</head>
+<body class="hold-transition sidebar-mini layout-fixed" data-page="entries">
+    <div class="wrapper">
+        <div id="navbar-placeholder"></div>
+        <div id="sidebar-placeholder"></div>
+
+        <div class="content-wrapper">
+            <section class="content">
+                <div class="container-fluid">
+                    <div class="content-header">
+                        <div class="row mb-2">
+                            <div class="col-sm-6">
+                                <h1 class="m-0">Entries</h1>
+                                <small class="text-muted">The newest public check-in and check-out records.</small>
+                            </div>
+                            <div class="col-sm-6 text-right no-print">
+                                <button type="button" class="btn btn-secondary" id="refresh-entries">
+                                    <i class="fa fa-sync"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card card-glass">
+                                <div class="card-header">
+                                    <h3 class="card-title">Latest entries</h3>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>When</th>
+                                                    <th>Name</th>
+                                                    <th>Location</th>
+                                                    <th>Direction</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="entries-body">
+                                                <tr><td colspan="4" class="text-center py-4">Loading…</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="card-footer d-flex justify-content-between align-items-center">
+                                    <span class="text-muted small" id="entries-summary"></span>
+                                    <div id="entries-pagination"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer class="main-footer">
+            <strong>Care Attendance</strong>
+            <div class="float-right d-none d-sm-inline">Signed in as <span data-admin-name>Administrator</span></div>
+        </footer>
+    </div>
+
+    <script src="/vendor/jquery.min.js"></script>
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script src="/vendor/toastr/toastr.min.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/toast.js"></script>
+    <script src="/js/dom.js"></script>
+    <script src="/js/fullscreen.js"></script>
+    <script src="/js/layout.js"></script>
+    <script src="/js/entries.js"></script>
+</body>
+</html>

@@ -400,7 +400,7 @@
 
   function setDateLabel() {
     sheetTitle.textContent = state.date ? 'Daily sheet — ' + state.date : 'Daily sheet';
-    document.title = (state.date ? state.date + ' attendance' : 'Attendance') + ' | Human Resource';
+    document.title = (state.date ? state.date + ' attendance' : 'Attendance') + ' | Care Attendance';
   }
 
   function showLoadingState() {
