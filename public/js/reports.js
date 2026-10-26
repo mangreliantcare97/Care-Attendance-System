@@ -4,7 +4,7 @@
  * Three tabs use the existing APIs:
  *  - attendance summary: GET /api/reports/attendance-summary (+ CSV)
  *  - overtime: GET /api/overtime/summary (reused as-is)
- *  - leave activity: GET /api/leaves plus the per-employee leave totals
+ *  - leave activity: GET /api/leaves plus the per-student leave totals
  *
  * All data is loaded on page load, so the print stylesheet can print every tab.
  */
@@ -60,14 +60,14 @@
     return html`<span class="badge-soft badge-soft-${variant}">${rate}%</span>`;
   }
 
-  function employeeOf(record) {
-    return record.employeeId && typeof record.employeeId === 'object' ? record.employeeId : {};
+  function studentOf(record) {
+    return record.studentId && typeof record.studentId === 'object' ? record.studentId : {};
   }
 
   function departmentOf(record) {
-    var employee = employeeOf(record);
-    return employee.departmentId && typeof employee.departmentId === 'object'
-      ? employee.departmentId.name
+    var student = studentOf(record);
+    return student.departmentId && typeof student.departmentId === 'object'
+      ? student.departmentId.name
       : null;
   }
 
@@ -78,18 +78,18 @@
   }
 
   async function loadFilters() {
-    var [departmentsResponse, employeesResponse] = await Promise.all([
+    var [departmentsResponse, studentsResponse] = await Promise.all([
       window.HrmApi.get('/api/departments'),
-      window.HrmApi.get('/api/employees?perPage=100'),
+      window.HrmApi.get('/api/students?perPage=100'),
     ]);
 
     var departments = departmentsResponse.data.departments;
-    var employees = employeesResponse.data.employees;
+    var students = studentsResponse.data.students;
 
     fillSelect(document.getElementById('attendance-department'), 'All departments', departments);
     fillSelect(document.getElementById('overtime-department'), 'All departments', departments);
-    fillSelect(document.getElementById('attendance-employee'), 'All employees', employees);
-    fillSelect(document.getElementById('leave-employee'), 'All employees', employees);
+    fillSelect(document.getElementById('attendance-student'), 'All students', students);
+    fillSelect(document.getElementById('leave-student'), 'All students', students);
   }
 
   // -------------------------------------------------------------------------
@@ -102,12 +102,12 @@
     var from = document.getElementById('attendance-from').value;
     var to = document.getElementById('attendance-to').value;
     var department = document.getElementById('attendance-department').value;
-    var employee = document.getElementById('attendance-employee').value;
+    var student = document.getElementById('attendance-student').value;
 
     if (from) params.set('from', from);
     if (to) params.set('to', to);
     if (department) params.set('departmentId', department);
-    if (employee) params.set('employeeId', employee);
+    if (student) params.set('studentId', student);
 
     if (includePagination) {
       params.set('page', String(attendancePage));
@@ -135,14 +135,14 @@
         window.HrmDom.renderListState(document.getElementById('attendance-body'), 9, {
           type: 'empty',
           message: 'No attendance in this range.',
-          help: 'Change the dates, department or employee and try again.',
+          help: 'Change the dates, department or student and try again.',
         });
       } else {
         window.HrmDom.renderRows(
           document.getElementById('attendance-body'),
           rows.map(function (row) {
             return [
-              html`<td><a href="/employee.html?id=${row.employeeId}"><strong>${row.name}</strong></a></td>`,
+              html`<td><a href="/student.html?id=${row.studentId}"><strong>${row.name}</strong></a></td>`,
               html`<td>${row.department || '—'}</td>`,
               html`<td>${row.position || '—'}</td>`,
               html`<td class="text-center">${row.present}</td>`,
@@ -169,8 +169,8 @@
       </tr>`;
 
       document.getElementById('attendance-count').textContent = meta.total
-        ? meta.total + (meta.total === 1 ? ' employee' : ' employees')
-        : 'No employees';
+        ? meta.total + (meta.total === 1 ? ' student' : ' students')
+        : 'No students';
 
       window.HrmDom.renderPagination(
         document.getElementById('attendance-pagination'),
@@ -234,7 +234,7 @@
           document.getElementById('overtime-body'),
           data.rows.map(function (row) {
             return [
-              html`<td><a href="/employee.html?id=${row.employeeId}"><strong>${row.name}</strong></a></td>`,
+              html`<td><a href="/student.html?id=${row.studentId}"><strong>${row.name}</strong></a></td>`,
               html`<td>${row.department || '—'}</td>`,
               html`<td class="text-center">${row.entries}</td>`,
               html`<td class="text-center">${row.totalHours}</td>`,
@@ -273,13 +273,13 @@
     var to = document.getElementById('leave-to').value;
     var type = document.getElementById('leave-type').value;
     var status = document.getElementById('leave-status').value;
-    var employee = document.getElementById('leave-employee').value;
+    var student = document.getElementById('leave-student').value;
 
     if (from) params.set('from', from);
     if (to) params.set('to', to);
     if (type) params.set('type', type);
     if (status) params.set('status', status);
-    if (employee) params.set('employeeId', employee);
+    if (student) params.set('studentId', student);
 
     if (includePagination) {
       params.set('page', String(leavePage));
@@ -290,14 +290,14 @@
   }
 
   async function loadLeaveTotals() {
-    var select = document.getElementById('leave-employee');
-    var employeeId = select.value;
+    var select = document.getElementById('leave-student');
+    var studentId = select.value;
     var body = document.getElementById('leave-totals-body');
     var title = document.getElementById('leave-totals-title');
 
-    if (!employeeId) {
+    if (!studentId) {
       title.textContent = 'Approved leave totals by year';
-      body.innerHTML = html`<tr><td colspan="5" class="text-muted text-center py-3">Choose an employee to see their yearly totals.</td></tr>`;
+      body.innerHTML = html`<tr><td colspan="5" class="text-muted text-center py-3">Choose a student to see their yearly totals.</td></tr>`;
       return;
     }
 
@@ -307,7 +307,7 @@
     });
 
     try {
-      var response = await window.HrmApi.get('/api/employees/' + employeeId + '/leave-totals');
+      var response = await window.HrmApi.get('/api/students/' + studentId + '/leave-totals');
       var totals = response.data.totalsByYear || [];
       var name = select.options[select.selectedIndex].textContent;
       title.textContent = 'Approved leave totals — ' + name;
@@ -315,7 +315,7 @@
       if (!totals.length) {
         window.HrmDom.renderListState(body, 5, {
           type: 'empty',
-          message: 'No approved leave for this employee.',
+          message: 'No approved leave for this student.',
           help: 'Approved leave will be counted by year here.',
         });
       } else {
@@ -331,7 +331,7 @@
             ];
           }),
           5,
-          'No approved leave for this employee.',
+          'No approved leave for this student.',
         );
       }
     } catch (error) {
@@ -360,16 +360,16 @@
         window.HrmDom.renderListState(document.getElementById('leave-body'), 8, {
           type: 'empty',
           message: 'No leave records match these filters.',
-          help: 'Change the dates, type, status or employee and try again.',
+          help: 'Change the dates, type, status or student and try again.',
         });
       } else {
         window.HrmDom.renderRows(
           document.getElementById('leave-body'),
           leaves.map(function (leave) {
-            var employee = employeeOf(leave);
+            var student = studentOf(leave);
 
             return [
-              html`<td><a href="/employee.html?id=${employee.id}"><strong>${employee.name || '—'}</strong></a></td>`,
+              html`<td><a href="/student.html?id=${student.id}"><strong>${student.name || '—'}</strong></a></td>`,
               html`<td>${departmentOf(leave) || '—'}</td>`,
               html`<td>${typeLabel(leave.type)}</td>`,
               html`<td>${leave.category || '—'}</td>`,
@@ -478,7 +478,7 @@
     }, 0);
   });
 
-  document.getElementById('leave-employee').addEventListener('change', loadLeaveTotals);
+  document.getElementById('leave-student').addEventListener('change', loadLeaveTotals);
 
   document.getElementById('leave-export').addEventListener('click', function () {
     window.location.href = '/api/leaves/export.csv?' + leaveParams(false).toString();

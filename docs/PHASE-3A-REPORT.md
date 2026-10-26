@@ -1,3 +1,5 @@
+Terminology: 'employee' in this document means 'student' since the rename.
+
 # Phase 3A — Departments, Employees, Attendance + admin password reset
 
 **Branch:** `rebuild/lean-hrm`

@@ -1,3 +1,5 @@
+Terminology: 'employee' in this document means 'student' since the rename.
+
 # Phase 3B — Overtime, Leave & Vacation + the leave → attendance sync
 
 **Branch:** `rebuild/lean-hrm`

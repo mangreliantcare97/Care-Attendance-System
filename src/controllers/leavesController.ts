@@ -16,7 +16,7 @@ export const leaveIdSchema = z.object({ id: idString });
 export const leaveQuerySchema = z.object({
   from: dateString.optional(),
   to: dateString.optional(),
-  employeeId: idString.optional(),
+  studentId: idString.optional(),
   departmentId: idString.optional(),
   type: z.enum(LEAVE_TYPES).optional(),
   status: z.enum(LEAVE_STATUSES).optional(),
@@ -25,7 +25,7 @@ export const leaveQuerySchema = z.object({
 });
 
 export const createLeaveSchema = z.object({
-  employeeId: idString,
+  studentId: idString,
   type: z.enum(LEAVE_TYPES),
   category: z.string().trim().max(60).nullish(),
   startDate: dateString,
@@ -45,7 +45,7 @@ const optionalPositiveInt = (max: number) =>
 
 export const previewLeaveQuerySchema = z
   .object({
-    employeeId: idString,
+    studentId: idString,
     type: z.enum(LEAVE_TYPES),
     startDate: dateString,
     endDate: dateString,
@@ -101,7 +101,7 @@ export async function preview(req: Request, res: Response): Promise<void> {
   ok(res, { preview: await allowances.previewLeave(query) });
 }
 
-/** Every active employee with their holiday allowance, paginated. */
+/** Every active student with their holiday allowance, paginated. */
 export async function allowancesIndex(req: Request, res: Response): Promise<void> {
   const query = req.valid.query as z.infer<typeof allowanceQuerySchema>;
   const result = await allowances.listAllowances(query);
@@ -140,7 +140,7 @@ export async function allowancesCsv(req: Request, res: Response): Promise<void> 
   const result = await allowances.allowanceRows(query);
 
   const headers = [
-    'Employee',
+    'Student',
     'Department',
     'Position',
     'Year',
@@ -184,11 +184,11 @@ export async function exportCsv(req: Request, res: Response): Promise<void> {
   const rows = (await leaves.leaveRows(query)) as Array<Record<string, unknown>>;
 
   const data = rows.map((leave) => {
-    const employee = (leave.employeeId ?? {}) as Record<string, unknown>;
-    const department = (employee.departmentId ?? {}) as Record<string, unknown>;
+    const student = (leave.studentId ?? {}) as Record<string, unknown>;
+    const department = (student.departmentId ?? {}) as Record<string, unknown>;
 
     return [
-      employee.name ?? '',
+      student.name ?? '',
       department.name ?? '',
       leave.type,
       leave.category ?? '',
@@ -201,7 +201,7 @@ export async function exportCsv(req: Request, res: Response): Promise<void> {
   });
 
   const csv = toCsv(
-    ['Employee', 'Department', 'Type', 'Category', 'From', 'To', 'Working days', 'Status', 'Reason'],
+    ['Student', 'Department', 'Type', 'Category', 'From', 'To', 'Working days', 'Status', 'Reason'],
     data,
   );
 

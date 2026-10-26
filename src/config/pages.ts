@@ -6,7 +6,7 @@
  * served.
  */
 export interface PageDefinition {
-  /** URL segment, e.g. `employees` -> `/employees.html`. */
+  /** URL segment, e.g. `students` -> `/students.html`. */
   slug: string;
   /** File name inside `public/`. */
   file: string;
@@ -24,8 +24,8 @@ export interface PageDefinition {
 
 export const PAGES: PageDefinition[] = [
   { slug: 'dashboard', file: 'dashboard.html', title: 'Dashboard', icon: 'fa fa-tachometer-alt', section: 'Main Information' },
-  { slug: 'employees', file: 'employees.html', title: 'Employees', icon: 'fa fa-users', section: 'Main Information' },
-  { slug: 'employee', file: 'employee.html', title: 'Employee Profile', icon: 'fa fa-user', section: 'Main Information' },
+  { slug: 'students', file: 'students.html', title: 'Students', icon: 'fa fa-users', section: 'Main Information' },
+  { slug: 'student', file: 'student.html', title: 'Student Profile', icon: 'fa fa-user', section: 'Main Information' },
   { slug: 'departments', file: 'departments.html', title: 'Departments', icon: 'fa fa-building', section: 'Main Information' },
   { slug: 'attendance', file: 'attendance.html', title: 'Attendance Manually', icon: 'fa fa-calendar-alt', section: 'Attendance & Time' },
   { slug: 'attendance-report', file: 'attendance-report.html', title: 'Attendance Reports', icon: 'fa fa-file-alt', section: 'Attendance & Time' },

@@ -1,13 +1,13 @@
 import { Types } from 'mongoose';
 import { AttendanceModel, type AttendanceStatus } from '../models/Attendance.ts';
-import { EmployeeModel, WITHOUT_PHOTO } from '../models/Employee.ts';
+import { StudentModel, WITHOUT_PHOTO } from '../models/Student.ts';
 import { DepartmentModel } from '../models/Department.ts';
 import { HttpError } from '../utils/response.ts';
 import { parsePagination, pageMeta, type PaginationMeta } from '../utils/pagination.ts';
 import { isAfterToday, today } from '../utils/dates.ts';
 
 export interface SheetEntry {
-  employeeId: string;
+  studentId: string;
   status: AttendanceStatus;
   checkIn?: string | null;
   checkOut?: string | null;
@@ -18,7 +18,7 @@ export interface AttendanceFilters {
   from?: string;
   to?: string;
   departmentId?: string;
-  employeeId?: string;
+  studentId?: string;
 }
 
 const STATUSES: AttendanceStatus[] = ['present', 'late', 'absent', 'on_leave', 'vacation'];
@@ -45,33 +45,33 @@ function emptyCounts(): Record<string, number> {
 }
 
 /**
- * The daily sheet: every active employee with the record for that day.
+ * The daily sheet: every active student with the record for that day.
  *
- * An employee without a record is *not marked yet* — it is never counted as
+ * A student without a record is *not marked yet* — it is never counted as
  * absent.
  */
 export async function getSheet(date: string): Promise<{
   date: string;
   /** Today in `APP_TIMEZONE` — the client uses it to cap the date picker. */
   today: string;
-  employees: Array<{ employee: unknown; record: unknown | null }>;
+  students: Array<{ student: unknown; record: unknown | null }>;
 }> {
-  const [employees, records] = await Promise.all([
-    EmployeeModel.find({ status: 'active' })
+  const [students, records] = await Promise.all([
+    StudentModel.find({ status: 'active' })
       .select(WITHOUT_PHOTO)
       .populate('departmentId', 'name')
       .sort({ name: 1 }),
     AttendanceModel.find({ date }),
   ]);
 
-  const recordByEmployee = new Map(records.map((record) => [String(record.employeeId), record]));
+  const recordByStudent = new Map(records.map((record) => [String(record.studentId), record]));
 
   return {
     date,
     today: today(),
-    employees: employees.map((employee) => ({
-      employee,
-      record: recordByEmployee.get(String(employee._id)) ?? null,
+    students: students.map((student) => ({
+      student,
+      record: recordByStudent.get(String(student._id)) ?? null,
     })),
   };
 }
@@ -92,7 +92,7 @@ function sameSheetValues(
 /**
  * Save a whole sheet in one request.
  *
- * Only the employees that are part of the payload are written — everybody else
+ * Only the students that are part of the payload are written — everybody else
  * stays "not marked yet". A row whose values did not change is left exactly as
  * it is; that matters for records generated from a leave, because rewriting an
  * unchanged row would detach it (`source: 'manual'`, `leaveId: null`). Only a
@@ -107,26 +107,26 @@ export async function saveSheet(
 
   const seen = new Set<string>();
   for (const entry of entries) {
-    if (seen.has(entry.employeeId)) {
-      throw new HttpError(422, 'duplicate_entry', 'The sheet lists the same employee twice.');
+    if (seen.has(entry.studentId)) {
+      throw new HttpError(422, 'duplicate_entry', 'The sheet lists the same student twice.');
     }
-    seen.add(entry.employeeId);
+    seen.add(entry.studentId);
   }
 
-  const employeeIds = entries.map((entry) => entry.employeeId);
-  const existingEmployees = await EmployeeModel.countDocuments({ _id: { $in: employeeIds } });
-  if (existingEmployees !== employeeIds.length) {
-    throw new HttpError(422, 'employee_not_found', 'One of the employees on the sheet does not exist.');
+  const studentIds = entries.map((entry) => entry.studentId);
+  const existingStudents = await StudentModel.countDocuments({ _id: { $in: studentIds } });
+  if (existingStudents !== studentIds.length) {
+    throw new HttpError(422, 'student_not_found', 'One of the students on the sheet does not exist.');
   }
 
   // Load the day in one query instead of one query per row. The records are
   // also what the "did anything change?" decision is based on.
   const existingRecords = await AttendanceModel.find({
-    employeeId: { $in: employeeIds },
+    studentId: { $in: studentIds },
     date,
   });
-  const existingByEmployee = new Map(
-    existingRecords.map((record) => [String(record.employeeId), record]),
+  const existingByStudent = new Map(
+    existingRecords.map((record) => [String(record.studentId), record]),
   );
 
   const records = [];
@@ -134,7 +134,7 @@ export async function saveSheet(
   let unchanged = 0;
 
   for (const entry of entries) {
-    const existing = existingByEmployee.get(entry.employeeId);
+    const existing = existingByStudent.get(entry.studentId);
 
     if (existing && sameSheetValues(existing, entry)) {
       unchanged += 1;
@@ -143,7 +143,7 @@ export async function saveSheet(
     }
 
     const record = await AttendanceModel.findOneAndUpdate(
-      { employeeId: entry.employeeId, date },
+      { studentId: entry.studentId, date },
       {
         $set: {
           status: entry.status,
@@ -178,19 +178,19 @@ async function buildFilter(filters: AttendanceFilters): Promise<Record<string, u
     filter.date = range;
   }
 
-  let employeeIds: string[] | null = null;
+  let studentIds: string[] | null = null;
 
   if (filters.departmentId) {
-    const ids = await EmployeeModel.find({ departmentId: filters.departmentId }).distinct('_id');
-    employeeIds = ids.map(String);
+    const ids = await StudentModel.find({ departmentId: filters.departmentId }).distinct('_id');
+    studentIds = ids.map(String);
   }
 
-  if (filters.employeeId) {
-    employeeIds = employeeIds ? employeeIds.filter((id) => id === String(filters.employeeId)) : [String(filters.employeeId)];
+  if (filters.studentId) {
+    studentIds = studentIds ? studentIds.filter((id) => id === String(filters.studentId)) : [String(filters.studentId)];
   }
 
-  if (employeeIds) {
-    filter.employeeId = { $in: employeeIds };
+  if (studentIds) {
+    filter.studentId = { $in: studentIds };
   }
 
   return filter;
@@ -212,7 +212,7 @@ export async function attendanceReport(query: AttendanceReport): Promise<{
   const [records, total, grouped] = await Promise.all([
     AttendanceModel.find(filter)
       .populate({
-        path: 'employeeId',
+        path: 'studentId',
         select: 'name position departmentId',
         populate: { path: 'departmentId', select: 'name' },
       })
@@ -241,7 +241,7 @@ export async function attendanceRows(query: AttendanceReport): Promise<unknown[]
   const filter = await buildFilter(query);
   return AttendanceModel.find(filter)
     .populate({
-      path: 'employeeId',
+      path: 'studentId',
       select: 'name position departmentId',
       populate: { path: 'departmentId', select: 'name' },
     })
@@ -252,13 +252,13 @@ export async function attendanceRows(query: AttendanceReport): Promise<unknown[]
 export async function addAttendance(payload: SheetEntry & { date: string }, adminId: string) {
   assertNotFuture(payload.date);
 
-  if (!(await EmployeeModel.exists({ _id: payload.employeeId }))) {
-    throw new HttpError(422, 'employee_not_found', 'That employee does not exist.');
+  if (!(await StudentModel.exists({ _id: payload.studentId }))) {
+    throw new HttpError(422, 'student_not_found', 'That student does not exist.');
   }
 
   try {
     const record = await AttendanceModel.create({
-      employeeId: new Types.ObjectId(payload.employeeId),
+      studentId: new Types.ObjectId(payload.studentId),
       date: payload.date,
       status: payload.status,
       checkIn: payload.checkIn || null,
@@ -275,7 +275,7 @@ export async function addAttendance(payload: SheetEntry & { date: string }, admi
       throw new HttpError(
         409,
         'duplicate_attendance',
-        'There is already a record for that employee on that day.',
+        'There is already a record for that student on that day.',
       );
     }
     throw error;

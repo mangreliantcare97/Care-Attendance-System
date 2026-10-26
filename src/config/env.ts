@@ -76,7 +76,7 @@ export const env = {
   workingWeek: parseWorkingWeek(str('WORKING_WEEK', '1,2,3,4,5')),
 
   /**
-   * Holiday allowance in working days per employee and calendar year.
+   * Holiday allowance in working days per student and calendar year.
    *
    * A missing `leaveAllowances` row uses this value. Unused days expire on
    * 31 December; there is no carry-over.
@@ -119,7 +119,7 @@ export const env = {
     password: str('SEED_ADMIN_PASSWORD', ''),
   },
 
-  employeePhotoMaxBytes: int('EMPLOYEE_PHOTO_MAX_BYTES', 256 * 1024),
+  studentPhotoMaxBytes: int('STUDENT_PHOTO_MAX_BYTES', 256 * 1024),
 } as const;
 
 export type Env = typeof env;

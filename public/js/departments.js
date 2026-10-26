@@ -1,8 +1,8 @@
 /**
  * Departments.
  *
- * The employee count comes from the server (an aggregation), so it is never
- * out of date. A department that still has employees cannot be deleted.
+ * The student count comes from the server (an aggregation), so it is never
+ * out of date. A department that still has students cannot be deleted.
  */
 (function () {
   var html = window.HrmDom.html;
@@ -30,7 +30,7 @@
         window.HrmDom.renderListState(body, 5, {
           type: 'empty',
           message: 'No departments yet.',
-          help: 'Add the first department to start organising employees.',
+          help: 'Add the first department to start organising students.',
         });
         return;
       }
@@ -41,7 +41,7 @@
           return [
             html`<td><strong>${department.name}</strong></td>`,
             html`<td>${department.location || '—'}</td>`,
-            html`<td>${badge(department.employeeCount)}</td>`,
+            html`<td>${badge(department.studentCount)}</td>`,
             html`<td>${department.description || '—'}</td>`,
             html`<td class="no-print text-nowrap">
               <button type="button" class="btn btn-sm btn-primary" data-edit="${department.id}" aria-label="Edit ${department.name}" title="Edit"><i class="fa fa-pen" aria-hidden="true"></i></button>
@@ -93,7 +93,7 @@
       var name = deleteButton.getAttribute('data-name');
       var confirmed = await window.HrmConfirm({
         title: 'Delete department',
-        message: 'Delete the department "' + name + '"? Departments that still have employees cannot be deleted.',
+        message: 'Delete the department "' + name + '"? Departments that still have students cannot be deleted.',
         confirmLabel: 'Delete department',
       });
       if (!confirmed) return;

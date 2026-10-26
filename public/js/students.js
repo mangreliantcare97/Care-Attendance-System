@@ -1,18 +1,18 @@
 /**
- * The employee list.
+ * The student list.
  *
  * The list is paginated and filtered on the server. The photo is never part
- * of the list answer — it is loaded from `/api/employees/:id/photo`.
+ * of the list answer — it is loaded from `/api/students/:id/photo`.
  */
 (function () {
   var html = window.HrmDom.html;
-  var body = document.getElementById('employees-body');
-  var form = document.getElementById('employee-form');
+  var body = document.getElementById('students-body');
+  var form = document.getElementById('student-form');
   var searchForm = document.getElementById('search-form');
   var departmentFilter = document.getElementById('filter-department');
-  var departmentSelect = document.getElementById('employee-department');
-  var photoInput = document.getElementById('employee-photo-input');
-  var photoPreview = document.getElementById('employee-photo-preview');
+  var departmentSelect = document.getElementById('student-department');
+  var photoInput = document.getElementById('student-photo-input');
+  var photoPreview = document.getElementById('student-photo-preview');
 
   var editingId = null;
   var pendingPhoto = null;
@@ -35,22 +35,22 @@
     return (parts[0].slice(0, 1) + parts[parts.length - 1].slice(0, 1)).toUpperCase();
   }
 
-  function departmentName(employee) {
-    if (!employee.departmentId) return '—';
-    if (typeof employee.departmentId === 'string') return '—';
-    return employee.departmentId.name || '—';
+  function departmentName(student) {
+    if (!student.departmentId) return '—';
+    if (typeof student.departmentId === 'string') return '—';
+    return student.departmentId.name || '—';
   }
 
-  function photoCell(employee) {
-    if (!employee.id) {
-      return html`<td class="employee-photo-cell" data-label="Photo">—</td>`;
+  function photoCell(student) {
+    if (!student.id) {
+      return html`<td class="student-photo-cell" data-label="Photo">—</td>`;
     }
 
-    return html`<td class="employee-photo-cell" data-label="Photo">
+    return html`<td class="student-photo-cell" data-label="Photo">
       <span class="list-photo">
-        <span class="avatar-initials" aria-hidden="true">${initials(employee.name)}</span>
-        ${employee.hasPhoto
-          ? html`<img src="/api/employees/${employee.id}/photo" alt="${employee.name}" width="40" height="40"
+        <span class="avatar-initials" aria-hidden="true">${initials(student.name)}</span>
+        ${student.hasPhoto
+          ? html`<img src="/api/students/${student.id}/photo" alt="${student.name}" width="40" height="40"
                  loading="lazy" decoding="async" data-photo="1" class="list-photo-img img-circle elevation-1">`
           : ''}
       </span>
@@ -96,7 +96,7 @@
       // The list itself can still load without the department filter.
       departmentFilter.textContent = '';
       departmentFilter.appendChild(option('all', 'All departments'));
-      window.HrmToast.error('Departments could not be loaded. The employee list is still available.');
+      window.HrmToast.error('Departments could not be loaded. The student list is still available.');
     }
   }
 
@@ -117,28 +117,28 @@
     return params;
   }
 
-  function render(employees) {
+  function render(students) {
     window.HrmDom.renderRows(
       body,
-      employees.map(function (employee) {
+      students.map(function (student) {
         return [
-          photoCell(employee),
-          html`<td class="employee-name-cell" data-label="Name"><a href="/employee.html?id=${employee.id}"><strong>${employee.name}</strong></a></td>`,
-          html`<td data-label="Email">${employee.email || '—'}</td>`,
-          html`<td data-label="Phone">${employee.phone || '—'}</td>`,
-          html`<td data-label="Department">${departmentName(employee)}</td>`,
-          html`<td data-label="Position">${employee.position || '—'}</td>`,
-          html`<td data-label="Status">${statusBadge(employee.status)}</td>`,
-          html`<td class="no-print employee-actions" data-label="Actions">
-            <a href="/employee.html?id=${employee.id}" class="btn btn-sm btn-info" aria-label="View profile for ${employee.name}" title="View profile"><i class="fa fa-eye" aria-hidden="true"></i></a>
-            <button type="button" class="btn btn-sm btn-primary" data-edit="${employee.id}" aria-label="Edit ${employee.name}" title="Edit"><i class="fa fa-pen" aria-hidden="true"></i></button>
-            <button type="button" class="btn btn-sm btn-secondary" data-status="${employee.id}" data-current="${employee.status}" aria-label="${employee.status === 'active' ? 'Deactivate' : 'Activate'} ${employee.name}" title="Activate / deactivate"><i class="fa fa-power-off" aria-hidden="true"></i></button>
-            <button type="button" class="btn btn-sm btn-danger" data-delete="${employee.id}" data-name="${employee.name}" aria-label="Delete ${employee.name}" title="Delete"><i class="fa fa-trash" aria-hidden="true"></i></button>
+          photoCell(student),
+          html`<td class="student-name-cell" data-label="Name"><a href="/student.html?id=${student.id}"><strong>${student.name}</strong></a></td>`,
+          html`<td data-label="Email">${student.email || '—'}</td>`,
+          html`<td data-label="Phone">${student.phone || '—'}</td>`,
+          html`<td data-label="Department">${departmentName(student)}</td>`,
+          html`<td data-label="Position">${student.position || '—'}</td>`,
+          html`<td data-label="Status">${statusBadge(student.status)}</td>`,
+          html`<td class="no-print student-actions" data-label="Actions">
+            <a href="/student.html?id=${student.id}" class="btn btn-sm btn-info" aria-label="View profile for ${student.name}" title="View profile"><i class="fa fa-eye" aria-hidden="true"></i></a>
+            <button type="button" class="btn btn-sm btn-primary" data-edit="${student.id}" aria-label="Edit ${student.name}" title="Edit"><i class="fa fa-pen" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-sm btn-secondary" data-status="${student.id}" data-current="${student.status}" aria-label="${student.status === 'active' ? 'Deactivate' : 'Activate'} ${student.name}" title="Activate / deactivate"><i class="fa fa-power-off" aria-hidden="true"></i></button>
+            <button type="button" class="btn btn-sm btn-danger" data-delete="${student.id}" data-name="${student.name}" aria-label="Delete ${student.name}" title="Delete"><i class="fa fa-trash" aria-hidden="true"></i></button>
           </td>`,
         ];
       }),
       8,
-      'No employees found.',
+      'No students found.',
     );
 
     bindPhotoErrors();
@@ -147,15 +147,15 @@
   async function load() {
     var submit = searchForm.querySelector('[type="submit"]');
     window.HrmForms.setBusy(submit, true, 'Searching…');
-    window.HrmDom.renderListState(body, 8, { type: 'loading', message: 'Loading employees…' });
+    window.HrmDom.renderListState(body, 8, { type: 'loading', message: 'Loading students…' });
     body.setAttribute('aria-busy', 'true');
 
     try {
-      var response = await window.HrmApi.get('/api/employees?' + filters().toString());
-      var employees = response.data.employees;
+      var response = await window.HrmApi.get('/api/students?' + filters().toString());
+      var students = response.data.students;
       var meta = response.meta || {};
 
-      if (!employees.length) {
+      if (!students.length) {
         var hasFilters =
           document.getElementById('filter-search').value.trim() !== '' ||
           departmentFilter.value !== 'all' ||
@@ -163,20 +163,20 @@
 
         window.HrmDom.renderListState(body, 8, {
           type: 'empty',
-          message: hasFilters ? 'No employees match these filters.' : 'No employees yet.',
+          message: hasFilters ? 'No students match these filters.' : 'No students yet.',
           help: hasFilters
             ? 'Try a different search, department or status, or reset the filters.'
-            : 'Use “Add Employee” to create the first profile.',
+            : 'Use “Add Student” to create the first profile.',
         });
       } else {
-        render(employees);
+        render(students);
       }
 
-      document.getElementById('employees-count').textContent = meta.total
-        ? meta.total + (meta.total === 1 ? ' employee' : ' employees')
+      document.getElementById('students-count').textContent = meta.total
+        ? meta.total + (meta.total === 1 ? ' student' : ' students')
         : '';
 
-      window.HrmDom.renderPagination(document.getElementById('employees-pagination'), meta, function (page) {
+      window.HrmDom.renderPagination(document.getElementById('students-pagination'), meta, function (page) {
         currentPage = page;
         void load();
       });
@@ -184,7 +184,7 @@
       window.HrmDom.renderListState(body, 8, {
         type: 'error',
         message: error.message,
-        help: 'The employee list could not be loaded. Check your connection and try again.',
+        help: 'The student list could not be loaded. Check your connection and try again.',
         onRetry: function () {
           void load();
         },
@@ -203,33 +203,33 @@
     photoPreview.src = '/assets/img/admin.jpg';
   }
 
-  function openModal(employee) {
-    editingId = employee ? employee.id : null;
+  function openModal(student) {
+    editingId = student ? student.id : null;
     resetPhoto();
     window.HrmForms.clear(form);
 
-    document.getElementById('employee-modal-title').textContent = employee ? 'Edit employee' : 'Add employee';
-    document.getElementById('employee-name').value = employee ? employee.name : '';
-    document.getElementById('employee-email').value = employee && employee.email ? employee.email : '';
-    document.getElementById('employee-phone').value = employee && employee.phone ? employee.phone : '';
-    document.getElementById('employee-position').value = employee && employee.position ? employee.position : '';
-    document.getElementById('employee-hire-date').value = employee && employee.hireDate ? employee.hireDate : '';
-    document.getElementById('employee-status').value = employee ? employee.status : 'active';
+    document.getElementById('student-modal-title').textContent = student ? 'Edit student' : 'Add student';
+    document.getElementById('student-name').value = student ? student.name : '';
+    document.getElementById('student-email').value = student && student.email ? student.email : '';
+    document.getElementById('student-phone').value = student && student.phone ? student.phone : '';
+    document.getElementById('student-position').value = student && student.position ? student.position : '';
+    document.getElementById('student-hire-date').value = student && student.hireDate ? student.hireDate : '';
+    document.getElementById('student-status').value = student ? student.status : 'active';
 
     var departmentId =
-      employee && employee.departmentId && typeof employee.departmentId === 'object'
-        ? employee.departmentId.id || employee.departmentId._id
+      student && student.departmentId && typeof student.departmentId === 'object'
+        ? student.departmentId.id || student.departmentId._id
         : '';
     departmentSelect.value = departmentId || '';
 
-    if (employee && employee.id && employee.hasPhoto) {
-      photoPreview.src = '/api/employees/' + employee.id + '/photo';
+    if (student && student.id && student.hasPhoto) {
+      photoPreview.src = '/api/students/' + student.id + '/photo';
     }
 
-    window.jQuery('#employee-modal').modal('show');
+    window.jQuery('#student-modal').modal('show');
   }
 
-  document.getElementById('add-employee').addEventListener('click', function () {
+  document.getElementById('add-student').addEventListener('click', function () {
     openModal(null);
   });
 
@@ -247,7 +247,7 @@
     }
   });
 
-  document.getElementById('employee-photo-clear').addEventListener('click', function () {
+  document.getElementById('student-photo-clear').addEventListener('click', function () {
     resetPhoto();
     removePhoto = true;
     photoPreview.src = '/assets/img/admin.jpg';
@@ -271,8 +271,8 @@
     if (editButton) {
       window.HrmForms.setBusy(editButton, true, 'Loading…');
       try {
-        var response = await window.HrmApi.get('/api/employees/' + editButton.getAttribute('data-edit'));
-        openModal(response.data.employee);
+        var response = await window.HrmApi.get('/api/students/' + editButton.getAttribute('data-edit'));
+        openModal(response.data.student);
       } catch (error) {
         window.HrmToast.error(error.message);
       } finally {
@@ -286,10 +286,10 @@
       var id = statusButton.getAttribute('data-status');
       var current = statusButton.getAttribute('data-current');
       var next = current === 'active' ? 'inactive' : 'active';
-      var name = statusButton.getAttribute('aria-label') || 'this employee';
+      var name = statusButton.getAttribute('aria-label') || 'this student';
 
       var changeConfirmed = await window.HrmConfirm({
-        title: next === 'inactive' ? 'Deactivate employee?' : 'Activate employee?',
+        title: next === 'inactive' ? 'Deactivate student?' : 'Activate student?',
         message:
           next === 'inactive'
             ? 'Deactivate ' + name + '? They will stop appearing on the attendance sheet.'
@@ -301,8 +301,8 @@
 
       window.HrmForms.setBusy(statusButton, true, 'Saving…');
       try {
-        await window.HrmApi.patch('/api/employees/' + id, { status: next });
-        window.HrmToast.success('The employee was ' + next + '.');
+        await window.HrmApi.patch('/api/students/' + id, { status: next });
+        window.HrmToast.success('The student was ' + next + '.');
         await load();
       } catch (error) {
         window.HrmToast.error(error.message);
@@ -316,7 +316,7 @@
     if (deleteButton) {
       var deleteName = deleteButton.getAttribute('data-name');
       var confirmed = await window.HrmConfirm({
-        title: 'Delete employee?',
+        title: 'Delete student?',
         message: 'Delete “' + deleteName + '” for good? This cannot be undone.',
         confirmLabel: 'Delete',
         variant: 'danger',
@@ -325,8 +325,8 @@
 
       window.HrmForms.setBusy(deleteButton, true, 'Deleting…');
       try {
-        await window.HrmApi.delete('/api/employees/' + deleteButton.getAttribute('data-delete'));
-        window.HrmToast.success('The employee was deleted.');
+        await window.HrmApi.delete('/api/students/' + deleteButton.getAttribute('data-delete'));
+        window.HrmToast.success('The student was deleted.');
         await load();
       } catch (error) {
         window.HrmToast.error(error.message);
@@ -341,13 +341,13 @@
     window.HrmForms.clear(form);
 
     var payload = {
-      name: document.getElementById('employee-name').value.trim(),
-      email: document.getElementById('employee-email').value.trim() || null,
-      phone: document.getElementById('employee-phone').value.trim() || null,
+      name: document.getElementById('student-name').value.trim(),
+      email: document.getElementById('student-email').value.trim() || null,
+      phone: document.getElementById('student-phone').value.trim() || null,
       departmentId: departmentSelect.value || null,
-      position: document.getElementById('employee-position').value.trim() || null,
-      hireDate: document.getElementById('employee-hire-date').value || null,
-      status: document.getElementById('employee-status').value,
+      position: document.getElementById('student-position').value.trim() || null,
+      hireDate: document.getElementById('student-hire-date').value || null,
+      status: document.getElementById('student-status').value,
     };
 
     if (pendingPhoto) payload.photo = pendingPhoto;
@@ -358,16 +358,16 @@
 
     try {
       if (editingId) {
-        await window.HrmApi.patch('/api/employees/' + editingId, payload);
-        window.HrmToast.success('The employee was updated.');
+        await window.HrmApi.patch('/api/students/' + editingId, payload);
+        window.HrmToast.success('The student was updated.');
       } else {
-        await window.HrmApi.post('/api/employees', payload);
-        window.HrmToast.success('The employee was created.');
+        await window.HrmApi.post('/api/students', payload);
+        window.HrmToast.success('The student was created.');
       }
 
       form.reset();
       resetPhoto();
-      window.jQuery('#employee-modal').modal('hide');
+      window.jQuery('#student-modal').modal('hide');
       await load();
     } catch (error) {
       window.HrmForms.showErrors(form, error);

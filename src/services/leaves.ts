@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { LeaveModel, type LeaveStatus, type LeaveType } from '../models/Leave.ts';
-import { EmployeeModel } from '../models/Employee.ts';
+import { StudentModel } from '../models/Student.ts';
 import { HttpError } from '../utils/response.ts';
 import { parsePagination, pageMeta, type PaginationMeta } from '../utils/pagination.ts';
 import { diffDays, workingDaysBetween } from '../utils/dates.ts';
@@ -15,7 +15,7 @@ import {
 export const MAX_LEAVE_SPAN_DAYS = 366;
 
 export interface LeavePayload {
-  employeeId: string;
+  studentId: string;
   type: LeaveType;
   category?: string | null;
   startDate: string;
@@ -29,7 +29,7 @@ export interface LeavePayload {
 export interface LeaveListQuery {
   page?: unknown;
   perPage?: unknown;
-  employeeId?: unknown;
+  studentId?: unknown;
   departmentId?: unknown;
   type?: unknown;
   status?: unknown;
@@ -67,20 +67,20 @@ export function assertLeaveRange(startDate: string, endDate: string): void {
 
 /**
  * Reject a leave whose range overlaps another **approved** leave of the same
- * employee.
+ * student.
  *
  * A pending request is allowed to overlap provisionally; the rule is enforced
  * again when it is approved. Two approved leaves for the same days would
  * otherwise fight over the same attendance rows.
  */
 async function assertNoOverlap(
-  employeeId: string,
+  studentId: string,
   startDate: string,
   endDate: string,
   excludeId?: string,
 ): Promise<void> {
   const filter: Record<string, unknown> = {
-    employeeId: new Types.ObjectId(employeeId),
+    studentId: new Types.ObjectId(studentId),
     status: 'approved',
     startDate: { $lte: endDate },
     endDate: { $gte: startDate },
@@ -101,9 +101,9 @@ async function assertNoOverlap(
   }
 }
 
-async function assertEmployeeExists(employeeId: string): Promise<void> {
-  if (!(await EmployeeModel.exists({ _id: employeeId }))) {
-    throw new HttpError(422, 'employee_not_found', 'That employee does not exist.');
+async function assertStudentExists(studentId: string): Promise<void> {
+  if (!(await StudentModel.exists({ _id: studentId }))) {
+    throw new HttpError(422, 'student_not_found', 'That student does not exist.');
   }
 }
 
@@ -111,13 +111,13 @@ async function assertEmployeeExists(employeeId: string): Promise<void> {
 async function buildFilter(query: LeaveListQuery): Promise<Record<string, unknown>> {
   const filter: Record<string, unknown> = {};
 
-  if (typeof query.employeeId === 'string' && query.employeeId) {
-    filter.employeeId = new Types.ObjectId(query.employeeId);
+  if (typeof query.studentId === 'string' && query.studentId) {
+    filter.studentId = new Types.ObjectId(query.studentId);
   }
 
   if (typeof query.departmentId === 'string' && query.departmentId) {
-    const ids = await EmployeeModel.find({ departmentId: query.departmentId }).distinct('_id');
-    filter.employeeId = { $in: ids };
+    const ids = await StudentModel.find({ departmentId: query.departmentId }).distinct('_id');
+    filter.studentId = { $in: ids };
   }
 
   if (typeof query.type === 'string' && query.type) {
@@ -148,7 +148,7 @@ export async function listLeaves(query: LeaveListQuery): Promise<{
   const [leaves, total] = await Promise.all([
     LeaveModel.find(filter)
       .populate({
-        path: 'employeeId',
+        path: 'studentId',
         select: 'name position departmentId',
         populate: { path: 'departmentId', select: 'name' },
       })
@@ -166,7 +166,7 @@ export async function leaveRows(query: LeaveListQuery): Promise<unknown[]> {
   const filter = await buildFilter(query);
   return LeaveModel.find(filter)
     .populate({
-      path: 'employeeId',
+      path: 'studentId',
       select: 'name position departmentId',
       populate: { path: 'departmentId', select: 'name' },
     })
@@ -175,7 +175,7 @@ export async function leaveRows(query: LeaveListQuery): Promise<unknown[]> {
 
 export async function getLeave(id: string): Promise<unknown> {
   const leave = await LeaveModel.findById(id).populate({
-    path: 'employeeId',
+    path: 'studentId',
     select: 'name position departmentId',
     populate: { path: 'departmentId', select: 'name' },
   });
@@ -191,16 +191,16 @@ export async function createLeave(
   payload: LeavePayload,
   adminId: string,
 ): Promise<unknown> {
-  await assertEmployeeExists(payload.employeeId);
+  await assertStudentExists(payload.studentId);
   assertLeaveRange(payload.startDate, payload.endDate);
 
   const status: LeaveStatus = payload.status ?? 'pending';
 
   if (status === 'approved') {
-    await assertNoOverlap(payload.employeeId, payload.startDate, payload.endDate);
+    await assertNoOverlap(payload.studentId, payload.startDate, payload.endDate);
     await assertVacationAllowance(
       {
-        employeeId: payload.employeeId,
+        studentId: payload.studentId,
         type: payload.type,
         startDate: payload.startDate,
         endDate: payload.endDate,
@@ -212,7 +212,7 @@ export async function createLeave(
   const holidayDates = await holidayDatesForRange(payload.startDate, payload.endDate);
 
   const leave = await LeaveModel.create({
-    employeeId: new Types.ObjectId(payload.employeeId),
+    studentId: new Types.ObjectId(payload.studentId),
     type: payload.type,
     category: payload.category?.trim() || null,
     startDate: payload.startDate,
@@ -244,9 +244,9 @@ export async function updateLeave(
     throw new HttpError(404, 'leave_not_found', 'That leave no longer exists.');
   }
 
-  if (payload.employeeId !== undefined) {
-    await assertEmployeeExists(payload.employeeId);
-    leave.employeeId = new Types.ObjectId(payload.employeeId);
+  if (payload.studentId !== undefined) {
+    await assertStudentExists(payload.studentId);
+    leave.studentId = new Types.ObjectId(payload.studentId);
   }
 
   const previousStatus = leave.status as LeaveStatus;
@@ -269,10 +269,10 @@ export async function updateLeave(
   // The overlap rule looks at the **resulting** leave: editing the dates of an
   // approved leave is just as much an approval decision as pressing "approve".
   if (leave.status === 'approved') {
-    await assertNoOverlap(String(leave.employeeId), leave.startDate, leave.endDate, id);
+    await assertNoOverlap(String(leave.studentId), leave.startDate, leave.endDate, id);
     await assertVacationAllowance(
       {
-        employeeId: String(leave.employeeId),
+        studentId: String(leave.studentId),
         type: leave.type as LeaveType,
         startDate: leave.startDate,
         endDate: leave.endDate,
@@ -295,9 +295,9 @@ export async function updateLeave(
   leave.updatedBy = new Types.ObjectId(adminId);
   await leave.save();
 
-  // Reconcile after every edit: dates, status, type and even the employee can
+  // Reconcile after every edit: dates, status, type and even the student can
   // change. The reconcile deletes the rows this leave owns for another
-  // employee, so moving a leave does not leave rows behind.
+  // student, so moving a leave does not leave rows behind.
   await reconcileLeave(String(leave._id));
 
   return leave;
@@ -330,21 +330,21 @@ export interface LeaveYearTotals {
 }
 
 /**
- * Approved leave days of one employee, per calendar year and per type.
+ * Approved leave days of one student, per calendar year and per type.
  *
  * Days are counted by their **actual** calendar year and month, so a leave
  * from December to January contributes to both years. Only working days that
  * are not covered by a holiday event count (the same rule as `days`, the
  * attendance sync and the allowance), and only `approved` leaves count.
  */
-export async function employeeLeaveTotals(id: string): Promise<LeaveYearTotals[]> {
-  const employee = await EmployeeModel.findById(id).select('name').lean();
-  if (!employee) {
-    throw new HttpError(404, 'employee_not_found', 'That employee no longer exists.');
+export async function studentLeaveTotals(id: string): Promise<LeaveYearTotals[]> {
+  const student = await StudentModel.findById(id).select('name').lean();
+  if (!student) {
+    throw new HttpError(404, 'student_not_found', 'That student no longer exists.');
   }
 
   const leaves = await LeaveModel.find({
-    employeeId: new Types.ObjectId(id),
+    studentId: new Types.ObjectId(id),
     status: 'approved',
   })
     .select('type startDate endDate')

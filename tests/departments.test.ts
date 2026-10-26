@@ -1,11 +1,11 @@
 /**
- * Departments: CRUD, the unique name, the employee count and the delete guard.
+ * Departments: CRUD, the unique name, the student count and the delete guard.
  */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createAdmin,
-  createEmployee,
+  createStudent,
   signIn,
   startTestApp,
   OWNER_EMAIL,
@@ -49,7 +49,7 @@ describe('departments', () => {
 
     assert.equal(response.status, 200);
     assert.equal(response.body.data.department.name, 'Sales');
-    assert.equal(response.body.data.department.employeeCount, 0);
+    assert.equal(response.body.data.department.studentCount, 0);
   });
 
   it('refuses a duplicate name', async () => {
@@ -63,7 +63,7 @@ describe('departments', () => {
     assert.equal(response.body.error.code, 'department_name_taken');
   });
 
-  it('counts the employees of a department', async () => {
+  it('counts the students of a department', async () => {
     const { agent, csrf } = await signIn(context.app);
     const created = await agent
       .post('/api/departments')
@@ -72,13 +72,13 @@ describe('departments', () => {
 
     const departmentId = created.body.data.department.id;
 
-    await createEmployee({ name: 'Ada', departmentId });
-    await createEmployee({ name: 'Grace', departmentId });
+    await createStudent({ name: 'Ada', departmentId });
+    await createStudent({ name: 'Grace', departmentId });
 
     const list = await agent.get('/api/departments');
     const support = list.body.data.departments.filter((item: { id: string }) => item.id === departmentId)[0];
 
-    assert.equal(support.employeeCount, 2);
+    assert.equal(support.studentCount, 2);
   });
 
   it('updates a department', async () => {
@@ -95,7 +95,7 @@ describe('departments', () => {
     assert.equal(response.body.data.department.name, 'Renamed');
   });
 
-  it('does not delete a department that still has employees', async () => {
+  it('does not delete a department that still has students', async () => {
     const { agent, csrf } = await signIn(context.app);
     const list = await agent.get('/api/departments');
     const support = list.body.data.departments.filter((item: { name: string }) => item.name === 'Support')[0];
@@ -103,7 +103,7 @@ describe('departments', () => {
     const response = await agent.delete(`/api/departments/${support.id}`).set('X-CSRF-Token', csrf);
 
     assert.equal(response.status, 409);
-    assert.equal(response.body.error.code, 'department_has_employees');
+    assert.equal(response.body.error.code, 'department_has_students');
   });
 
   it('deletes an empty department', async () => {

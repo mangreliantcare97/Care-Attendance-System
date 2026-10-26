@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#ffffff" data-theme-color>
     <script src="/js/theme.js"></script>
-    <title>Employees | Human Resource</title>
+    <title>Students | Human Resource</title>
     <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
 
     <link rel="stylesheet" href="/css/source-sans-pro.css">
@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="/css/theme.css">
 
 </head>
-<body class="hold-transition sidebar-mini layout-fixed" data-page="employees">
+<body class="hold-transition sidebar-mini layout-fixed" data-page="students">
     <div class="wrapper">
         <div id="navbar-placeholder"></div>
         <div id="sidebar-placeholder"></div>
@@ -27,11 +27,11 @@
                     <div class="content-header">
                         <div class="row mb-2">
                             <div class="col-sm-6">
-                                <h1 class="m-0">Employees</h1>
+                                <h1 class="m-0">Students</h1>
                             </div>
                             <div class="col-sm-6 text-right no-print">
-                                <button type="button" class="btn btn-primary" id="add-employee">
-                                    <i class="fa fa-plus"></i> Add Employee
+                                <button type="button" class="btn btn-primary" id="add-student">
+                                    <i class="fa fa-plus"></i> Add Student
                                 </button>
                             </div>
                         </div>
@@ -42,7 +42,7 @@
                         <div class="col-12">
                             <div class="card card-glass no-print">
                                 <div class="card-header">
-                                    <h3 class="card-title">Search employees</h3>
+                                    <h3 class="card-title">Search students</h3>
                                 </div>
                                 <div class="card-body">
                                     <form id="search-form">
@@ -82,11 +82,11 @@
                         <div class="col-12">
                             <div class="card card-glass">
                                 <div class="card-header">
-                                    <h3 class="card-title">Employees</h3>
+                                    <h3 class="card-title">Students</h3>
                                 </div>
                                 <div class="card-body p-0">
                                     <div class="table-responsive">
-                                        <table class="table table-striped employees-table">
+                                        <table class="table table-striped students-table">
                                             <thead>
                                                 <tr>
                                                     <th>Photo</th>
@@ -99,15 +99,15 @@
                                                     <th class="no-print">Action</th>
                                                 </tr>
                                             </thead>
-                                            <tbody id="employees-body">
+                                            <tbody id="students-body">
                                                 <tr><td colspan="8" class="text-center py-4">Loading…</td></tr>
                                             </tbody>
                                         </table>
                                     </div>
                                 </div>
                                 <div class="card-footer d-flex justify-content-between align-items-center">
-                                    <span class="text-muted" id="employees-count"></span>
-                                    <div id="employees-pagination"></div>
+                                    <span class="text-muted" id="students-count"></span>
+                                    <div id="students-pagination"></div>
                                 </div>
                             </div>
                         </div>
@@ -122,56 +122,56 @@
         </footer>
     </div>
 
-    <!-- Add / edit employee -->
-    <div class="modal fade" id="employee-modal" tabindex="-1" aria-hidden="true">
+    <!-- Add / edit student -->
+    <div class="modal fade" id="student-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="employee-modal-title">Add employee</h5>
+                    <h5 class="modal-title" id="student-modal-title">Add student</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <form id="employee-form">
+                <form id="student-form">
                     <div class="modal-body">
                         <div class="row">
                             <div class="col-md-3 text-center">
-                                <img id="employee-photo-preview" src="/assets/img/admin.jpg" alt="Photo"
+                                <img id="student-photo-preview" src="/assets/img/admin.jpg" alt="Photo"
                                      class="img-circle elevation-2 mb-2" style="width: 128px; height: 128px; object-fit: cover;">
-                                <input type="file" id="employee-photo-input" accept="image/jpeg,image/png,image/webp" class="form-control-file">
+                                <input type="file" id="student-photo-input" accept="image/jpeg,image/png,image/webp" class="form-control-file">
                                 <small class="form-text text-muted">JPEG, PNG or WebP — scaled down in your browser.</small>
-                                <button type="button" class="btn btn-sm btn-link p-0" id="employee-photo-clear">Remove photo</button>
+                                <button type="button" class="btn btn-sm btn-link p-0" id="student-photo-clear">Remove photo</button>
                             </div>
                             <div class="col-md-9">
                                 <div class="form-group">
-                                    <label for="employee-name">Name</label>
-                                    <input type="text" class="form-control" id="employee-name" required maxlength="120">
+                                    <label for="student-name">Name</label>
+                                    <input type="text" class="form-control" id="student-name" required maxlength="120">
                                 </div>
                                 <div class="form-group">
-                                    <label for="employee-email">Email <small class="text-muted">(optional)</small></label>
-                                    <input type="email" class="form-control" id="employee-email" maxlength="255">
+                                    <label for="student-email">Email <small class="text-muted">(optional)</small></label>
+                                    <input type="email" class="form-control" id="student-email" maxlength="255">
                                 </div>
                                 <div class="form-group">
-                                    <label for="employee-phone">Phone</label>
-                                    <input type="text" class="form-control" id="employee-phone" maxlength="40">
+                                    <label for="student-phone">Phone</label>
+                                    <input type="text" class="form-control" id="student-phone" maxlength="40">
                                 </div>
                                 <div class="form-group">
-                                    <label for="employee-department">Department</label>
-                                    <select class="custom-select" id="employee-department">
+                                    <label for="student-department">Department</label>
+                                    <select class="custom-select" id="student-department">
                                         <option value="">No department</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="employee-position">Position</label>
-                                    <input type="text" class="form-control" id="employee-position" maxlength="120">
+                                    <label for="student-position">Position</label>
+                                    <input type="text" class="form-control" id="student-position" maxlength="120">
                                 </div>
                                 <div class="form-group">
-                                    <label for="employee-hire-date">Hire date</label>
-                                    <input type="date" class="form-control" id="employee-hire-date">
+                                    <label for="student-hire-date">Hire date</label>
+                                    <input type="date" class="form-control" id="student-hire-date">
                                 </div>
                                 <div class="form-group">
-                                    <label for="employee-status">Status</label>
-                                    <select class="custom-select" id="employee-status">
+                                    <label for="student-status">Status</label>
+                                    <select class="custom-select" id="student-status">
                                         <option value="active">Active</option>
                                         <option value="inactive">Inactive — not counted in the attendance sheet</option>
                                         <option value="terminated">Terminated</option>
@@ -198,6 +198,6 @@
     <script src="/js/photo.js"></script>
     <script src="/js/fullscreen.js"></script>
     <script src="/js/layout.js"></script>
-    <script src="/js/employees.js"></script>
+    <script src="/js/students.js"></script>
 </body>
 </html>

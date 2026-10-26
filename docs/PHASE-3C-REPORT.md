@@ -1,3 +1,5 @@
+Terminology: 'employee' in this document means 'student' since the rename.
+
 # Phase 3C — Calendar, dashboard, reports and demo data
 
 **Branch:** `rebuild/lean-hrm`

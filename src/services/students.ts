@@ -1,4 +1,4 @@
-import { EmployeeModel, WITHOUT_PHOTO } from '../models/Employee.ts';
+import { StudentModel, WITHOUT_PHOTO } from '../models/Student.ts';
 import { Types } from 'mongoose';
 import { AttendanceModel } from '../models/Attendance.ts';
 import { OvertimeModel } from '../models/Overtime.ts';
@@ -9,7 +9,7 @@ import { parsePagination, pageMeta, type PaginationMeta } from '../utils/paginat
 import { resolveMonth } from '../utils/dates.ts';
 import { env } from '../config/env.ts';
 
-/** The image types an employee photo may have. */
+/** The image types a student photo may have. */
 export const ALLOWED_PHOTO_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 export interface StoredPhoto {
@@ -18,7 +18,7 @@ export interface StoredPhoto {
   size: number;
 }
 
-export interface EmployeePayload {
+export interface StudentPayload {
   name: string;
   email?: string | null;
   phone?: string | null;
@@ -85,20 +85,20 @@ export function validatePhoto(input: unknown): StoredPhoto {
     throw new HttpError(422, 'photo_invalid', 'The photo is empty.');
   }
 
-  if (buffer.length > env.employeePhotoMaxBytes) {
+  if (buffer.length > env.studentPhotoMaxBytes) {
     throw new HttpError(
       422,
       'photo_too_large',
-      `The photo is ${Math.round(buffer.length / 1024)} KB — the maximum is ${Math.round(env.employeePhotoMaxBytes / 1024)} KB.`,
+      `The photo is ${Math.round(buffer.length / 1024)} KB — the maximum is ${Math.round(env.studentPhotoMaxBytes / 1024)} KB.`,
     );
   }
 
   const declaredSize = typeof photo.size === 'number' ? photo.size : undefined;
-  if (declaredSize !== undefined && declaredSize > env.employeePhotoMaxBytes) {
+  if (declaredSize !== undefined && declaredSize > env.studentPhotoMaxBytes) {
     throw new HttpError(
       422,
       'photo_too_large',
-      `The photo is larger than the maximum of ${Math.round(env.employeePhotoMaxBytes / 1024)} KB.`,
+      `The photo is larger than the maximum of ${Math.round(env.studentPhotoMaxBytes / 1024)} KB.`,
     );
   }
 
@@ -120,13 +120,13 @@ export function validatePhoto(input: unknown): StoredPhoto {
 }
 
 /** Remove the photo from a document (the photo is never part of a list). */
-export function stripPhoto<T extends { photo?: unknown }>(employee: T): Omit<T, 'photo'> {
-  const { photo, ...rest } = employee;
+export function stripPhoto<T extends { photo?: unknown }>(student: T): Omit<T, 'photo'> {
+  const { photo, ...rest } = student;
   void photo;
   return rest;
 }
 
-export interface EmployeeListQuery {
+export interface StudentListQuery {
   page?: unknown;
   perPage?: unknown;
   search?: unknown;
@@ -134,8 +134,8 @@ export interface EmployeeListQuery {
   status?: unknown;
 }
 
-export async function listEmployees(query: EmployeeListQuery): Promise<{
-  employees: unknown[];
+export async function listStudents(query: StudentListQuery): Promise<{
+  students: unknown[];
   meta: PaginationMeta;
 }> {
   const pagination = parsePagination(query);
@@ -157,59 +157,59 @@ export async function listEmployees(query: EmployeeListQuery): Promise<{
     filter.status = status;
   }
 
-  const [employees, total] = await Promise.all([
+  const [students, total] = await Promise.all([
     // The photo is never part of a list answer.
-    EmployeeModel.find(filter)
+    StudentModel.find(filter)
       .select(WITHOUT_PHOTO)
       .populate('departmentId', 'name')
       .sort({ name: 1 })
       .skip(pagination.skip)
       .limit(pagination.limit),
-    EmployeeModel.countDocuments(filter),
+    StudentModel.countDocuments(filter),
   ]);
 
   const photoIds = new Set(
     (
-      await EmployeeModel.find({
-        _id: { $in: employees.map((employee) => employee._id) },
+      await StudentModel.find({
+        _id: { $in: students.map((student) => student._id) },
         'photo.data': { $nin: [null, ''] },
       }).distinct('_id')
     ).map(String),
   );
 
   return {
-    employees: employees.map((employee) => ({
-      ...(employee.toJSON() as Record<string, unknown>),
-      hasPhoto: photoIds.has(String(employee._id)),
+    students: students.map((student) => ({
+      ...(student.toJSON() as Record<string, unknown>),
+      hasPhoto: photoIds.has(String(student._id)),
     })),
     meta: pageMeta(total, pagination),
   };
 }
 
-export async function getEmployee(id: string): Promise<Record<string, unknown>> {
+export async function getStudent(id: string): Promise<Record<string, unknown>> {
   // The photo is served by its own endpoint, so it is left out here as well.
   // The boolean lets the profile avoid requesting a photo that does not exist.
-  const [employee, hasPhoto] = await Promise.all([
-    EmployeeModel.findById(id).select(WITHOUT_PHOTO).populate('departmentId', 'name'),
-    EmployeeModel.exists({ _id: id, 'photo.data': { $nin: [null, ''] } }),
+  const [student, hasPhoto] = await Promise.all([
+    StudentModel.findById(id).select(WITHOUT_PHOTO).populate('departmentId', 'name'),
+    StudentModel.exists({ _id: id, 'photo.data': { $nin: [null, ''] } }),
   ]);
-  if (!employee) {
-    throw new HttpError(404, 'employee_not_found', 'That employee no longer exists.');
+  if (!student) {
+    throw new HttpError(404, 'student_not_found', 'That student no longer exists.');
   }
   return {
-    ...(employee.toJSON() as Record<string, unknown>),
+    ...(student.toJSON() as Record<string, unknown>),
     hasPhoto: Boolean(hasPhoto),
   };
 }
 
-/** The photo of an employee — served on its own, never inside a list. */
-export async function getEmployeePhoto(id: string): Promise<StoredPhoto | null> {
-  const employee = await EmployeeModel.findById(id).select('photo').lean();
-  if (!employee) {
-    throw new HttpError(404, 'employee_not_found', 'That employee no longer exists.');
+/** The photo of a student — served on its own, never inside a list. */
+export async function getStudentPhoto(id: string): Promise<StoredPhoto | null> {
+  const student = await StudentModel.findById(id).select('photo').lean();
+  if (!student) {
+    throw new HttpError(404, 'student_not_found', 'That student no longer exists.');
   }
 
-  const photo = employee.photo as { data?: string; mime?: string; size?: number } | undefined;
+  const photo = student.photo as { data?: string; mime?: string; size?: number } | undefined;
   if (!photo?.data) return null;
 
   return { data: photo.data, mime: photo.mime ?? 'image/jpeg', size: photo.size ?? 0 };
@@ -222,114 +222,114 @@ async function assertDepartmentExists(departmentId: string | null | undefined): 
   }
 }
 
-export async function createEmployee(payload: EmployeePayload): Promise<Record<string, unknown>> {
+export async function createStudent(payload: StudentPayload): Promise<Record<string, unknown>> {
   await assertDepartmentExists(payload.departmentId);
 
   const email = payload.email?.trim().toLowerCase() || null;
-  if (email && (await EmployeeModel.exists({ email }))) {
-    throw new HttpError(409, 'email_taken', 'Another employee already uses that email address.');
+  if (email && (await StudentModel.exists({ email }))) {
+    throw new HttpError(409, 'email_taken', 'Another student already uses that email address.');
   }
 
   const photo = validatePhoto(payload.photo);
 
-  const employee = await EmployeeModel.create({
+  const student = await StudentModel.create({
     name: payload.name.trim(),
     email,
     phone: payload.phone?.trim() || null,
     departmentId: payload.departmentId || null,
     position: payload.position?.trim() || null,
     hireDate: payload.hireDate || null,
-    // New employees are deactivated until somebody activates them.
+    // New students are deactivated until somebody activates them.
     status: payload.status ?? 'inactive',
     photo: photo.data ? photo : { data: null, mime: null, size: null },
   });
 
-  return (await getEmployee(String(employee._id))) as Record<string, unknown>;
+  return (await getStudent(String(student._id))) as Record<string, unknown>;
 }
 
-export async function updateEmployee(
+export async function updateStudent(
   id: string,
-  payload: Partial<EmployeePayload>,
+  payload: Partial<StudentPayload>,
 ): Promise<Record<string, unknown>> {
-  const employee = await EmployeeModel.findById(id);
-  if (!employee) {
-    throw new HttpError(404, 'employee_not_found', 'That employee no longer exists.');
+  const student = await StudentModel.findById(id);
+  if (!student) {
+    throw new HttpError(404, 'student_not_found', 'That student no longer exists.');
   }
 
   if (payload.departmentId !== undefined) {
     await assertDepartmentExists(payload.departmentId);
-    employee.departmentId = payload.departmentId
+    student.departmentId = payload.departmentId
       ? new Types.ObjectId(payload.departmentId)
       : null;
   }
 
   if (payload.email !== undefined) {
     const email = payload.email?.trim().toLowerCase() || null;
-    if (email && email !== employee.email && (await EmployeeModel.exists({ email, _id: { $ne: employee._id } }))) {
-      throw new HttpError(409, 'email_taken', 'Another employee already uses that email address.');
+    if (email && email !== student.email && (await StudentModel.exists({ email, _id: { $ne: student._id } }))) {
+      throw new HttpError(409, 'email_taken', 'Another student already uses that email address.');
     }
-    employee.email = email;
+    student.email = email;
   }
 
-  if (payload.name !== undefined) employee.name = payload.name.trim();
-  if (payload.phone !== undefined) employee.phone = payload.phone?.trim() || null;
-  if (payload.position !== undefined) employee.position = payload.position?.trim() || null;
-  if (payload.hireDate !== undefined) employee.hireDate = payload.hireDate || null;
-  if (payload.status !== undefined) employee.status = payload.status;
+  if (payload.name !== undefined) student.name = payload.name.trim();
+  if (payload.phone !== undefined) student.phone = payload.phone?.trim() || null;
+  if (payload.position !== undefined) student.position = payload.position?.trim() || null;
+  if (payload.hireDate !== undefined) student.hireDate = payload.hireDate || null;
+  if (payload.status !== undefined) student.status = payload.status;
   if (payload.photo !== undefined) {
     const photo = validatePhoto(payload.photo);
-    employee.photo = photo.data ? photo : { data: null, mime: null, size: null };
+    student.photo = photo.data ? photo : { data: null, mime: null, size: null };
   }
 
-  await employee.save();
-  return (await getEmployee(String(employee._id))) as Record<string, unknown>;
+  await student.save();
+  return (await getStudent(String(student._id))) as Record<string, unknown>;
 }
 
 /**
- * Delete an employee for good.
+ * Delete a student for good.
  *
- * An employee that has attendance, overtime or leave records is never
- * deleted — that history has to stay readable. Deactivate the employee
+ * A student that has attendance, overtime or leave records is never
+ * deleted — that history has to stay readable. Deactivate the student
  * instead.
  */
-export async function deleteEmployee(id: string): Promise<{ deleted: boolean }> {
-  const employee = await EmployeeModel.findById(id);
-  if (!employee) {
-    throw new HttpError(404, 'employee_not_found', 'That employee no longer exists.');
+export async function deleteStudent(id: string): Promise<{ deleted: boolean }> {
+  const student = await StudentModel.findById(id);
+  if (!student) {
+    throw new HttpError(404, 'student_not_found', 'That student no longer exists.');
   }
 
   const [attendance, overtime, leaves] = await Promise.all([
-    AttendanceModel.countDocuments({ employeeId: employee._id }),
-    OvertimeModel.countDocuments({ employeeId: employee._id }),
-    LeaveModel.countDocuments({ employeeId: employee._id }),
+    AttendanceModel.countDocuments({ studentId: student._id }),
+    OvertimeModel.countDocuments({ studentId: student._id }),
+    LeaveModel.countDocuments({ studentId: student._id }),
   ]);
 
   if (attendance + overtime + leaves > 0) {
     throw new HttpError(
       409,
-      'employee_has_records',
-      'This employee has attendance, overtime or leave records and cannot be deleted. Deactivate the employee instead.',
+      'student_has_records',
+      'This student has attendance, overtime or leave records and cannot be deleted. Deactivate the student instead.',
     );
   }
 
-  await employee.deleteOne();
+  await student.deleteOne();
   return { deleted: true };
 }
 
-/** The attendance of one employee for one month, with the counts. */
-export async function employeeAttendance(
+/** The attendance of one student for one month, with the counts. */
+export async function studentAttendance(
   id: string,
   month: string | undefined,
 ): Promise<{ records: unknown[]; counts: Record<string, number> }> {
-  const employee = await EmployeeModel.findById(id).select('name').lean();
-  if (!employee) {
-    throw new HttpError(404, 'employee_not_found', 'That employee no longer exists.');
+  const student = await StudentModel.findById(id).select('name').lean();
+  if (!student) {
+    throw new HttpError(404, 'student_not_found', 'That student no longer exists.');
   }
 
   const bounds = resolveMonth(month ?? '');
 
   const records = await AttendanceModel.find({
-    employeeId: id,
+    studentId: id,
     date: { $gte: bounds.start, $lte: bounds.end },
   }).sort({ date: 1 });
 
@@ -342,12 +342,12 @@ export async function employeeAttendance(
   return { records, counts };
 }
 
-/** The leave history of one employee. */
-export async function employeeLeaves(id: string): Promise<unknown[]> {
-  const employee = await EmployeeModel.findById(id).select('name').lean();
-  if (!employee) {
-    throw new HttpError(404, 'employee_not_found', 'That employee no longer exists.');
+/** The leave history of one student. */
+export async function studentLeaves(id: string): Promise<unknown[]> {
+  const student = await StudentModel.findById(id).select('name').lean();
+  if (!student) {
+    throw new HttpError(404, 'student_not_found', 'That student no longer exists.');
   }
 
-  return LeaveModel.find({ employeeId: id }).sort({ startDate: -1 });
+  return LeaveModel.find({ studentId: id }).sort({ startDate: -1 });
 }

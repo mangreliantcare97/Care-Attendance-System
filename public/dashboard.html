@@ -48,8 +48,8 @@
                         <div class="col-xl-2 col-md-4 col-6">
                             <div class="small-box bg-primary">
                                 <div class="inner">
-                                    <h3 data-summary="totalEmployees">—</h3>
-                                    <p>Total employees</p>
+                                    <h3 data-summary="totalStudents">—</h3>
+                                    <p>Total students</p>
                                 </div>
                                 <div class="icon"><i class="fa fa-users"></i></div>
                             </div>
@@ -142,11 +142,11 @@
                         <div class="col-lg-4">
                             <div class="card card-glass">
                                 <div class="card-header">
-                                    <h3 class="card-title">Active employees by department</h3>
+                                    <h3 class="card-title">Active students by department</h3>
                                 </div>
                                 <div class="card-body">
                                     <div class="chart-box chart-doughnut">
-                                        <canvas id="departments-chart" aria-label="Active employees by department" role="img"></canvas>
+                                        <canvas id="departments-chart" aria-label="Active students by department" role="img"></canvas>
                                     </div>
                                     <p class="text-muted text-center mb-0 d-none" id="departments-chart-empty">No departments yet.</p>
                                 </div>
@@ -154,12 +154,12 @@
                         </div>
                     </div>
 
-                    <!-- Top employees + department table -->
+                    <!-- Top students + department table -->
                     <div class="row">
                         <div class="col-lg-7">
                             <div class="card card-glass">
                                 <div class="card-header">
-                                    <h3 class="card-title">Top employees of the month</h3>
+                                    <h3 class="card-title">Top students of the month</h3>
                                 </div>
                                 <div class="card-body p-0">
                                     <div class="table-responsive">
@@ -167,14 +167,14 @@
                                             <thead>
                                                 <tr>
                                                     <th>#</th>
-                                                    <th>Employee</th>
+                                                    <th>Student</th>
                                                     <th class="text-center">Score</th>
                                                     <th class="text-center">Present</th>
                                                     <th class="text-center">Late</th>
                                                     <th class="text-center">Absent</th>
                                                 </tr>
                                             </thead>
-                                            <tbody id="top-employees-body">
+                                            <tbody id="top-students-body">
                                                 <tr><td colspan="6" class="text-center py-4">Loading…</td></tr>
                                             </tbody>
                                         </table>
@@ -196,7 +196,7 @@
                                             <thead>
                                                 <tr>
                                                     <th>Department</th>
-                                                    <th class="text-center">Active employees</th>
+                                                    <th class="text-center">Active students</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="departments-body">

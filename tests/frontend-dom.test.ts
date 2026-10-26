@@ -3,7 +3,7 @@
  *
  * `HrmDom.html` must return a SafeHtml value. Nested fragments and arrays of
  * fragments are trusted markup, while every plain string is escaped. These
- * tests deliberately use employee names that look like markup.
+ * tests deliberately use student names that look like markup.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -18,9 +18,9 @@ const myAccountSource = readFileSync(new URL('../public/js/my-account.js', impor
 const adminsPage = readFileSync(new URL('../public/admins.html', import.meta.url), 'utf8');
 const adminFormPage = readFileSync(new URL('../public/admin-form.html', import.meta.url), 'utf8');
 const myAccountPage = readFileSync(new URL('../public/my-account.html', import.meta.url), 'utf8');
-const employeePage = readFileSync(new URL('../public/employee.html', import.meta.url), 'utf8');
+const studentPage = readFileSync(new URL('../public/student.html', import.meta.url), 'utf8');
 const leavesPage = readFileSync(new URL('../public/leaves.html', import.meta.url), 'utf8');
-const employeeSource = readFileSync(new URL('../public/js/employee.js', import.meta.url), 'utf8');
+const studentSource = readFileSync(new URL('../public/js/student.js', import.meta.url), 'utf8');
 const leavesSource = readFileSync(new URL('../public/js/leaves.js', import.meta.url), 'utf8');
 
 const strayTemplateText = /\$\{|undefined|NaN|\[object Object\]/;
@@ -51,13 +51,13 @@ test('HrmDom.html returns a SafeHtml value and escapes plain strings', () => {
   const { HrmDom } = dom.window;
   const name = '<script>alert(1)</script>';
 
-  const fragment = HrmDom.html`<p class="employee-name">${name}</p>`;
+  const fragment = HrmDom.html`<p class="student-name">${name}</p>`;
 
   assert.ok(fragment instanceof HrmDom.SafeHtml);
   dom.window.document.body.innerHTML = fragment;
 
   assert.equal(dom.window.document.querySelector('script'), null);
-  assert.equal(dom.window.document.querySelector('.employee-name')?.textContent, name);
+  assert.equal(dom.window.document.querySelector('.student-name')?.textContent, name);
   assert.equal(dom.window.document.body.textContent?.includes('<script>'), true);
 });
 
@@ -66,10 +66,10 @@ test('nested fragments and arrays are inserted as markup, not escaped twice', ()
   const { HrmDom } = dom.window;
   const { document } = dom.window;
 
-  const meta = HrmDom.html`<span class="employee-card-meta">${'Analyst'} · ${'Operations'}</span>`;
+  const meta = HrmDom.html`<span class="student-card-meta">${'Analyst'} · ${'Operations'}</span>`;
   const row = HrmDom.html`
-    <article class="employee-card">
-      <strong class="employee-card-name">${'Ada Lovelace'}</strong>
+    <article class="student-card">
+      <strong class="student-card-name">${'Ada Lovelace'}</strong>
       ${meta}
       <ul>${[
         HrmDom.html`<li>${'First item'}</li>`,
@@ -80,24 +80,24 @@ test('nested fragments and arrays are inserted as markup, not escaped twice', ()
 
   document.body.innerHTML = row;
 
-  const metaElement = document.querySelector('.employee-card-meta');
+  const metaElement = document.querySelector('.student-card-meta');
   assert.equal(metaElement?.tagName, 'SPAN');
   assert.equal(metaElement?.textContent, 'Analyst · Operations');
   assert.equal(document.body.textContent?.includes('<span'), false);
-  assert.equal(document.querySelectorAll('.employee-card li').length, 2);
-  assert.equal(document.querySelector('.employee-card')?.textContent?.includes('class='), false);
+  assert.equal(document.querySelectorAll('.student-card li').length, 2);
+  assert.equal(document.querySelector('.student-card')?.textContent?.includes('class='), false);
 });
 
-test('malicious employee names stay text and never create script or image elements', () => {
+test('malicious student names stay text and never create script or image elements', () => {
   const dom = createDocument();
   const { HrmDom } = dom.window;
   const { document } = dom.window;
 
   for (const name of ['<script>alert(1)</script>', '"><img src=x onerror=alert(1)>']) {
-    const meta = HrmDom.html`<span class="employee-card-meta">${'Analyst'} · ${'Operations'}</span>`;
+    const meta = HrmDom.html`<span class="student-card-meta">${'Analyst'} · ${'Operations'}</span>`;
     const card = HrmDom.html`
-      <div class="employee-card">
-        <strong class="employee-card-name">${name}</strong>
+      <div class="student-card">
+        <strong class="student-card-name">${name}</strong>
         ${meta}
       </div>
     `;
@@ -106,8 +106,8 @@ test('malicious employee names stay text and never create script or image elemen
 
     assert.equal(document.querySelectorAll('script').length, 0);
     assert.equal(document.querySelectorAll('img').length, 0);
-    assert.equal(document.querySelector('.employee-card-name')?.textContent, name);
-    assert.equal(document.querySelector('.employee-card-meta')?.textContent, 'Analyst · Operations');
+    assert.equal(document.querySelector('.student-card-name')?.textContent, name);
+    assert.equal(document.querySelector('.student-card-meta')?.textContent, 'Analyst · Operations');
     assert.equal(document.body.textContent?.includes('<span'), false);
   }
 });
@@ -137,24 +137,24 @@ test('renderRows uses the same escaping rules for every cell', () => {
   assert.equal(document.body.textContent?.includes('<span'), false);
 });
 
-test('the employee profile allowance card has every scripted element and no stray text', () => {
-  const doc = parsePage(employeePage, 'http://localhost/employee.html?id=1');
+test('the student profile allowance card has every scripted element and no stray text', () => {
+  const doc = parsePage(studentPage, 'http://localhost/student.html?id=1');
   const card = doc.getElementById('allowance-card');
 
-  assert.ok(card, 'employee.html must contain the allowance card');
+  assert.ok(card, 'student.html must contain the allowance card');
   assert.match(card.textContent || '', /Holiday allowance/);
   assert.match(card.textContent || '', /Holiday used/);
-  assert.match(employeePage, /Unused days do not carry over to the next year\./);
-  assert.match(employeeSource, /Holiday remaining/);
-  assert.match(employeeSource, /summary\.remainingLabel/);
-  assert.match(employeeSource, /summary\.expiredNote/);
-  assert.equal(employeePage.includes('allowance-carry'), false);
-  assert.equal(employeePage.includes('carryOver'), false);
-  assert.equal(employeeSource.includes('carryOver'), false);
+  assert.match(studentPage, /Unused days do not carry over to the next year\./);
+  assert.match(studentSource, /Holiday remaining/);
+  assert.match(studentSource, /summary\.remainingLabel/);
+  assert.match(studentSource, /summary\.expiredNote/);
+  assert.equal(studentPage.includes('allowance-carry'), false);
+  assert.equal(studentPage.includes('carryOver'), false);
+  assert.equal(studentSource.includes('carryOver'), false);
   assert.equal(strayTemplateText.test(card.textContent || ''), false);
 
-  for (const id of referencedIds(employeeSource)) {
-    assert.ok(doc.getElementById(id), `employee.html is missing #${id}`);
+  for (const id of referencedIds(studentSource)) {
+    assert.ok(doc.getElementById(id), `student.html is missing #${id}`);
   }
 
   assert.equal(card.querySelectorAll('[onclick], [onchange], [onsubmit]').length, 0);

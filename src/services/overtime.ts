@@ -1,15 +1,15 @@
 import { Types } from 'mongoose';
 import { OvertimeModel } from '../models/Overtime.ts';
-import { EmployeeModel } from '../models/Employee.ts';
+import { StudentModel } from '../models/Student.ts';
 import { HttpError } from '../utils/response.ts';
 import { parsePagination, pageMeta, type PaginationMeta } from '../utils/pagination.ts';
 import { resolveMonth } from '../utils/dates.ts';
 
-/** The most hours one employee can book on one calendar day. */
+/** The most hours one student can book on one calendar day. */
 export const MAX_DAY_HOURS = 24;
 
 export interface OvertimePayload {
-  employeeId: string;
+  studentId: string;
   date: string;
   hours: number;
   note?: string | null;
@@ -18,7 +18,7 @@ export interface OvertimePayload {
 export interface OvertimeQuery {
   from?: unknown;
   to?: unknown;
-  employeeId?: unknown;
+  studentId?: unknown;
   departmentId?: unknown;
   page?: unknown;
   perPage?: unknown;
@@ -29,23 +29,23 @@ export interface OvertimeSummaryQuery {
   departmentId?: unknown;
 }
 
-async function assertEmployeeExists(employeeId: string): Promise<void> {
-  if (!(await EmployeeModel.exists({ _id: employeeId }))) {
-    throw new HttpError(422, 'employee_not_found', 'That employee does not exist.');
+async function assertStudentExists(studentId: string): Promise<void> {
+  if (!(await StudentModel.exists({ _id: studentId }))) {
+    throw new HttpError(422, 'student_not_found', 'That student does not exist.');
   }
 }
 
 /**
- * The hours already booked for an employee on a day, optionally excluding the
+ * The hours already booked for a student on a day, optionally excluding the
  * record that is being edited.
  */
 async function bookedHours(
-  employeeId: string,
+  studentId: string,
   date: string,
   excludeId?: string,
 ): Promise<number> {
   const match: Record<string, unknown> = {
-    employeeId: new Types.ObjectId(employeeId),
+    studentId: new Types.ObjectId(studentId),
     date,
   };
 
@@ -62,18 +62,18 @@ async function bookedHours(
 }
 
 /**
- * Several entries per employee and day are allowed, but their sum may never
+ * Several entries per student and day are allowed, but their sum may never
  * exceed 24 hours. A tiny epsilon keeps floating point sums exact
  * (`0.25` is representable, but four quarters can still add up to
  * `0.9999999999999999` in an aggregation).
  */
 async function assertDayLimit(
-  employeeId: string,
+  studentId: string,
   date: string,
   hours: number,
   excludeId?: string,
 ): Promise<void> {
-  const total = (await bookedHours(employeeId, date, excludeId)) + hours;
+  const total = (await bookedHours(studentId, date, excludeId)) + hours;
 
   if (total > MAX_DAY_HOURS + 1e-9) {
     throw new HttpError(
@@ -97,13 +97,13 @@ async function buildFilter(query: OvertimeQuery): Promise<Record<string, unknown
     filter.date = range;
   }
 
-  if (typeof query.employeeId === 'string' && query.employeeId) {
-    filter.employeeId = new Types.ObjectId(query.employeeId);
+  if (typeof query.studentId === 'string' && query.studentId) {
+    filter.studentId = new Types.ObjectId(query.studentId);
   }
 
   if (typeof query.departmentId === 'string' && query.departmentId) {
-    const ids = await EmployeeModel.find({ departmentId: query.departmentId }).distinct('_id');
-    filter.employeeId = { $in: ids };
+    const ids = await StudentModel.find({ departmentId: query.departmentId }).distinct('_id');
+    filter.studentId = { $in: ids };
   }
 
   return filter;
@@ -119,8 +119,8 @@ export async function listOvertime(query: OvertimeQuery): Promise<{
 
   const [records, total, totals] = await Promise.all([
     OvertimeModel.find(filter)
-      .populate('employeeId', 'name position departmentId')
-      .populate('employeeId.departmentId', 'name')
+      .populate('studentId', 'name position departmentId')
+      .populate('studentId.departmentId', 'name')
       .sort({ date: -1, createdAt: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit),
@@ -142,20 +142,20 @@ export async function listOvertime(query: OvertimeQuery): Promise<{
 export async function overtimeRows(query: OvertimeQuery): Promise<unknown[]> {
   const filter = await buildFilter(query);
   return OvertimeModel.find(filter)
-    .populate('employeeId', 'name position departmentId')
-    .populate('employeeId.departmentId', 'name')
+    .populate('studentId', 'name position departmentId')
+    .populate('studentId.departmentId', 'name')
     .sort({ date: 1, createdAt: 1 });
 }
 
 export interface OvertimeSummaryRow {
-  employeeId: string;
+  studentId: string;
   name: string;
   department: string;
   totalHours: number;
   entries: number;
 }
 
-/** Per-employee overtime totals for one month. */
+/** Per-student overtime totals for one month. */
 export async function overtimeSummary(query: OvertimeSummaryQuery): Promise<{
   month: string;
   start: string;
@@ -167,8 +167,8 @@ export async function overtimeSummary(query: OvertimeSummaryQuery): Promise<{
   const filter: Record<string, unknown> = { date: { $gte: bounds.start, $lte: bounds.end } };
 
   if (typeof query.departmentId === 'string' && query.departmentId) {
-    const ids = await EmployeeModel.find({ departmentId: query.departmentId }).distinct('_id');
-    filter.employeeId = { $in: ids };
+    const ids = await StudentModel.find({ departmentId: query.departmentId }).distinct('_id');
+    filter.studentId = { $in: ids };
   }
 
   const grouped = await OvertimeModel.aggregate<{
@@ -179,27 +179,27 @@ export async function overtimeSummary(query: OvertimeSummaryQuery): Promise<{
     { $match: filter },
     {
       $group: {
-        _id: '$employeeId',
+        _id: '$studentId',
         hours: { $sum: '$hours' },
         entries: { $sum: 1 },
       },
     },
   ]);
 
-  const employees = await EmployeeModel.find({ _id: { $in: grouped.map((row) => row._id) } })
+  const students = await StudentModel.find({ _id: { $in: grouped.map((row) => row._id) } })
     .select('name departmentId')
     .populate('departmentId', 'name');
 
-  const byId = new Map(employees.map((employee) => [String(employee._id), employee]));
+  const byId = new Map(students.map((student) => [String(student._id), student]));
 
   const rows: OvertimeSummaryRow[] = grouped
     .map((row) => {
-      const employee = byId.get(String(row._id));
-      const department = employee?.departmentId as { name?: string } | null | undefined;
+      const student = byId.get(String(row._id));
+      const department = student?.departmentId as { name?: string } | null | undefined;
 
       return {
-        employeeId: String(row._id),
-        name: employee?.name ?? '—',
+        studentId: String(row._id),
+        name: student?.name ?? '—',
         department: department?.name ?? '—',
         totalHours: Math.round(row.hours * 100) / 100,
         entries: row.entries,
@@ -223,11 +223,11 @@ export async function createOvertime(
   payload: OvertimePayload,
   adminId: string,
 ): Promise<unknown> {
-  await assertEmployeeExists(payload.employeeId);
-  await assertDayLimit(payload.employeeId, payload.date, payload.hours);
+  await assertStudentExists(payload.studentId);
+  await assertDayLimit(payload.studentId, payload.date, payload.hours);
 
   return OvertimeModel.create({
-    employeeId: new Types.ObjectId(payload.employeeId),
+    studentId: new Types.ObjectId(payload.studentId),
     date: payload.date,
     hours: payload.hours,
     note: payload.note?.trim() || '',
@@ -248,9 +248,9 @@ export async function updateOvertime(
 
   let checkLimit = false;
 
-  if (payload.employeeId !== undefined) {
-    await assertEmployeeExists(payload.employeeId);
-    record.employeeId = new Types.ObjectId(payload.employeeId);
+  if (payload.studentId !== undefined) {
+    await assertStudentExists(payload.studentId);
+    record.studentId = new Types.ObjectId(payload.studentId);
     checkLimit = true;
   }
 
@@ -267,7 +267,7 @@ export async function updateOvertime(
   if (payload.note !== undefined) record.note = payload.note?.trim() || '';
 
   if (checkLimit) {
-    await assertDayLimit(String(record.employeeId), record.date, record.hours, id);
+    await assertDayLimit(String(record.studentId), record.date, record.hours, id);
   }
 
   record.updatedBy = new Types.ObjectId(adminId);

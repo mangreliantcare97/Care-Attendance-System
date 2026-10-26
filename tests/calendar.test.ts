@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import request from 'supertest';
 import {
   createAdmin,
-  createEmployee,
+  createStudent,
   signIn,
   startTestApp,
   OWNER_EMAIL,
@@ -162,8 +162,8 @@ describe('calendar', () => {
 
   it('merges approved leaves and leaves pending/rejected requests out', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Calendar Leave Person' });
-    const base = { employeeId: String(employee._id), type: 'vacation' };
+    const student = await createStudent({ name: 'Calendar Leave Person' });
+    const base = { studentId: String(student._id), type: 'vacation' };
 
     const approved = await agent
       .post('/api/leaves')
@@ -182,8 +182,8 @@ describe('calendar', () => {
 
     const feed = await agent.get('/api/calendar?start=2026-04-01&end=2026-04-30');
     const leaveItems = feed.body.data.events.filter(
-      (event: { kind: string; employeeId?: string }) =>
-        event.kind === 'leave' && event.employeeId === String(employee._id),
+      (event: { kind: string; studentId?: string }) =>
+        event.kind === 'leave' && event.studentId === String(student._id),
     );
 
     assert.equal(leaveItems.length, 1);

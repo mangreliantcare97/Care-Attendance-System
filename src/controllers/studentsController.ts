@@ -1,26 +1,26 @@
 import { createHash } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import * as employees from '../services/employees.ts';
-import { employeeLeaveTotals } from '../services/leaves.ts';
+import * as students from '../services/students.ts';
+import { studentLeaveTotals } from '../services/leaves.ts';
 import {
-  employeeAllowance,
-  employeeAllowanceMonth,
+  studentAllowance,
+  studentAllowanceMonth,
   setAllowance,
 } from '../services/allowances.ts';
 import { HttpError, ok } from '../utils/response.ts';
 import { isDateString, today } from '../utils/dates.ts';
 
-export const employeeIdSchema = z.object({
-  id: z.string().regex(/^[a-f\d]{24}$/i, 'That employee id is not valid.'),
+export const studentIdSchema = z.object({
+  id: z.string().regex(/^[a-f\d]{24}$/i, 'That student id is not valid.'),
 });
 
 const dateString = z
   .string()
   .refine(isDateString, 'That is not a valid date.');
 
-export const createEmployeeSchema = z.object({
-  name: z.string().trim().min(2, 'Enter the employee’s name.').max(120),
+export const createStudentSchema = z.object({
+  name: z.string().trim().min(2, 'Enter the student’s name.').max(120),
   // An empty address means "no address" and is stored as null.
   email: z.preprocess(
     (value) => (typeof value === 'string' && value.trim() === '' ? null : value),
@@ -34,9 +34,9 @@ export const createEmployeeSchema = z.object({
   photo: z.unknown().optional(),
 });
 
-export const updateEmployeeSchema = createEmployeeSchema.partial();
+export const updateStudentSchema = createStudentSchema.partial();
 
-export const employeeQuerySchema = z.object({
+export const studentQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
   perPage: z.coerce.number().int().min(1).max(100).optional(),
   search: z.string().trim().max(120).optional(),
@@ -44,7 +44,7 @@ export const employeeQuerySchema = z.object({
   status: z.enum(['active', 'inactive', 'terminated']).optional(),
 });
 
-export const employeeMonthSchema = z.object({
+export const studentMonthSchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/, 'Use the format YYYY-MM.').optional(),
 });
 
@@ -62,7 +62,7 @@ export const allowanceMonthQuerySchema = z.object({
   month: z.coerce.number().int().min(1, 'Choose a month.').max(12),
 });
 
-export const allowanceYearSchema = employeeIdSchema.extend({
+export const allowanceYearSchema = studentIdSchema.extend({
   year: z.coerce.number().int().min(2000).max(2100),
 });
 
@@ -79,44 +79,44 @@ export const setAllowanceSchema = z.object({
 });
 
 export async function index(req: Request, res: Response): Promise<void> {
-  const query = req.valid.query as z.infer<typeof employeeQuerySchema>;
-  const result = await employees.listEmployees(query);
-  ok(res, { employees: result.employees }, result.meta as unknown as Record<string, unknown>);
+  const query = req.valid.query as z.infer<typeof studentQuerySchema>;
+  const result = await students.listStudents(query);
+  ok(res, { students: result.students }, result.meta as unknown as Record<string, unknown>);
 }
 
 export async function show(req: Request, res: Response): Promise<void> {
-  const { id } = req.valid.params as z.infer<typeof employeeIdSchema>;
-  ok(res, { employee: await employees.getEmployee(id) });
+  const { id } = req.valid.params as z.infer<typeof studentIdSchema>;
+  ok(res, { student: await students.getStudent(id) });
 }
 
 export async function create(req: Request, res: Response): Promise<void> {
-  const body = req.valid.body as z.infer<typeof createEmployeeSchema>;
-  ok(res, { employee: await employees.createEmployee(body) });
+  const body = req.valid.body as z.infer<typeof createStudentSchema>;
+  ok(res, { student: await students.createStudent(body) });
 }
 
 export async function update(req: Request, res: Response): Promise<void> {
-  const { id } = req.valid.params as z.infer<typeof employeeIdSchema>;
-  const body = req.valid.body as z.infer<typeof updateEmployeeSchema>;
-  ok(res, { employee: await employees.updateEmployee(id, body) });
+  const { id } = req.valid.params as z.infer<typeof studentIdSchema>;
+  const body = req.valid.body as z.infer<typeof updateStudentSchema>;
+  ok(res, { student: await students.updateStudent(id, body) });
 }
 
 export async function remove(req: Request, res: Response): Promise<void> {
-  const { id } = req.valid.params as z.infer<typeof employeeIdSchema>;
-  ok(res, await employees.deleteEmployee(id));
+  const { id } = req.valid.params as z.infer<typeof studentIdSchema>;
+  ok(res, await students.deleteStudent(id));
 }
 
 /**
- * The photo of an employee.
+ * The photo of a student.
  *
- * The photo is stored inside the employee document but it is never part of a
+ * The photo is stored inside the student document but it is never part of a
  * list answer — it is served from here, with cache headers.
  */
 export async function photo(req: Request, res: Response): Promise<void> {
-  const { id } = req.valid.params as z.infer<typeof employeeIdSchema>;
-  const photo = await employees.getEmployeePhoto(id);
+  const { id } = req.valid.params as z.infer<typeof studentIdSchema>;
+  const photo = await students.getStudentPhoto(id);
 
   if (!photo) {
-    throw new HttpError(404, 'photo_not_found', 'This employee has no photo.');
+    throw new HttpError(404, 'photo_not_found', 'This student has no photo.');
   }
 
   const buffer = Buffer.from(photo.data, 'base64');
@@ -134,47 +134,47 @@ export async function photo(req: Request, res: Response): Promise<void> {
   res.type(photo.mime).send(buffer);
 }
 
-/** The attendance of one employee for one month. */
+/** The attendance of one student for one month. */
 export async function attendance(req: Request, res: Response): Promise<void> {
-  const { id } = req.valid.params as z.infer<typeof employeeIdSchema>;
-  const { month } = req.valid.query as z.infer<typeof employeeMonthSchema>;
-  const result = await employees.employeeAttendance(id, month);
+  const { id } = req.valid.params as z.infer<typeof studentIdSchema>;
+  const { month } = req.valid.query as z.infer<typeof studentMonthSchema>;
+  const result = await students.studentAttendance(id, month);
   ok(res, { records: result.records, counts: result.counts });
 }
 
-/** The leave history of one employee. */
+/** The leave history of one student. */
 export async function leaves(req: Request, res: Response): Promise<void> {
-  const { id } = req.valid.params as z.infer<typeof employeeIdSchema>;
-  ok(res, { leaves: await employees.employeeLeaves(id) });
+  const { id } = req.valid.params as z.infer<typeof studentIdSchema>;
+  ok(res, { leaves: await students.studentLeaves(id) });
 }
 
 /**
- * The approved leave days of one employee, broken down by year and type.
+ * The approved leave days of one student, broken down by year and type.
  *
  * Only approved leaves count, and `days` is the number of working days — the
  * same number the attendance sync used.
  */
 export async function leaveTotals(req: Request, res: Response): Promise<void> {
-  const { id } = req.valid.params as z.infer<typeof employeeIdSchema>;
-  ok(res, { totalsByYear: await employeeLeaveTotals(id) });
+  const { id } = req.valid.params as z.infer<typeof studentIdSchema>;
+  ok(res, { totalsByYear: await studentLeaveTotals(id) });
 }
 
-/** The holiday allowance of one employee and one year. */
+/** The holiday allowance of one student and one year. */
 export async function allowance(req: Request, res: Response): Promise<void> {
-  const { id } = req.valid.params as z.infer<typeof employeeIdSchema>;
+  const { id } = req.valid.params as z.infer<typeof studentIdSchema>;
   const { year } = req.valid.query as z.infer<typeof allowanceQuerySchema>;
   const resolved = year ?? Number(today().slice(0, 4));
-  ok(res, { allowance: await employeeAllowance(id, resolved) });
+  ok(res, { allowance: await studentAllowance(id, resolved) });
 }
 
-/** The approved vacation days of one employee in one month, grouped by leave. */
+/** The approved vacation days of one student in one month, grouped by leave. */
 export async function allowanceMonth(req: Request, res: Response): Promise<void> {
-  const { id } = req.valid.params as z.infer<typeof employeeIdSchema>;
+  const { id } = req.valid.params as z.infer<typeof studentIdSchema>;
   const { year, month } = req.valid.query as z.infer<typeof allowanceMonthQuerySchema>;
-  ok(res, { month: await employeeAllowanceMonth(id, year, month) });
+  ok(res, { month: await studentAllowanceMonth(id, year, month) });
 }
 
-/** Create or replace the allowance of one employee and one year. */
+/** Create or replace the allowance of one student and one year. */
 export async function updateAllowance(req: Request, res: Response): Promise<void> {
   const { id, year } = req.valid.params as z.infer<typeof allowanceYearSchema>;
   const body = req.valid.body as z.infer<typeof setAllowanceSchema>;

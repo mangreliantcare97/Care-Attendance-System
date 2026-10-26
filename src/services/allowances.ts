@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { env } from '../config/env.ts';
-import { EmployeeModel } from '../models/Employee.ts';
+import { StudentModel } from '../models/Student.ts';
 import { LeaveAllowanceModel } from '../models/LeaveAllowance.ts';
 import { LeaveModel, type LeaveType } from '../models/Leave.ts';
 import { HttpError } from '../utils/response.ts';
@@ -34,7 +34,7 @@ export interface AllowanceBalanceCopy {
 }
 
 export interface AllowanceSummary extends AllowanceValue, AllowanceBalanceCopy {
-  employeeId: string;
+  studentId: string;
   year: number;
   used: number;
   pending: number;
@@ -131,8 +131,8 @@ function configFromRow(
   };
 }
 
-export async function getAllowanceValue(employeeId: string, year: number): Promise<AllowanceValue> {
-  const row = await LeaveAllowanceModel.findOne({ employeeId, year }).lean();
+export async function getAllowanceValue(studentId: string, year: number): Promise<AllowanceValue> {
+  const row = await LeaveAllowanceModel.findOne({ studentId, year }).lean();
   return configFromRow(row);
 }
 
@@ -142,14 +142,14 @@ interface VacationBuckets {
 }
 
 /**
- * Counted vacation dates of an employee, grouped by status and calendar year.
+ * Counted vacation dates of a student, grouped by status and calendar year.
  *
  * A single holiday lookup covers every leave in the range. The leave's stored
  * `days` is deliberately not used: the allowance depends on the counted dates,
  * which may have changed after a holiday event was edited.
  */
 async function vacationDates(
-  employeeId: string,
+  studentId: string,
   years: number[],
   excludeLeaveId?: string,
 ): Promise<VacationBuckets> {
@@ -162,7 +162,7 @@ async function vacationDates(
   const rangeEnd = `${maxYear}-12-31`;
 
   const filter: Record<string, unknown> = {
-    employeeId: new Types.ObjectId(employeeId),
+    studentId: new Types.ObjectId(studentId),
     type: 'vacation',
     status: { $in: ['approved', 'pending'] },
     startDate: { $lte: rangeEnd },
@@ -206,13 +206,13 @@ function monthsFromDates(dates: string[]): AllowanceMonthPoint[] {
   return months;
 }
 
-async function summaryForEmployee(
-  employeeId: string,
+async function summaryForStudent(
+  studentId: string,
   year: number,
 ): Promise<AllowanceSummary> {
   const [config, buckets] = await Promise.all([
-    getAllowanceValue(employeeId, year),
-    vacationDates(employeeId, [year]),
+    getAllowanceValue(studentId, year),
+    vacationDates(studentId, [year]),
   ]);
 
   const usedDates = buckets.approved.get(year) ?? [];
@@ -220,7 +220,7 @@ async function summaryForEmployee(
   const remaining = roundDays(config.total - usedDates.length);
 
   return {
-    employeeId,
+    studentId,
     year,
     ...config,
     ...allowanceBalanceCopy(year, remaining),
@@ -231,11 +231,11 @@ async function summaryForEmployee(
   };
 }
 
-export async function employeeAllowance(employeeId: string, year: number): Promise<AllowanceSummary> {
-  if (!(await EmployeeModel.exists({ _id: employeeId }))) {
-    throw new HttpError(404, 'employee_not_found', 'That employee no longer exists.');
+export async function studentAllowance(studentId: string, year: number): Promise<AllowanceSummary> {
+  if (!(await StudentModel.exists({ _id: studentId }))) {
+    throw new HttpError(404, 'student_not_found', 'That student no longer exists.');
   }
-  return summaryForEmployee(employeeId, year);
+  return summaryForStudent(studentId, year);
 }
 
 export interface AllowanceMonthLeave {
@@ -249,28 +249,28 @@ export interface AllowanceMonthLeave {
 }
 
 export interface AllowanceMonthResult {
-  employeeId: string;
+  studentId: string;
   year: number;
   month: number;
   total: number;
   leaves: AllowanceMonthLeave[];
 }
 
-/** The approved vacation days of one employee in one month, grouped by leave. */
-export async function employeeAllowanceMonth(
-  employeeId: string,
+/** The approved vacation days of one student in one month, grouped by leave. */
+export async function studentAllowanceMonth(
+  studentId: string,
   year: number,
   month: number,
 ): Promise<AllowanceMonthResult> {
-  if (!(await EmployeeModel.exists({ _id: employeeId }))) {
-    throw new HttpError(404, 'employee_not_found', 'That employee no longer exists.');
+  if (!(await StudentModel.exists({ _id: studentId }))) {
+    throw new HttpError(404, 'student_not_found', 'That student no longer exists.');
   }
 
   const bounds = monthBounds(year, month);
   const holidayDates = await holidayDatesForRange(bounds.start, bounds.end);
 
   const leaves = await LeaveModel.find({
-    employeeId: new Types.ObjectId(employeeId),
+    studentId: new Types.ObjectId(studentId),
     type: 'vacation',
     status: 'approved',
     startDate: { $lte: bounds.end },
@@ -303,7 +303,7 @@ export async function employeeAllowanceMonth(
   }
 
   return {
-    employeeId,
+    studentId,
     year,
     month,
     total: result.reduce((sum, leave) => sum + leave.days, 0),
@@ -326,7 +326,7 @@ function readMonth(value: unknown): number | null {
   return Number.isFinite(month) && month >= 1 && month <= 12 ? month : null;
 }
 
-function overviewEmployeeFilter(query: AllowanceOverviewQuery): Record<string, unknown> {
+function overviewStudentFilter(query: AllowanceOverviewQuery): Record<string, unknown> {
   const filter: Record<string, unknown> = { status: 'active' };
 
   if (typeof query.departmentId === 'string' && query.departmentId) {
@@ -353,7 +353,7 @@ async function overviewRows(
   const year = readYear(query.year, Number(today().slice(0, 4)));
   const month = readMonth(query.month);
 
-  const employees = await EmployeeModel.find(overviewEmployeeFilter(query))
+  const students = await StudentModel.find(overviewStudentFilter(query))
     .select('name position departmentId')
     .populate('departmentId', 'name')
     .sort({ name: 1 })
@@ -361,19 +361,19 @@ async function overviewRows(
 
   const rows: AllowanceOverviewRow[] = [];
 
-  for (const employee of employees) {
-    const summary = await summaryForEmployee(String(employee._id), year);
-    const department = employee.departmentId as unknown as
+  for (const student of students) {
+    const summary = await summaryForStudent(String(student._id), year);
+    const department = student.departmentId as unknown as
       | { _id?: unknown; name?: string }
       | null;
     const monthPoint = month ? summary.months.find((point) => point.month === month) : null;
 
     rows.push({
       ...summary,
-      name: employee.name,
+      name: student.name,
       departmentId: department?._id ? String(department._id) : null,
       department: department?.name ?? null,
-      position: employee.position ?? null,
+      position: student.position ?? null,
       usedInMonth: monthPoint ? monthPoint.used : null,
     });
   }
@@ -421,17 +421,17 @@ export async function allowanceRows(query: AllowanceOverviewQuery): Promise<{
 }
 
 export async function setAllowance(
-  employeeId: string,
+  studentId: string,
   year: number,
   input: { allowance: number; note?: string | null },
   adminId: string,
 ): Promise<AllowanceSummary> {
-  if (!(await EmployeeModel.exists({ _id: employeeId }))) {
-    throw new HttpError(404, 'employee_not_found', 'That employee no longer exists.');
+  if (!(await StudentModel.exists({ _id: studentId }))) {
+    throw new HttpError(404, 'student_not_found', 'That student no longer exists.');
   }
 
   await LeaveAllowanceModel.findOneAndUpdate(
-    { employeeId: new Types.ObjectId(employeeId), year },
+    { studentId: new Types.ObjectId(studentId), year },
     {
       $set: {
         allowance: input.allowance,
@@ -443,11 +443,11 @@ export async function setAllowance(
     { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
   );
 
-  return summaryForEmployee(employeeId, year);
+  return summaryForStudent(studentId, year);
 }
 
 async function usageForRange(
-  employeeId: string,
+  studentId: string,
   startDate: string,
   endDate: string,
   excludeLeaveId?: string,
@@ -464,11 +464,11 @@ async function usageForRange(
     };
   }
 
-  const buckets = await vacationDates(employeeId, years, excludeLeaveId);
+  const buckets = await vacationDates(studentId, years, excludeLeaveId);
   const yearChecks: AllowanceYearCheck[] = [];
 
   for (const year of years) {
-    const config = await getAllowanceValue(employeeId, year);
+    const config = await getAllowanceValue(studentId, year);
     const added = byYear.get(year)?.length ?? 0;
     const usedBefore = (buckets.approved.get(year) ?? []).length;
     const usedAfter = usedBefore + added;
@@ -498,12 +498,12 @@ async function usageForRange(
 }
 
 /**
- * Check whether a vacation would take an employee below zero in any calendar
+ * Check whether a vacation would take a student below zero in any calendar
  * year it touches. `planning` is the UI hint (weekends/holidays skipped); the
  * over-allowance guard is the server's decision.
  */
 export async function checkVacationAllowance(input: {
-  employeeId: string;
+  studentId: string;
   type: LeaveType;
   startDate: string;
   endDate: string;
@@ -519,7 +519,7 @@ export async function checkVacationAllowance(input: {
   }
 
   const { countedDates, check } = await usageForRange(
-    input.employeeId,
+    input.studentId,
     input.startDate,
     input.endDate,
     input.excludeLeaveId,
@@ -536,7 +536,7 @@ export async function checkVacationAllowance(input: {
 /** Throw the 409 unless the caller confirmed the over-allowance. */
 export async function assertVacationAllowance(
   input: {
-    employeeId: string;
+    studentId: string;
     type: LeaveType;
     startDate: string;
     endDate: string;
@@ -568,7 +568,7 @@ export async function assertVacationAllowance(
 }
 
 export interface LeavePreview {
-  employeeId: string;
+  studentId: string;
   type: LeaveType;
   startDate: string;
   endDate: string;
@@ -588,7 +588,7 @@ export interface LeavePreview {
 }
 
 export async function previewLeave(input: {
-  employeeId: string;
+  studentId: string;
   type: LeaveType;
   startDate: string;
   endDate: string;
@@ -598,8 +598,8 @@ export async function previewLeave(input: {
     throw new HttpError(422, 'leave_range_invalid', 'The end date cannot be before the start date.');
   }
 
-  if (!(await EmployeeModel.exists({ _id: input.employeeId }))) {
-    throw new HttpError(422, 'employee_not_found', 'That employee does not exist.');
+  if (!(await StudentModel.exists({ _id: input.studentId }))) {
+    throw new HttpError(422, 'student_not_found', 'That student does not exist.');
   }
 
   const holidayDates = await holidayDatesForRange(input.startDate, input.endDate);
@@ -619,7 +619,7 @@ export async function previewLeave(input: {
     .sort();
 
   const base: LeavePreview = {
-    employeeId: input.employeeId,
+    studentId: input.studentId,
     type: input.type,
     startDate: input.startDate,
     endDate: input.endDate,
@@ -641,7 +641,7 @@ export async function previewLeave(input: {
   if (input.type !== 'vacation') return base;
 
   const { check } = await usageForRange(
-    input.employeeId,
+    input.studentId,
     input.startDate,
     input.endDate,
     input.excludeLeaveId,

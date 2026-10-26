@@ -13,7 +13,7 @@ export type LeaveStatus = (typeof LEAVE_STATUSES)[number];
  */
 const leaveSchema = new Schema(
   {
-    employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
+    studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true },
     type: { type: String, enum: LEAVE_TYPES, default: 'leave' },
     /** casual | sick | early | annual | unpaid | ... */
     category: { type: String, default: null, trim: true },
@@ -35,10 +35,10 @@ const leaveSchema = new Schema(
   { timestamps: true },
 );
 
-leaveSchema.index({ employeeId: 1, startDate: 1 });
+leaveSchema.index({ studentId: 1, startDate: 1 });
 leaveSchema.index({ startDate: 1, endDate: 1 });
 /** The overlap rule only ever looks at approved leaves. */
-leaveSchema.index({ employeeId: 1, status: 1, startDate: 1, endDate: 1 });
+leaveSchema.index({ studentId: 1, status: 1, startDate: 1, endDate: 1 });
 
 applyJsonTransform(leaveSchema);
 

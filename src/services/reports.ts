@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { AttendanceModel } from '../models/Attendance.ts';
-import { EmployeeModel } from '../models/Employee.ts';
+import { StudentModel } from '../models/Student.ts';
 import { HttpError } from '../utils/response.ts';
 import { pageMeta, parsePagination, type PaginationMeta } from '../utils/pagination.ts';
 
@@ -8,13 +8,13 @@ export interface AttendanceSummaryQuery {
   from?: unknown;
   to?: unknown;
   departmentId?: unknown;
-  employeeId?: unknown;
+  studentId?: unknown;
   page?: unknown;
   perPage?: unknown;
 }
 
 export interface AttendanceSummaryRow {
-  employeeId: string;
+  studentId: string;
   name: string;
   position: string | null;
   department: string | null;
@@ -53,9 +53,9 @@ function withRate(row: Omit<AttendanceSummaryRow, 'rate'>): AttendanceSummaryRow
 /**
  * Build the attendance filter.
  *
- * A date range is inclusive. A department filter resolves the employees of
- * that department first — the report groups by employee, so the grouping can
- * never fan out into a query per employee.
+ * A date range is inclusive. A department filter resolves the students of
+ * that department first — the report groups by student, so the grouping can
+ * never fan out into a query per student.
  */
 async function buildMatch(query: AttendanceSummaryQuery): Promise<Record<string, unknown>> {
   const from = typeof query.from === 'string' ? query.from : '';
@@ -74,20 +74,20 @@ async function buildMatch(query: AttendanceSummaryQuery): Promise<Record<string,
     match.date = range;
   }
 
-  if (typeof query.employeeId === 'string' && query.employeeId) {
-    match.employeeId = new Types.ObjectId(query.employeeId);
+  if (typeof query.studentId === 'string' && query.studentId) {
+    match.studentId = new Types.ObjectId(query.studentId);
   } else if (typeof query.departmentId === 'string' && query.departmentId) {
-    const ids = await EmployeeModel.find({ departmentId: query.departmentId }).distinct('_id');
-    match.employeeId = { $in: ids };
+    const ids = await StudentModel.find({ departmentId: query.departmentId }).distinct('_id');
+    match.studentId = { $in: ids };
   }
 
   return match;
 }
 
 /**
- * The shared aggregation: one row per employee with the five status counts.
+ * The shared aggregation: one row per student with the five status counts.
  *
- * The employee lookup projects only name and position (never the photo), and
+ * The student lookup projects only name and position (never the photo), and
  * the department name comes from a second lookup — no N+1 queries.
  */
 function summaryPipeline(match: Record<string, unknown>) {
@@ -95,7 +95,7 @@ function summaryPipeline(match: Record<string, unknown>) {
     { $match: match },
     {
       $group: {
-        _id: '$employeeId',
+        _id: '$studentId',
         present: { $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] } },
         late: { $sum: { $cond: [{ $eq: ['$status', 'late'] }, 1, 0] } },
         absent: { $sum: { $cond: [{ $eq: ['$status', 'absent'] }, 1, 0] } },
@@ -105,17 +105,17 @@ function summaryPipeline(match: Record<string, unknown>) {
     },
     {
       $lookup: {
-        from: 'employees',
+        from: 'students',
         localField: '_id',
         foreignField: '_id',
-        as: 'employee',
+        as: 'student',
       },
     },
-    { $unwind: { path: '$employee', preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: '$student', preserveNullAndEmptyArrays: true } },
     {
       $lookup: {
         from: 'departments',
-        localField: 'employee.departmentId',
+        localField: 'student.departmentId',
         foreignField: '_id',
         as: 'department',
       },
@@ -123,9 +123,9 @@ function summaryPipeline(match: Record<string, unknown>) {
     {
       $project: {
         _id: 0,
-        employeeId: { $toString: '$_id' },
-        name: { $ifNull: ['$employee.name', '—'] },
-        position: { $ifNull: ['$employee.position', null] },
+        studentId: { $toString: '$_id' },
+        name: { $ifNull: ['$student.name', '—'] },
+        position: { $ifNull: ['$student.position', null] },
         department: { $ifNull: [{ $arrayElemAt: ['$department.name', 0] }, null] },
         present: 1,
         late: 1,
@@ -137,7 +137,7 @@ function summaryPipeline(match: Record<string, unknown>) {
   ];
 }
 
-/** Per-employee attendance summary for a range, paginated, with a totals row. */
+/** Per-student attendance summary for a range, paginated, with a totals row. */
 export async function attendanceSummary(query: AttendanceSummaryQuery): Promise<{
   rows: AttendanceSummaryRow[];
   totals: AttendanceSummaryTotals;
@@ -155,7 +155,7 @@ export async function attendanceSummary(query: AttendanceSummaryQuery): Promise<
     {
       $facet: {
         rows: [
-          { $sort: { name: 1, employeeId: 1 } },
+          { $sort: { name: 1, studentId: 1 } },
           { $skip: pagination.skip },
           { $limit: pagination.limit },
         ],
@@ -202,7 +202,7 @@ export async function attendanceSummaryRows(
   const match = await buildMatch(query);
   const rows = await AttendanceModel.aggregate<Omit<AttendanceSummaryRow, 'rate'>>([
     ...summaryPipeline(match),
-    { $sort: { name: 1, employeeId: 1 } },
+    { $sort: { name: 1, studentId: 1 } },
   ]);
 
   return rows.map(withRate);

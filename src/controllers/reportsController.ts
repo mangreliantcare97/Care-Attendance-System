@@ -12,7 +12,7 @@ export const attendanceSummaryQuerySchema = z.object({
   from: dateString.optional(),
   to: dateString.optional(),
   departmentId: idString.optional(),
-  employeeId: idString.optional(),
+  studentId: idString.optional(),
   page: z.coerce.number().int().min(1).optional(),
   perPage: z.coerce.number().int().min(1).max(100).optional(),
 });
@@ -30,7 +30,7 @@ export async function attendanceSummaryCsv(req: Request, res: Response): Promise
 
   const csv = toCsv(
     [
-      'Employee',
+      'Student',
       'Department',
       'Position',
       'Present',

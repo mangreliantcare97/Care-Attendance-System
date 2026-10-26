@@ -11,7 +11,7 @@ import request from 'supertest';
 import type { Types } from 'mongoose';
 import {
   createAdmin,
-  createEmployee,
+  createStudent,
   OWNER_EMAIL,
   OWNER_PASSWORD,
   signIn,
@@ -496,36 +496,36 @@ describe('DELETE /api/admins/:id', () => {
     const { deleteAdmin } = await import('../src/services/admins.ts');
 
     const cases = [
-      async (targetId: Types.ObjectId, employeeId: Types.ObjectId) =>
+      async (targetId: Types.ObjectId, studentId: Types.ObjectId) =>
         AttendanceModel.create({
-          employeeId,
+          studentId,
           date: '2041-01-01',
           status: 'present',
           createdBy: targetId,
         }),
-      async (targetId: Types.ObjectId, employeeId: Types.ObjectId) =>
+      async (targetId: Types.ObjectId, studentId: Types.ObjectId) =>
         OvertimeModel.create({
-          employeeId,
+          studentId,
           date: '2041-01-02',
           hours: 1,
           updatedBy: targetId,
         }),
-      async (targetId: Types.ObjectId, employeeId: Types.ObjectId) =>
+      async (targetId: Types.ObjectId, studentId: Types.ObjectId) =>
         LeaveModel.create({
-          employeeId,
+          studentId,
           startDate: '2041-01-03',
           endDate: '2041-01-03',
           days: 1,
           decidedBy: targetId,
         }),
-      async (targetId: Types.ObjectId, employeeId: Types.ObjectId) =>
+      async (targetId: Types.ObjectId, studentId: Types.ObjectId) =>
         LeaveAllowanceModel.create({
-          employeeId,
+          studentId,
           year: 2041,
           allowance: 20,
           createdBy: targetId,
         }),
-      async (targetId: Types.ObjectId, employeeId: Types.ObjectId) =>
+      async (targetId: Types.ObjectId, studentId: Types.ObjectId) =>
         EventModel.create({
           title: 'History guard event',
           startDate: '2041-01-04',
@@ -536,8 +536,8 @@ describe('DELETE /api/admins/:id', () => {
 
     for (const [index, createRecord] of cases.entries()) {
       const target = await makeAdmin(`History Table ${index}`);
-      const employee = await createEmployee({ name: `History Table Employee ${index}` });
-      await createRecord(target._id, employee._id);
+      const student = await createStudent({ name: `History Table Student ${index}` });
+      await createRecord(target._id, student._id);
 
       await assert.rejects(
         () => deleteAdmin(String(target._id), ownerId),

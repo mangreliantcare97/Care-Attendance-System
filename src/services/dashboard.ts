@@ -1,6 +1,6 @@
 import { AttendanceModel, type AttendanceStatus } from '../models/Attendance.ts';
 import { DepartmentModel } from '../models/Department.ts';
-import { EmployeeModel } from '../models/Employee.ts';
+import { StudentModel } from '../models/Student.ts';
 import { EventModel } from '../models/Event.ts';
 import { eachDate, isWorkingDay, resolveMonth, today } from '../utils/dates.ts';
 
@@ -24,7 +24,7 @@ const COUNTED_STATUSES: AttendanceStatus[] = ['present', 'late', 'absent'];
 export interface DashboardDepartment {
   id: string;
   name: string;
-  activeEmployees: number;
+  activeStudents: number;
 }
 
 export interface DashboardSummary {
@@ -34,7 +34,7 @@ export interface DashboardSummary {
   isHoliday: boolean;
   /** Title of the holiday covering this date, or `null`. */
   holidayTitle: string | null;
-  totalEmployees: number;
+  totalStudents: number;
   present: number;
   late: number;
   absent: number;
@@ -49,12 +49,12 @@ interface StatusCount {
   count: number;
 }
 
-/** Active employees per department — one aggregation, no per-department query. */
+/** Active students per department — one aggregation, no per-department query. */
 async function departmentSummary(): Promise<DashboardDepartment[]> {
   const rows = await DepartmentModel.aggregate<DashboardDepartment>([
     {
       $lookup: {
-        from: 'employees',
+        from: 'students',
         let: { departmentId: '$_id' },
         pipeline: [
           {
@@ -69,7 +69,7 @@ async function departmentSummary(): Promise<DashboardDepartment[]> {
           },
           { $project: { _id: 1 } },
         ],
-        as: 'activeEmployees',
+        as: 'activeStudents',
       },
     },
     {
@@ -77,7 +77,7 @@ async function departmentSummary(): Promise<DashboardDepartment[]> {
         _id: 0,
         id: { $toString: '$_id' },
         name: 1,
-        activeEmployees: { $size: '$activeEmployees' },
+        activeStudents: { $size: '$activeStudents' },
       },
     },
     { $sort: { name: 1 } },
@@ -89,18 +89,18 @@ async function departmentSummary(): Promise<DashboardDepartment[]> {
 /**
  * The cards of the dashboard for one day (today in `APP_TIMEZONE` by default).
  *
- * Only active employees are counted. "Not marked yet" is the number of active
- * employees without a record; it is meaningless on a non-working day or a
+ * Only active students are counted. "Not marked yet" is the number of active
+ * students without a record; it is meaningless on a non-working day or a
  * holiday, so it is `null` there and the page hides the card.
  */
 export async function dashboardSummary(date: string = today()): Promise<DashboardSummary> {
-  const employeeIds = await EmployeeModel.find({ status: 'active' }).distinct('_id');
+  const studentIds = await StudentModel.find({ status: 'active' }).distinct('_id');
 
   const [grouped, departments, holiday] = await Promise.all([
-    employeeIds.length === 0
+    studentIds.length === 0
       ? Promise.resolve([] as StatusCount[])
       : AttendanceModel.aggregate<StatusCount>([
-          { $match: { date, employeeId: { $in: employeeIds } } },
+          { $match: { date, studentId: { $in: studentIds } } },
           { $group: { _id: '$status', count: { $sum: 1 } } },
         ]),
     departmentSummary(),
@@ -138,12 +138,12 @@ export async function dashboardSummary(date: string = today()): Promise<Dashboar
     isWorkingDay: workingDay,
     isHoliday: Boolean(holiday),
     holidayTitle: holiday?.title ?? null,
-    totalEmployees: employeeIds.length,
+    totalStudents: studentIds.length,
     present: counts.present,
     late: counts.late,
     absent: counts.absent,
     onLeave: around,
-    notMarked: workingDay && !holiday ? Math.max(0, employeeIds.length - marked) : null,
+    notMarked: workingDay && !holiday ? Math.max(0, studentIds.length - marked) : null,
     departments,
   };
 }
@@ -210,8 +210,8 @@ export async function dashboardYear(year: number): Promise<{
   return { year, start, end, months };
 }
 
-export interface TopEmployee {
-  employeeId: string;
+export interface TopStudent {
+  studentId: string;
   name: string;
   position: string | null;
   department: string | null;
@@ -222,14 +222,14 @@ export interface TopEmployee {
 }
 
 /**
- * Top five employees of a month.
+ * Top five students of a month.
  *
  * score = present × 3 − late × 1 − absent × 2. On-leave and vacation days are
  * not counted at all. Ties: fewer absences, then more present days, then name.
  * The aggregation projects name/position/department and never the photo.
  */
-async function topEmployees(start: string, end: string): Promise<TopEmployee[]> {
-  return AttendanceModel.aggregate<TopEmployee>([
+async function topStudents(start: string, end: string): Promise<TopStudent[]> {
+  return AttendanceModel.aggregate<TopStudent>([
     {
       $match: {
         date: { $gte: start, $lte: end },
@@ -238,7 +238,7 @@ async function topEmployees(start: string, end: string): Promise<TopEmployee[]> 
     },
     {
       $group: {
-        _id: '$employeeId',
+        _id: '$studentId',
         present: { $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] } },
         late: { $sum: { $cond: [{ $eq: ['$status', 'late'] }, 1, 0] } },
         absent: { $sum: { $cond: [{ $eq: ['$status', 'absent'] }, 1, 0] } },
@@ -246,21 +246,21 @@ async function topEmployees(start: string, end: string): Promise<TopEmployee[]> 
     },
     {
       $lookup: {
-        from: 'employees',
+        from: 'students',
         localField: '_id',
         foreignField: '_id',
-        as: 'employee',
+        as: 'student',
         pipeline: [
           { $match: { $expr: { $eq: ['$status', 'active'] } } },
           { $project: { name: 1, position: 1, departmentId: 1 } },
         ],
       },
     },
-    { $unwind: '$employee' },
+    { $unwind: '$student' },
     {
       $lookup: {
         from: 'departments',
-        localField: 'employee.departmentId',
+        localField: 'student.departmentId',
         foreignField: '_id',
         as: 'department',
       },
@@ -268,9 +268,9 @@ async function topEmployees(start: string, end: string): Promise<TopEmployee[]> 
     {
       $project: {
         _id: 0,
-        employeeId: { $toString: '$_id' },
-        name: '$employee.name',
-        position: { $ifNull: ['$employee.position', null] },
+        studentId: { $toString: '$_id' },
+        name: '$student.name',
+        position: { $ifNull: ['$student.position', null] },
         department: { $ifNull: [{ $arrayElemAt: ['$department.name', 0] }, null] },
         present: 1,
         late: 1,
@@ -296,13 +296,13 @@ export interface DashboardDayPoint {
   leave: number;
 }
 
-/** Daily series and the top employees of one month. */
+/** Daily series and the top students of one month. */
 export async function dashboardMonth(month: string): Promise<{
   month: string;
   start: string;
   end: string;
   days: DashboardDayPoint[];
-  topEmployees: TopEmployee[];
+  topStudents: TopStudent[];
 }> {
   const bounds = resolveMonth(month);
   const monthKey = `${bounds.year}-${String(bounds.month).padStart(2, '0')}`;
@@ -320,7 +320,7 @@ export async function dashboardMonth(month: string): Promise<{
         },
       },
     ]),
-    topEmployees(bounds.start, bounds.end),
+    topStudents(bounds.start, bounds.end),
   ]);
 
   const days = eachDate(bounds.start, bounds.end).map((date) => ({
@@ -342,6 +342,6 @@ export async function dashboardMonth(month: string): Promise<{
     start: bounds.start,
     end: bounds.end,
     days,
-    topEmployees: top,
+    topStudents: top,
   };
 }

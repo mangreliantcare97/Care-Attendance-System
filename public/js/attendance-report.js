@@ -2,7 +2,7 @@
  * The attendance report.
  *
  * The counts come from the server and only cover records that were actually
- * written — an employee without a record is not counted as absent.
+ * written — a student without a record is not counted as absent.
  */
 (function () {
   var html = window.HrmDom.html;
@@ -34,8 +34,8 @@
     var department = document.getElementById('filter-department').value;
     if (department) params.set('departmentId', department);
 
-    var employee = document.getElementById('filter-employee').value;
-    if (employee) params.set('employeeId', employee);
+    var student = document.getElementById('filter-student').value;
+    if (student) params.set('studentId', student);
 
     return params;
   }
@@ -90,23 +90,23 @@
         window.HrmDom.renderRows(
           body,
           records.map(function (record) {
-            var employee = record.employeeId && typeof record.employeeId === 'object' ? record.employeeId : {};
-            var department = employee.departmentId && typeof employee.departmentId === 'object'
-              ? employee.departmentId.name
+            var student = record.studentId && typeof record.studentId === 'object' ? record.studentId : {};
+            var department = student.departmentId && typeof student.departmentId === 'object'
+              ? student.departmentId.name
               : null;
 
             return [
               html`<td>${record.date}</td>`,
-              html`<td><a href="/employee.html?id=${employee.id}">${employee.name || '—'}</a></td>`,
+              html`<td><a href="/student.html?id=${student.id}">${student.name || '—'}</a></td>`,
               html`<td>${department || '—'}</td>`,
-              html`<td>${employee.position || '—'}</td>`,
+              html`<td>${student.position || '—'}</td>`,
               html`<td>${statusBadge(record.status)}</td>`,
               html`<td>${record.checkIn || '—'}</td>`,
               html`<td>${record.checkOut || '—'}</td>`,
               html`<td>${record.note || '—'}</td>`,
               html`<td class="no-print text-nowrap">
-                <button type="button" class="btn btn-sm btn-primary" data-edit="${record.id}" aria-label="Edit attendance for ${employee.name || 'employee'}" title="Edit"><i class="fa fa-pen" aria-hidden="true"></i></button>
-                <button type="button" class="btn btn-sm btn-danger" data-delete="${record.id}" aria-label="Delete attendance for ${employee.name || 'employee'}" title="Delete"><i class="fa fa-trash" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-sm btn-primary" data-edit="${record.id}" aria-label="Edit attendance for ${student.name || 'student'}" title="Edit"><i class="fa fa-pen" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-sm btn-danger" data-delete="${record.id}" aria-label="Delete attendance for ${student.name || 'student'}" title="Delete"><i class="fa fa-trash" aria-hidden="true"></i></button>
               </td>`,
             ];
           }),
@@ -145,10 +145,10 @@
         },
       )}`;
 
-      var employees = await window.HrmApi.get('/api/employees?perPage=100');
-      document.getElementById('filter-employee').innerHTML = html`<option value="">All employees</option>${employees.data.employees.map(
-        function (employee) {
-          return html`<option value="${employee.id}">${employee.name}</option>`;
+      var students = await window.HrmApi.get('/api/students?perPage=100');
+      document.getElementById('filter-student').innerHTML = html`<option value="">All students</option>${students.data.students.map(
+        function (student) {
+          return html`<option value="${student.id}">${student.name}</option>`;
         },
       )}`;
     } catch (error) {
@@ -212,10 +212,10 @@
         return;
       }
 
-      var employee = record.employeeId && typeof record.employeeId === 'object' ? record.employeeId : {};
+      var student = record.studentId && typeof record.studentId === 'object' ? record.studentId : {};
 
       document.getElementById('record-modal-title').textContent =
-        'Edit ' + (employee.name || 'record') + ' — ' + record.date;
+        'Edit ' + (student.name || 'record') + ' — ' + record.date;
       document.getElementById('record-status').value = record.status;
       document.getElementById('record-check-in').value = record.checkIn || '';
       document.getElementById('record-check-out').value = record.checkOut || '';

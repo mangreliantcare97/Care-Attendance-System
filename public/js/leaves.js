@@ -10,8 +10,8 @@
   var html = window.HrmDom.html;
   var body = document.getElementById('leaves-body');
   var form = document.getElementById('leave-form');
-  var employeeSelect = document.getElementById('leave-employee');
-  var filterEmployee = document.getElementById('filter-employee');
+  var studentSelect = document.getElementById('leave-student');
+  var filterStudent = document.getElementById('filter-student');
   var filterDepartment = document.getElementById('filter-department');
   var typeSelect = document.getElementById('leave-type');
   var startInput = document.getElementById('leave-start');
@@ -60,14 +60,14 @@
     return html`<span class="badge-soft badge-soft-warning">Pending</span>`;
   }
 
-  function employeeOf(leave) {
-    return leave.employeeId && typeof leave.employeeId === 'object' ? leave.employeeId : {};
+  function studentOf(leave) {
+    return leave.studentId && typeof leave.studentId === 'object' ? leave.studentId : {};
   }
 
   function departmentOf(leave) {
-    var employee = employeeOf(leave);
-    return employee.departmentId && typeof employee.departmentId === 'object'
-      ? employee.departmentId.name
+    var student = studentOf(leave);
+    return student.departmentId && typeof student.departmentId === 'object'
+      ? student.departmentId.name
       : null;
   }
 
@@ -113,8 +113,8 @@
     var to = document.getElementById('filter-to').value;
     if (to) params.set('to', to);
 
-    var employee = filterEmployee.value;
-    if (employee) params.set('employeeId', employee);
+    var student = filterStudent.value;
+    if (student) params.set('studentId', student);
 
     var department = filterDepartment.value;
     if (department) params.set('departmentId', department);
@@ -149,10 +149,10 @@
         window.HrmDom.renderRows(
           body,
           leaves.map(function (leave) {
-            var employee = employeeOf(leave);
+            var student = studentOf(leave);
 
             return [
-              html`<td class="leave-employee-cell" data-label="Employee"><a href="/employee.html?id=${employee.id}"><strong>${employee.name || '—'}</strong></a></td>`,
+              html`<td class="leave-student-cell" data-label="Student"><a href="/student.html?id=${student.id}"><strong>${student.name || '—'}</strong></a></td>`,
               html`<td data-label="Department">${departmentOf(leave) || '—'}</td>`,
               html`<td data-label="Type">${typeLabel(leave.type)}</td>`,
               html`<td data-label="Category">${leave.category || '—'}</td>`,
@@ -162,8 +162,8 @@
               html`<td data-label="Status">${statusBadge(leave.status)}</td>`,
               html`<td class="leave-reason-cell" data-label="Reason">${leave.reason || '—'}</td>`,
               html`<td class="no-print text-nowrap leave-actions-cell" data-label="Actions">
-                <button type="button" class="btn btn-sm btn-primary" data-edit="${leave.id}" aria-label="Edit leave for ${employee.name || 'employee'}" title="Edit"><i class="fa fa-pen" aria-hidden="true"></i></button>
-                <button type="button" class="btn btn-sm btn-danger" data-delete="${leave.id}" aria-label="Delete leave for ${employee.name || 'employee'}" title="Delete"><i class="fa fa-trash" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-sm btn-primary" data-edit="${leave.id}" aria-label="Edit leave for ${student.name || 'student'}" title="Edit"><i class="fa fa-pen" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-sm btn-danger" data-delete="${leave.id}" aria-label="Delete leave for ${student.name || 'student'}" title="Delete"><i class="fa fa-trash" aria-hidden="true"></i></button>
               </td>`,
             ];
           }),
@@ -203,20 +203,20 @@
       filterDepartment.innerHTML = html`<option value="">All departments</option>${departmentOptions}`;
       allowanceDepartment.innerHTML = html`<option value="">All departments</option>${departmentOptions}`;
 
-      var employees = await window.HrmApi.get('/api/employees?perPage=100');
-      var options = employees.data.employees.map(function (employee) {
-        return html`<option value="${employee.id}">${employee.name}</option>`;
+      var students = await window.HrmApi.get('/api/students?perPage=100');
+      var options = students.data.students.map(function (student) {
+        return html`<option value="${student.id}">${student.name}</option>`;
       });
 
-      filterEmployee.innerHTML = html`<option value="">All employees</option>${options}`;
-      employeeSelect.innerHTML = html`<option value="">Choose an employee</option>${options}`;
+      filterStudent.innerHTML = html`<option value="">All students</option>${options}`;
+      studentSelect.innerHTML = html`<option value="">Choose a student</option>${options}`;
 
-      // A profile "View leave" link can pre-select the employee and range.
+      // A profile "View leave" link can pre-select the student and range.
       var params = new URLSearchParams(window.location.search);
-      var presetEmployee = params.get('employeeId');
+      var presetStudent = params.get('studentId');
       var presetFrom = params.get('from');
       var presetTo = params.get('to');
-      if (presetEmployee) filterEmployee.value = presetEmployee;
+      if (presetStudent) filterStudent.value = presetStudent;
       if (presetFrom) document.getElementById('filter-from').value = presetFrom;
       if (presetTo) document.getElementById('filter-to').value = presetTo;
     } catch (error) {
@@ -235,8 +235,8 @@
     document.getElementById('leave-status').value = leave ? leave.status : 'approved';
     document.getElementById('leave-reason').value = leave && leave.reason ? leave.reason : '';
 
-    var employee = leave ? employeeOf(leave) : {};
-    employeeSelect.value = employee.id || '';
+    var student = leave ? studentOf(leave) : {};
+    studentSelect.value = student.id || '';
 
     schedulePreview();
     $('#leave-modal').modal('show');
@@ -315,13 +315,13 @@
   }
 
   async function updatePreview() {
-    var employeeId = employeeSelect.value;
+    var studentId = studentSelect.value;
     var type = typeSelect.value;
     var startDate = startInput.value;
     var endDate = endInput.value;
 
-    if (!employeeId || !type || !startDate || !endDate) {
-      previewBox.textContent = 'Choose an employee and dates to see the holiday days.';
+    if (!studentId || !type || !startDate || !endDate) {
+      previewBox.textContent = 'Choose a student and dates to see the holiday days.';
       previewBox.classList.remove('leave-preview-warning');
       return;
     }
@@ -337,7 +337,7 @@
     previewBox.classList.remove('leave-preview-warning');
 
     var params = new URLSearchParams({
-      employeeId: employeeId,
+      studentId: studentId,
       type: type,
       startDate: startDate,
       endDate: endDate,
@@ -453,7 +453,7 @@
       if (!rows.length) {
         window.HrmDom.renderListState(allowanceBody, columns, {
           type: 'empty',
-          message: 'No employees match these filters.',
+          message: 'No students match these filters.',
           help: 'Change the year, department or search, then try again.',
         });
       } else {
@@ -461,7 +461,7 @@
           allowanceBody,
           rows.map(function (row) {
             var cells = [
-              html`<td class="allowance-employee-cell" data-label="Employee"><a href="/employee.html?id=${row.employeeId}"><strong>${row.name}</strong></a></td>`,
+              html`<td class="allowance-student-cell" data-label="Student"><a href="/student.html?id=${row.studentId}"><strong>${row.name}</strong></a></td>`,
               html`<td data-label="Department">${row.department || '—'}</td>`,
               html`<td class="text-center" data-label="Allowance">${formatDays(row.allowance)}</td>`,
               html`<td class="text-center" data-label="Total"><strong>${formatDays(row.total)}</strong></td>`,
@@ -478,19 +478,19 @@
 
             cells.push(
               html`<td class="no-print text-nowrap allowance-actions-cell" data-label="Actions">
-                <button type="button" class="btn btn-sm btn-outline-primary" data-edit-allowance="${row.employeeId}" data-name="${row.name}" data-year="${row.year}" data-allowance="${row.allowance}" data-note="${row.note || ''}" aria-label="Edit the holiday allowance of ${row.name}">Edit allowance</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-edit-allowance="${row.studentId}" data-name="${row.name}" data-year="${row.year}" data-allowance="${row.allowance}" data-note="${row.note || ''}" aria-label="Edit the holiday allowance of ${row.name}">Edit allowance</button>
               </td>`,
             );
 
             return cells;
           }),
           columns,
-          'No employees match these filters.',
+          'No students match these filters.',
         );
       }
 
       document.getElementById('allowances-count').textContent = meta.total
-        ? meta.total + (meta.total === 1 ? ' employee' : ' employees')
+        ? meta.total + (meta.total === 1 ? ' student' : ' students')
         : '';
 
       window.HrmDom.renderPagination(document.getElementById('allowances-pagination'), meta, function (page) {
@@ -511,10 +511,10 @@
   }
 
   function openAllowanceModal(button) {
-    var employeeId = button.getAttribute('data-edit-allowance');
+    var studentId = button.getAttribute('data-edit-allowance');
     var year = button.getAttribute('data-year');
 
-    allowanceEditing = { employeeId: employeeId, year: year };
+    allowanceEditing = { studentId: studentId, year: year };
     window.HrmForms.clear(allowanceForm);
 
     document.getElementById('allowance-modal-subtitle').textContent =
@@ -586,9 +586,9 @@
 
     if (event.target.closest('a')) return;
 
-    // The employee link is the accessible route; the whole row is a convenience.
+    // The student link is the accessible route; the whole row is a convenience.
     var row = event.target.closest('tr');
-    var link = row && row.querySelector('a[href^="/employee.html"]');
+    var link = row && row.querySelector('a[href^="/student.html"]');
     if (link) window.location.href = link.getAttribute('href');
   });
 
@@ -604,7 +604,7 @@
     }
 
     var payload = {
-      employeeId: employeeSelect.value,
+      studentId: studentSelect.value,
       type: typeSelect.value,
       category: document.getElementById('leave-category').value.trim() || null,
       startDate: startDate,
@@ -677,8 +677,8 @@
 
     try {
       await window.HrmApi.request(
-        '/api/employees/' +
-          allowanceEditing.employeeId +
+        '/api/students/' +
+          allowanceEditing.studentId +
           '/allowance/' +
           allowanceEditing.year,
         { method: 'PUT', body: payload },
@@ -695,7 +695,7 @@
   });
 
   typeSelect.addEventListener('change', schedulePreview);
-  employeeSelect.addEventListener('change', schedulePreview);
+  studentSelect.addEventListener('change', schedulePreview);
   startInput.addEventListener('change', schedulePreview);
   endInput.addEventListener('change', schedulePreview);
   startInput.addEventListener('input', schedulePreview);

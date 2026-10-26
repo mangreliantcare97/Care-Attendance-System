@@ -36,7 +36,7 @@ async function waitFor(milliseconds: number): Promise<void> {
  * Ask for a password reset link.
  *
  * The answer is always the same and always 200 — for an unknown address, for
- * an employee address and for an inactive administrator. Only an active
+ * a student address and for an inactive administrator. Only an active
  * administrator actually receives a mail.
  */
 export async function forgotPassword(req: Request, res: Response): Promise<void> {

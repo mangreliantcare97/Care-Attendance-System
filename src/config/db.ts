@@ -6,12 +6,21 @@ import { env } from './env.ts';
  *
  * The connection must be established *before* the express app is created,
  * because the session store and every model depend on it.
+ *
+ * `autoIndex` and `autoCreate` can be turned off for maintenance scripts:
+ * otherwise mongoose builds the model indexes and creates missing collections
+ * as soon as it connects, which would make a `--dry-run` migration write to
+ * the database before its planning starts.
  */
-export async function connectDatabase(uri: string = env.mongodbUri): Promise<typeof mongoose> {
+export async function connectDatabase(
+  uri: string = env.mongodbUri,
+  options: { autoIndex?: boolean; autoCreate?: boolean } = {},
+): Promise<typeof mongoose> {
   mongoose.set('strictQuery', true);
   await mongoose.connect(uri, {
     serverSelectionTimeoutMS: 10_000,
-    autoIndex: !env.isProduction,
+    autoIndex: options.autoIndex ?? !env.isProduction,
+    autoCreate: options.autoCreate ?? true,
   });
   return mongoose;
 }

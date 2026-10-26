@@ -8,8 +8,8 @@
   var html = window.HrmDom.html;
   var body = document.getElementById('overtime-body');
   var form = document.getElementById('overtime-form');
-  var employeeSelect = document.getElementById('overtime-employee');
-  var filterEmployee = document.getElementById('filter-employee');
+  var studentSelect = document.getElementById('overtime-student');
+  var filterStudent = document.getElementById('filter-student');
   var filterDepartment = document.getElementById('filter-department');
   var summaryDepartment = document.getElementById('summary-department');
   var summaryMonth = document.getElementById('summary-month');
@@ -27,14 +27,14 @@
     return Number(value).toString();
   }
 
-  function employeeOf(record) {
-    return record.employeeId && typeof record.employeeId === 'object' ? record.employeeId : {};
+  function studentOf(record) {
+    return record.studentId && typeof record.studentId === 'object' ? record.studentId : {};
   }
 
   function departmentOf(record) {
-    var employee = employeeOf(record);
-    return employee.departmentId && typeof employee.departmentId === 'object'
-      ? employee.departmentId.name
+    var student = studentOf(record);
+    return student.departmentId && typeof student.departmentId === 'object'
+      ? student.departmentId.name
       : null;
   }
 
@@ -49,8 +49,8 @@
     var to = document.getElementById('filter-to').value;
     if (to) params.set('to', to);
 
-    var employee = filterEmployee.value;
-    if (employee) params.set('employeeId', employee);
+    var student = filterStudent.value;
+    if (student) params.set('studentId', student);
 
     var department = filterDepartment.value;
     if (department) params.set('departmentId', department);
@@ -84,17 +84,17 @@
         window.HrmDom.renderRows(
           body,
           records.map(function (record) {
-            var employee = employeeOf(record);
+            var student = studentOf(record);
 
             return [
-              html`<td><a href="/employee.html?id=${employee.id}"><strong>${employee.name || '—'}</strong></a></td>`,
+              html`<td><a href="/student.html?id=${student.id}"><strong>${student.name || '—'}</strong></a></td>`,
               html`<td>${departmentOf(record) || '—'}</td>`,
               html`<td>${record.date}</td>`,
               html`<td class="text-center">${formatHours(record.hours)}</td>`,
               html`<td>${record.note || '—'}</td>`,
               html`<td class="no-print text-nowrap">
-                <button type="button" class="btn btn-sm btn-primary" data-edit="${record.id}" aria-label="Edit overtime for ${employee.name || 'employee'}" title="Edit"><i class="fa fa-pen" aria-hidden="true"></i></button>
-                <button type="button" class="btn btn-sm btn-danger" data-delete="${record.id}" aria-label="Delete overtime for ${employee.name || 'employee'}" title="Delete"><i class="fa fa-trash" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-sm btn-primary" data-edit="${record.id}" aria-label="Edit overtime for ${student.name || 'student'}" title="Edit"><i class="fa fa-pen" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-sm btn-danger" data-delete="${record.id}" aria-label="Delete overtime for ${student.name || 'student'}" title="Delete"><i class="fa fa-trash" aria-hidden="true"></i></button>
               </td>`,
             ];
           }),
@@ -134,13 +134,13 @@
       filterDepartment.innerHTML = html`<option value="">All departments</option>${departmentOptions}`;
       summaryDepartment.innerHTML = html`<option value="">All departments</option>${departmentOptions}`;
 
-      var employees = await window.HrmApi.get('/api/employees?perPage=100');
-      var employeeOptions = employees.data.employees.map(function (employee) {
-        return html`<option value="${employee.id}">${employee.name}</option>`;
+      var students = await window.HrmApi.get('/api/students?perPage=100');
+      var studentOptions = students.data.students.map(function (student) {
+        return html`<option value="${student.id}">${student.name}</option>`;
       });
 
-      filterEmployee.innerHTML = html`<option value="">All employees</option>${employeeOptions}`;
-      employeeSelect.innerHTML = html`<option value="">Choose an employee</option>${employeeOptions}`;
+      filterStudent.innerHTML = html`<option value="">All students</option>${studentOptions}`;
+      studentSelect.innerHTML = html`<option value="">Choose a student</option>${studentOptions}`;
     } catch (error) {
       window.HrmToast.error(error.message);
     }
@@ -156,8 +156,8 @@
     document.getElementById('overtime-hours').value = record ? record.hours : '';
     document.getElementById('overtime-note').value = record && record.note ? record.note : '';
 
-    var employee = record ? employeeOf(record) : {};
-    employeeSelect.value = employee.id || '';
+    var student = record ? studentOf(record) : {};
+    studentSelect.value = student.id || '';
 
     $('#overtime-modal').modal('show');
   }
@@ -184,7 +184,7 @@
           document.getElementById('summary-body'),
           result.rows.map(function (row) {
             return [
-              html`<td><a href="/employee.html?id=${row.employeeId}"><strong>${row.name}</strong></a></td>`,
+              html`<td><a href="/student.html?id=${row.studentId}"><strong>${row.name}</strong></a></td>`,
               html`<td>${row.department}</td>`,
               html`<td class="text-center">${row.entries}</td>`,
               html`<td class="text-right">${formatHours(row.totalHours)}</td>`,
@@ -256,7 +256,7 @@
     }
 
     var payload = {
-      employeeId: employeeSelect.value,
+      studentId: studentSelect.value,
       date: document.getElementById('overtime-date').value,
       hours: hours,
       note: document.getElementById('overtime-note').value.trim() || null,

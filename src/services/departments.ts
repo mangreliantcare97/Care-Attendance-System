@@ -1,5 +1,5 @@
 import { DepartmentModel } from '../models/Department.ts';
-import { EmployeeModel } from '../models/Employee.ts';
+import { StudentModel } from '../models/Student.ts';
 import { HttpError } from '../utils/response.ts';
 
 export interface DepartmentRecord {
@@ -7,7 +7,7 @@ export interface DepartmentRecord {
   name: string;
   location: string | null;
   description: string | null;
-  employeeCount: number;
+  studentCount: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -21,27 +21,27 @@ function toRecord(
     createdAt?: Date;
     updatedAt?: Date;
   },
-  employeeCount = 0,
+  studentCount = 0,
 ): DepartmentRecord {
   return {
     id: String(department._id),
     name: department.name,
     location: department.location ?? null,
     description: department.description ?? null,
-    employeeCount,
+    studentCount,
     createdAt: department.createdAt,
     updatedAt: department.updatedAt,
   };
 }
 
 /**
- * All departments with the number of employees in each.
+ * All departments with the number of students in each.
  *
  * The count comes from an aggregation instead of a stored counter, so it can
- * never drift away from the real number of employees.
+ * never drift away from the real number of students.
  */
 export async function listDepartments(): Promise<DepartmentRecord[]> {
-  const counts = await EmployeeModel.aggregate<{ _id: unknown; count: number }>([
+  const counts = await StudentModel.aggregate<{ _id: unknown; count: number }>([
     { $group: { _id: '$departmentId', count: { $sum: 1 } } },
   ]);
 
@@ -59,8 +59,8 @@ export async function getDepartment(id: string): Promise<DepartmentRecord> {
     throw new HttpError(404, 'department_not_found', 'That department no longer exists.');
   }
 
-  const employeeCount = await EmployeeModel.countDocuments({ departmentId: department._id });
-  return toRecord(department, employeeCount);
+  const studentCount = await StudentModel.countDocuments({ departmentId: department._id });
+  return toRecord(department, studentCount);
 }
 
 export async function createDepartment(input: {
@@ -109,14 +109,14 @@ export async function updateDepartment(
   }
 
   await department.save();
-  const employeeCount = await EmployeeModel.countDocuments({ departmentId: department._id });
-  return toRecord(department.toObject() as never, employeeCount);
+  const studentCount = await StudentModel.countDocuments({ departmentId: department._id });
+  return toRecord(department.toObject() as never, studentCount);
 }
 
 /**
  * Delete a department.
  *
- * A department that still has employees is never deleted — the employees would
+ * A department that still has students is never deleted — the students would
  * be left without a department. Move or deactivate them first.
  */
 export async function deleteDepartment(id: string): Promise<{ deleted: boolean }> {
@@ -125,12 +125,12 @@ export async function deleteDepartment(id: string): Promise<{ deleted: boolean }
     throw new HttpError(404, 'department_not_found', 'That department no longer exists.');
   }
 
-  const employeeCount = await EmployeeModel.countDocuments({ departmentId: department._id });
-  if (employeeCount > 0) {
+  const studentCount = await StudentModel.countDocuments({ departmentId: department._id });
+  if (studentCount > 0) {
     throw new HttpError(
       409,
-      'department_has_employees',
-      `This department still has ${employeeCount} employee${employeeCount === 1 ? '' : 's'}. Move them to another department first.`,
+      'department_has_students',
+      `This department still has ${studentCount} student${studentCount === 1 ? '' : 's'}. Move them to another department first.`,
     );
   }
 

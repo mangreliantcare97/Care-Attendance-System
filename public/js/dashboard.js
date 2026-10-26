@@ -195,7 +195,7 @@
           datasets: [
             {
               data: departments.map(function (department) {
-                return department.activeEmployees;
+                return department.activeStudents;
               }),
               backgroundColor: background,
               borderColor: cssVar('--hrm-surface', '#ffffff'),
@@ -232,7 +232,7 @@
       departments.map(function (department) {
         return [
           html`<td>${department.name}</td>`,
-          html`<td class="text-center">${department.activeEmployees}</td>`,
+          html`<td class="text-center">${department.activeStudents}</td>`,
         ];
       }),
       2,
@@ -240,9 +240,9 @@
     );
   }
 
-  function renderTopEmployees(rows) {
+  function renderTopStudents(rows) {
     window.HrmDom.renderRows(
-      document.getElementById('top-employees-body'),
+      document.getElementById('top-students-body'),
       rows.map(function (row, index) {
         var metaParts = [];
         if (row.position) metaParts.push(row.position);
@@ -323,7 +323,7 @@
     var response = await window.HrmApi.get('/api/dashboard/month?month=' + encodeURIComponent(month));
     lastData.month = response.data;
     renderMonth();
-    renderTopEmployees(response.data.topEmployees);
+    renderTopStudents(response.data.topStudents);
   }
 
   async function loadAll() {

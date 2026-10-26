@@ -101,6 +101,15 @@ export function createApp(options: AppOptions = {}): Express {
     res.redirect(302, '/dashboard.html');
   });
 
+  /** Permanent redirects for the old page names, keeping any query string. */
+  const legacyPageRedirect = (target: string) => (req: Request, res: Response) => {
+    const queryIndex = req.originalUrl.indexOf('?');
+    const suffix = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
+    res.redirect(301, `${target}${suffix}`);
+  };
+  app.get('/employees.html', legacyPageRedirect('/students.html'));
+  app.get('/employee.html', legacyPageRedirect('/student.html'));
+
   for (const page of PAGES) {
     // Public pages (password reset) are served without a session, everything
     // else is behind the session check.

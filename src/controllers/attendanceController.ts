@@ -14,7 +14,7 @@ const timeString = z
   .nullish();
 
 const entrySchema = z.object({
-  employeeId: z.string().regex(/^[a-f\d]{24}$/i, 'That employee id is not valid.'),
+  studentId: z.string().regex(/^[a-f\d]{24}$/i, 'That student id is not valid.'),
   status: z.enum(ATTENDANCE_STATUSES),
   checkIn: timeString,
   checkOut: timeString,
@@ -34,7 +34,7 @@ export const attendanceQuerySchema = z.object({
   from: dateString.optional(),
   to: dateString.optional(),
   departmentId: z.string().trim().max(64).optional(),
-  employeeId: z.string().trim().max(64).optional(),
+  studentId: z.string().trim().max(64).optional(),
   page: z.coerce.number().int().min(1).optional(),
   perPage: z.coerce.number().int().min(1).max(100).optional(),
 });
@@ -95,14 +95,14 @@ export async function exportCsv(req: Request, res: Response): Promise<void> {
   const rows = (await attendance.attendanceRows(query)) as Array<Record<string, unknown>>;
 
   const data = rows.map((record) => {
-    const employee = (record.employeeId ?? {}) as Record<string, unknown>;
-    const department = (employee.departmentId ?? {}) as Record<string, unknown>;
+    const student = (record.studentId ?? {}) as Record<string, unknown>;
+    const department = (student.departmentId ?? {}) as Record<string, unknown>;
 
     return [
       record.date,
-      employee.name ?? '',
+      student.name ?? '',
       (department as { name?: string }).name ?? '',
-      employee.position ?? '',
+      student.position ?? '',
       record.status,
       record.checkIn ?? '',
       record.checkOut ?? '',
@@ -111,7 +111,7 @@ export async function exportCsv(req: Request, res: Response): Promise<void> {
   });
 
   const csv = toCsv(
-    ['Date', 'Employee', 'Department', 'Position', 'Status', 'Check in', 'Check out', 'Note'],
+    ['Date', 'Student', 'Department', 'Position', 'Status', 'Check in', 'Check out', 'Note'],
     data,
   );
 

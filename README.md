@@ -40,9 +40,10 @@ to run when they are missing.
 | `npm run seed` | Create/update the administrator from the environment |
 | `npm run seed:history` | Local/test only: deterministic 2025-2026 HR history |
 | `npm run seed:2025` | Alias for `seed:history` (the same two-year dataset) |
-| `npm run seed:demo` | Local/demo only: departments, employees and three months of data |
-| `npm run seed:photos` | Attach the local portraits in `public/images/employees/` to matching employees |
+| `npm run seed:demo` | Local/demo only: departments, students and three months of data |
+| `npm run seed:photos` | Attach the local portraits in `public/images/students/` to matching students |
 | `npm run migrate:allowances` | Remove the retired `carryOver` field (idempotent, no other data touched) |
+| `npm run migrate:students` | Rename the legacy `employees` collection and `employeeId` fields to `students` / `studentId` (idempotent; `-- --dry-run` writes nothing) |
 | `npm run resync-leaves` | Recompute leave days and reconcile every leave after a `WORKING_WEEK` change |
 | `npm run reset-admin-password -- <email>` | Emergency password recovery (see below) |
 
@@ -58,9 +59,9 @@ Everything is read from the environment (see `.env.example`):
 | `SESSION_SECRET` | — | **Required in production** |
 | `TRUST_PROXY` | `1` | Number of reverse proxies in front of the app |
 | `WORKING_WEEK` | `1,2,3,4,5` | ISO weekdays (1 = Monday) that count as working days |
-| `ANNUAL_ALLOWANCE_DEFAULT` | `28` | Default holiday allowance per employee and calendar year |
+| `ANNUAL_ALLOWANCE_DEFAULT` | `28` | Default holiday allowance per student and calendar year |
 | `LOGIN_RATE_LIMIT_MAX` | `10` | Login attempts per window and IP |
-| `EMPLOYEE_PHOTO_MAX_BYTES` | `262144` | Maximum accepted photo size |
+| `STUDENT_PHOTO_MAX_BYTES` | `262144` | Maximum accepted photo size |
 | `MAIL_PROVIDER` | `none` | `none`, `console` or `cloudflare` |
 | `MAIL_FROM` | — | The sender, e.g. `Human Resource <noreply@example.com>` |
 | `CLOUDFLARE_ACCOUNT_ID` | — | Cloudflare account id (email sending) |
@@ -135,11 +136,11 @@ server.ts              entry point — connects to MongoDB and starts the HTTP s
 src/
   app.ts               the express application (middleware, routes, static files)
   config/              env, database, session store, page list
-  models/              mongoose models (Admin, Employee, Department, Attendance, …)
+  models/              mongoose models (Admin, Student, Department, Attendance, …)
   middleware/          requireAuth, requireAdmin, requireAuthPage, CSRF, rate limit, errors
   routes/              API routers
   controllers/         request handlers
-  services/            business rules (admins, safety rails, departments, employees, attendance, leave sync, leaves, overtime, calendar, dashboard, reports, mailer)
+  services/            business rules (admins, safety rails, departments, students, attendance, leave sync, leaves, overtime, calendar, dashboard, reports, mailer)
   utils/               dates, validation, responses, pagination, CSV, escaping
 public/
   *.html               one file per module (multi page, not an SPA)
@@ -151,7 +152,7 @@ public/
 seed/seed.ts           creates the first administrator
 seed/seed-history.ts   guarded CLI for the 2025-2026 local/test history
 seed/seed-history-data.ts deterministic two-year generator, checksum and assertions
-seed/seed-demo.ts      local/demo data (departments, employees, attendance, leaves, overtime, events)
+seed/seed-demo.ts      local/demo data (departments, students, attendance, leaves, overtime, events)
 seed/resync-leaves.ts  recomputes leave days and reconciles every leave after a WORKING_WEEK change
 seed/reset-admin-password.ts   emergency password recovery
 tests/                 node:test suites (in-memory MongoDB)
@@ -215,21 +216,21 @@ dates, and reconciles every leave through the same code path as a normal edit.
 It is idempotent, safe to run repeatedly, and never touches a manual attendance
 row.
 
-Only approved leaves count in the employee totals (per actual calendar year and
+Only approved leaves count in the student totals (per actual calendar year and
 type), and only approved leaves produce attendance entries. Two approved leaves
-of the same employee may not overlap (`409 leave_overlap`). A pending request may
+of the same student may not overlap (`409 leave_overlap`). A pending request may
 overlap provisionally; approval is refused while the overlap exists.
 
 ### Holiday allowance
 
-Every employee has a holiday allowance per calendar year:
+Every student has a holiday allowance per calendar year:
 
 * The default is `ANNUAL_ALLOWANCE_DEFAULT` (28 working days). A missing
-  `leaveAllowances` row is not an error: the employee just gets the default.
+  `leaveAllowances` row is not an error: the student just gets the default.
 * **No carry-over; the balance resets every 1 January.** Unused days expire on
   31 December and never move to another year. Days used in one year never affect
   another year's balance, in either direction.
-* An administrator can edit the allowance per employee and year on the employee
+* An administrator can edit the allowance per student and year on the student
   profile or in the **Allowances** tab on `/leaves.html`. The value is a day
   count from 0 to 100 in half-day steps; the available total is always the
   allowance. The edit modal states that unused days do not carry over.
@@ -262,6 +263,34 @@ Every employee has a holiday allowance per calendar year:
 npm run migrate:allowances
 ```
 
+### Students terminology migration
+
+Existing databases created before the student rename still use the old
+`employees` collection and `employeeId` field. Migrate them once with:
+
+```bash
+# print the plan and document counts without writing
+npm run migrate:students -- --dry-run
+
+# perform the rename
+npm run migrate:students
+```
+
+The migration renames the `employees` collection to `students`, applies
+`$rename` from `employeeId` to `studentId` in every collection that has the
+field, replaces the old indexes with the `studentId` indexes and verifies the
+unique `(studentId, date)` attendance index. It checks that all document counts
+are unchanged and never touches `admins` or `sessions`. Running it again is a
+no-op. If a `students` collection already exists, the migration merges the
+legacy documents after refusing duplicate `_id` or email conflicts.
+
+The old pages `/employees.html` and `/employee.html?id=…` answer with permanent
+301 redirects to `/students.html` and `/student.html?id=…` (the query string is
+preserved). The old `/api/employees…` endpoints no longer exist. Root words such
+as "employer" and "employment" are deliberately left unchanged.
+
+Take a `mongodump` before running it against a real database.
+
 ### Leave → attendance sync
 
 `src/services/attendanceSync.ts` keeps attendance in step with leaves:
@@ -270,9 +299,9 @@ npm run migrate:allowances
   status `vacation`; `leave` and `time_off` become `on_leave`.
 * Only working days are written. Every generated row carries `source:
   'leave_sync'` and the `leaveId` that created it.
-* Only missing `(employeeId, date)` rows are inserted. An existing row is never
+* Only missing `(studentId, date)` rows are inserted. An existing row is never
   overwritten — in particular a `source: 'manual'` row wins, and the unique
-  `(employeeId, date)` index turns that race into a duplicate-key conflict that
+  `(studentId, date)` index turns that race into a duplicate-key conflict that
   the sync ignores.
 * A leave only ever deletes rows with its own `leaveId`. Editing a generated
   row by hand flips it to `source: 'manual'` and clears `leaveId`, so the leave
@@ -284,7 +313,7 @@ npm run migrate:allowances
   how many rows were written and how many were left alone:
   `{ "saved": 0, "unchanged": 3 }`. A real change still turns the row into a
   manual one.
-* Every mutation reconciles: create, edit (dates, type, status, employee),
+* Every mutation reconciles: create, edit (dates, type, status, student),
   approve, reject, set back to pending and delete. Pending, rejected and
   deleted leaves end with zero rows of their own.
 * The reconcile uses `bulkWrite` and no multi-document transaction, so it works
@@ -303,9 +332,9 @@ future rows.
 
 Overtime records hours only — there is no money, rate or bonus anywhere.
 Entries are booked in quarter-hour steps between 0.25 and 24 hours. Several
-entries per employee and day are allowed, but their sum may not exceed 24
+entries per student and day are allowed, but their sum may not exceed 24
 hours for that day (`422 overtime_day_limit`). The monthly summary groups the
-entries per employee; both the list and the summary can be exported as CSV,
+entries per student; both the list and the summary can be exported as CSV,
 with the same formula-injection escaping as the attendance export.
 
 ### Calendar
@@ -330,7 +359,7 @@ Approved leaves are **not** events — they stay in the `leaves` collection.
 query time:
 
 * only **approved** leaves appear; pending and rejected requests are excluded;
-* a leave is titled with the employee's name and its type, and links to
+* a leave is titled with the student's name and its type, and links to
   `/leaves.html`;
 * the range is validated (`start <= end`) and capped at 400 inclusive days;
 * HR events and leaves are filtered by overlap with the requested range.
@@ -347,39 +376,39 @@ leave sync. Editing or deleting one recomputes every affected leave.
 ### Dashboard
 
 `/dashboard.html` keeps the AdminLTE look and uses **Chart.js 2.9.4**. The six
-cards are for **today in `APP_TIMEZONE`** and count **active employees only**:
-total employees, present, late, absent, on leave (`on_leave` + `vacation`) and
+cards are for **today in `APP_TIMEZONE`** and count **active students only**:
+total students, present, late, absent, on leave (`on_leave` + `vacation`) and
 not marked yet. On a non-working day the page shows a notice and hides the
 "not marked yet" card, because that number has no meaning there.
 
-The month selector drives both the daily chart and Top Employees; the year
+The month selector drives both the daily chart and Top Students; the year
 selector drives the twelve-month chart. Chart colours are read from the same
 CSS custom properties as the rest of the theme and every chart is rebuilt on a
 theme change, so dark mode has no stale palette.
 
-Top Employees uses `present × 3 − late × 1 − absent × 2` over the selected
+Top Students uses `present × 3 − late × 1 − absent × 2` over the selected
 month. Leave and vacation days do not appear in the score at all. Only active
-employees with at least one counted day are eligible; ties are broken by fewer
+students with at least one counted day are eligible; ties are broken by fewer
 absences, then more present days, then name. The aggregation projects only
 name, position and department — never the photo — so the table cannot leak a
 photo into a page or API response.
 
-Departments are shown as a doughnut and a table of **active** employee counts.
+Departments are shown as a doughnut and a table of **active** student counts.
 Both come from aggregation pipelines using the existing indexes, not from one
 query per department.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/dashboard/summary` | Today's cards plus active employees per department |
+| `GET /api/dashboard/summary` | Today's cards plus active students per department |
 | `GET /api/dashboard/year?year=YYYY` | Twelve month buckets with attendance, absence and leave |
-| `GET /api/dashboard/month?month=YYYY-MM` | Daily series plus Top Employees |
+| `GET /api/dashboard/month?month=YYYY-MM` | Daily series plus Top Students |
 
 ### Reports
 
 `/reports.html` has three tabs:
 
-1. **Attendance summary** — per employee present, late, absent, on leave and
-   vacation for a date range, filterable by department or employee. The
+1. **Attendance summary** — per student present, late, absent, on leave and
+   vacation for a date range, filterable by department or student. The
    attendance rate is `(present + late) / (present + late + absent)`; leave and
    vacation days are excluded from the denominator. The table is paginated and
    carries a totals row. The CSV export contains every filtered row (not just
@@ -388,7 +417,7 @@ query per department.
 2. **Overtime** — reuses `GET /api/overtime/summary` for a month and department,
    with the same CSV export.
 3. **Leave activity** — reuses `GET /api/leaves` and
-   `GET /api/employees/:id/leave-totals`. Choosing an employee shows their
+   `GET /api/students/:id/leave-totals`. Choosing a student shows their
    approved leave totals by year and type.
 
 Detailed attendance records stay on the existing attendance report page; the
@@ -402,26 +431,26 @@ MONGODB_URI=mongodb://127.0.0.1:27017/lean-hrm-demo npm run seed:demo
 ```
 
 `seed:demo` refuses to run when `NODE_ENV=production` and refuses to touch a
-database that already contains employees. It creates five departments, 25 fake
-employees, roughly three months of attendance up to yesterday (mostly present,
+database that already contains students. It creates five departments, 25 fake
+students, roughly three months of attendance up to yesterday (mostly present,
 with some late, absent and unmarked days), six approved leaves through the real
 leave reconcile, 30 overtime entries and a few calendar events. The random
 generator has a fixed seed, so an empty database produces the same demo data
 again. It does not create a login; run `npm run seed` with the `SEED_ADMIN_*`
 variables if the database has no administrator yet.
 
-Never point it at a production database: the employee check is a safety rail,
+Never point it at a production database: the student check is a safety rail,
 not a backup. Use a dedicated local or demo database URI.
 
 ### 2025-2026 history dataset (local/test only)
 
 `seed:history` produces a deterministic 22-month HR history from **1 January
 2025 to 20 October 2026** for reviewing the dashboard, reports, calendar and
-Top Employees against realistic records. `seed:2025` is an alias for the same
+Top Students against realistic records. `seed:2025` is an alias for the same
 command and the same two-year dataset.
 
 The marked period ends on **20 October 2026**. Three approved future leaves
-create `leave_sync` rows after that date: two employees are on leave on 21
+create `leave_sync` rows after that date: two students are on leave on 21
 October 2026 and one has a December 2026 vacation. No manual attendance is
 written after 20 October, and 21 October has no manual rows at all.
 
@@ -447,26 +476,26 @@ npm start
 
 The command prints a full verification report: the 22-month attendance table,
 yearly totals and shares, the partial October 2026 working-day count, event
-counts by type and month, multi-day and edge-case events, Top Employees hand
+counts by type and month, multi-day and edge-case events, Top Students hand
 checks, the fixed 21 October dashboard/sheet checks, both bank-holiday leave
-cases, a per-employee holiday allowance table for 2025 and 2026 (allowance,
+cases, a per-student holiday allowance table for 2025 and 2026 (allowance,
 used, pending and remaining) and every assertion.
 
 #### Profile photos
 
-`seed:history` deliberately creates employees **without** photos, and asserts
+`seed:history` deliberately creates students **without** photos, and asserts
 that none were written. A re-seed therefore clears them. To review the UI with
 portraits, the repository ships 26 local headshots in
-`public/images/employees/` (one JPEG per employee name, sourced from
+`public/images/students/` (one JPEG per student name, sourced from
 [randomuser.me](https://randomuser.me) for local demo use):
 
 ```bash
 MONGODB_URI=mongodb://127.0.0.1:27017/lean-hrm-2025-test npm run seed:photos
 ```
 
-The script matches `amelia-bennett.jpg` to employee "Amelia Bennett", stores the
-bytes on the employee document and skips anything it cannot match. Photos are
-served by `GET /api/employees/:id/photo`; the `/images` folder is also served
+The script matches `amelia-bennett.jpg` to student "Amelia Bennett", stores the
+bytes on the student document and skips anything it cannot match. Photos are
+served by `GET /api/students/:id/photo`; the `/images` folder is also served
 statically for local reference.
 
 #### Safety rails
@@ -479,9 +508,9 @@ statically for local reference.
   `SEED_ADMIN_EMAIL` when that active administrator exists, otherwise it uses
   the oldest active administrator and prints a warning. The script never
   creates, updates or deletes an administrator.
-* It refuses when employees already exist unless `-- --reset` is supplied.
+* It refuses when students already exist unless `-- --reset` is supplied.
 * `--reset` deletes only `attendance`, `overtime`, `leaves`, `events`,
-  `employees` and `departments`. Administrators and sessions are never touched.
+  `students` and `departments`. Administrators and sessions are never touched.
 * It forces `APP_TIMEZONE=Europe/London` and `WORKING_WEEK=1,2,3,4,5` for its own
   process. Every date is a fixed `YYYY-MM-DD` value; the system clock is never
   used to choose history dates.
@@ -496,17 +525,17 @@ calendar, dashboard and attendance-sheet cases.
 
 | Area | Data |
 |---|---|
-| Departments | 5: Operations, Finance, Human Resources, Sales and IT, with unequal employee counts (7 / 5 / 4 / 6 / 4) |
-| Employees | 26: 23 active, 1 inactive on 31 March 2026, 1 terminated on 30 June 2025 and 1 terminated on 14 August 2026; 3 hired during 2025, 2 during 2026; 5 without an email; no photos |
-| Attendance | 10,414 rows: 10,216 manual and 198 `leave_sync`. One manual row per employee per Mon–Fri working day inside employment up to 20 October 2026, excluding the England bank holidays and 31 deliberately unmarked days (0.3% of 10,435 expected slots) |
+| Departments | 5: Operations, Finance, Human Resources, Sales and IT, with unequal student counts (7 / 5 / 4 / 6 / 4) |
+| Students | 26: 23 active, 1 inactive on 31 March 2026, 1 terminated on 30 June 2025 and 1 terminated on 14 August 2026; 3 hired during 2025, 2 during 2026; 5 without an email; no photos |
+| Attendance | 10,414 rows: 10,216 manual and 198 `leave_sync`. One manual row per student per Mon–Fri working day inside employment up to 20 October 2026, excluding the England bank holidays and 31 deliberately unmarked days (0.3% of 10,435 expected slots) |
 | Attendance mix | About 90% present, 7% late and 3% absent among counted days, close to the requested 88 / 7 / 3. Present check-in is 08:30–09:00 and checkout 17:00–18:15; late check-in is 09:10–10:30. Absences form runs of 1–3 working days and are heavier in January–February |
 | Leaves | 73 approved (40 in 2025, 30 in 2026 through 20 October and 3 future), 10 pending and 6 rejected, created through the real leave/reconcile service. Types are `leave` (casual/sick/personal), `vacation` (annual) and `time_off`. The 73 leaves contain 200 approved working days; 198 `leave_sync` rows remain because 2 leave days were manually overridden with `present` |
-| Overtime | 260 entries: 150 in 2025 and 110 in 2026 through 20 October, spread across all 22 months. 0.5–4 hours in 0.25-hour steps, only on days the employee actually worked |
+| Overtime | 260 entries: 150 in 2025 and 110 in 2026 through 20 October, spread across all 22 months. 0.5–4 hours in 0.25-hour steps, only on days the student actually worked |
 | Events | 148: 75 in 2025 and 73 in 2026. 2025 has 9 holiday, 21 deadline, 29 meeting and 16 event entries; 2026 has 9 holiday, 20 deadline, 29 meeting and 15 event entries. No leave/vacation event types and no payroll/salary/bonus wording |
 
-Leave rules: approved leaves never overlap for the same employee, every leave
+Leave rules: approved leaves never overlap for the same student, every leave
 is within one calendar year, and no leave starts before hire or ends after the
-employee's leaving/deactivation date. Pending and rejected leaves create no
+student's leaving/deactivation date. Pending and rejected leaves create no
 attendance rows. Two approved leave days are deliberately overridden by a
 manual `present` row, so they demonstrate the real sheet behaviour where an
 edit detaches a `leave_sync` row from its leave.
@@ -525,7 +554,7 @@ informational only: they do not change a leave's `days` or the leave totals.
 The three future leaves are Amelia Bennett (21–23 October 2026, vacation), Noah
 Carter (21–22 October 2026, time off) and Isla Dawson (21–23 December 2026,
 vacation). On **21 October 2026** the dashboard therefore shows 23 active
-employees, 2 on leave and 21 not marked; the attendance sheet for that date has
+students, 2 on leave and 21 not marked; the attendance sheet for that date has
 only those two `leave_sync` rows.
 
 October 2026 is partial: **14 working days** through 20 October, out of 22
@@ -551,8 +580,8 @@ sync.
   Harry Nelson, and the 21 October 2026 `Autumn away day` appears beside the
   two future approved leaves.
 * Pending and rejected leaves never appear in the calendar feed.
-* The two terminated employees have no attendance after their leaving dates;
-  the inactive employee has none after 31 March 2026; the 2025 and 2026 hires
+* The two terminated students have no attendance after their leaving dates;
+  the inactive student has none after 31 March 2026; the 2025 and 2026 hires
   have no attendance before their hire dates.
 * The clock-change, month-crossing, multi-day, crowded-day, Christmas-closure
   and leave-day cases are all included in the printed edge-case report and in
@@ -562,7 +591,7 @@ To inspect the history, choose 2025 or 2026 in the dashboard year selector,
 open the attendance sheet for 20 October and 21 October 2026, run the attendance
 report across 2025–2026, and step through the calendar in month, week and list
 views for March, May, July, October and December in both years. Maya Patel and
-Oliver Grant are the 2026 hires to open from the employee list.
+Oliver Grant are the 2026 hires to open from the student list.
 
 ## API
 
@@ -583,22 +612,22 @@ Oliver Grant are the 2026 hires to open from the employee list.
 | `POST` | `/api/admins/:id/activate` | Activate an administrator (kept for compatibility) |
 | `POST` | `/api/admins/:id/deactivate` | Deactivate an administrator (kept for compatibility) |
 | `POST` | `/api/admins/me/password` | Change your own password |
-| `GET` | `/api/departments` | Departments with the number of employees |
+| `GET` | `/api/departments` | Departments with the number of students |
 | `POST` | `/api/departments` | Create a department |
 | `PATCH` | `/api/departments/:id` | Rename a department |
 | `DELETE` | `/api/departments/:id` | Delete a department (only when it is empty) |
-| `GET` | `/api/employees` | Employees — paginated, searchable, filterable |
-| `POST` | `/api/employees` | Create an employee |
-| `GET` | `/api/employees/:id` | One employee |
-| `PATCH` | `/api/employees/:id` | Change an employee |
-| `DELETE` | `/api/employees/:id` | Delete an employee (only without any records) |
-| `GET` | `/api/employees/:id/photo` | The photo (never part of a list) |
-| `GET` | `/api/employees/:id/attendance` | The attendance of one employee, per month |
-| `GET` | `/api/employees/:id/leaves` | The leave history of one employee |
-| `GET` | `/api/employees/:id/leave-totals` | Approved leave days per actual year and type |
-| `GET` | `/api/employees/:id/allowance?year=YYYY` | Holiday allowance summary and month breakdown |
-| `GET` | `/api/employees/:id/allowance/month?year=YYYY&month=M` | Approved vacation days counted in one month |
-| `PUT` | `/api/employees/:id/allowance/:year` | Set the allowance and note for one year |
+| `GET` | `/api/students` | Students — paginated, searchable, filterable |
+| `POST` | `/api/students` | Create a student |
+| `GET` | `/api/students/:id` | One student |
+| `PATCH` | `/api/students/:id` | Change a student |
+| `DELETE` | `/api/students/:id` | Delete a student (only without any records) |
+| `GET` | `/api/students/:id/photo` | The photo (never part of a list) |
+| `GET` | `/api/students/:id/attendance` | The attendance of one student, per month |
+| `GET` | `/api/students/:id/leaves` | The leave history of one student |
+| `GET` | `/api/students/:id/leave-totals` | Approved leave days per actual year and type |
+| `GET` | `/api/students/:id/allowance?year=YYYY` | Holiday allowance summary and month breakdown |
+| `GET` | `/api/students/:id/allowance/month?year=YYYY&month=M` | Approved vacation days counted in one month |
+| `PUT` | `/api/students/:id/allowance/:year` | Set the allowance and note for one year |
 | `GET` | `/api/attendance/sheet` | The daily sheet for a date |
 | `POST` | `/api/attendance/sheet` | Save the whole sheet in one request |
 | `GET` | `/api/attendance` | The report — filtered, paginated, with counts |
@@ -606,30 +635,30 @@ Oliver Grant are the 2026 hires to open from the employee list.
 | `POST` | `/api/attendance` | Add a single record |
 | `PATCH` | `/api/attendance/:id` | Change a record |
 | `DELETE` | `/api/attendance/:id` | Delete a record |
-| `GET` | `/api/overtime` | Overtime entries — date range, employee, department |
+| `GET` | `/api/overtime` | Overtime entries — date range, student, department |
 | `POST` | `/api/overtime` | Add an overtime entry |
 | `PATCH` | `/api/overtime/:id` | Change an overtime entry |
 | `DELETE` | `/api/overtime/:id` | Delete an overtime entry |
-| `GET` | `/api/overtime/summary` | Per employee hours and entries for a month |
+| `GET` | `/api/overtime/summary` | Per student hours and entries for a month |
 | `GET` | `/api/overtime/export.csv` | The entries as a CSV file |
 | `GET` | `/api/overtime/summary.csv` | The monthly summary as a CSV file |
-| `GET` | `/api/leaves` | Leave records — employee, department, type, status, dates |
+| `GET` | `/api/leaves` | Leave records — student, department, type, status, dates |
 | `POST` | `/api/leaves` | Create a leave |
 | `GET` | `/api/leaves/:id` | One leave |
 | `PATCH` | `/api/leaves/:id` | Change a leave (including approve/reject) |
 | `DELETE` | `/api/leaves/:id` | Delete a leave and its generated attendance |
 | `GET` | `/api/leaves/export.csv` | The leave records as a CSV file |
 | `GET` | `/api/leaves/preview` | Counted days, skipped dates and allowance impact for a proposed leave |
-| `GET` | `/api/leaves/allowances` | Per-employee allowance overview (year, department, search, month) |
+| `GET` | `/api/leaves/allowances` | Per-student allowance overview (year, department, search, month) |
 | `GET` | `/api/leaves/allowances/export.csv` | Every filtered allowance row as a CSV file |
 | `GET` | `/api/calendar` | HR events + approved leaves for a date range |
 | `POST` | `/api/events` | Create an HR calendar event |
 | `PATCH` | `/api/events/:id` | Change an HR calendar event |
 | `DELETE` | `/api/events/:id` | Delete an HR calendar event |
-| `GET` | `/api/dashboard/summary` | Today's cards and active employees per department |
+| `GET` | `/api/dashboard/summary` | Today's cards and active students per department |
 | `GET` | `/api/dashboard/year?year=YYYY` | Twelve month attendance/absence/leave series |
-| `GET` | `/api/dashboard/month?month=YYYY-MM` | Daily series and Top Employees |
-| `GET` | `/api/reports/attendance-summary` | Per-employee summary with rate and totals |
+| `GET` | `/api/dashboard/month?month=YYYY-MM` | Daily series and Top Students |
+| `GET` | `/api/reports/attendance-summary` | Per-student summary with rate and totals |
 | `GET` | `/api/reports/attendance-summary.csv` | The summary as a CSV file |
 
 Responses always use the same envelope:
@@ -682,7 +711,7 @@ with the activate/deactivate endpoints.
 * **Phase 1** — audit and decisions: [`docs/PHASE-1-AUDIT.md`](docs/PHASE-1-AUDIT.md)
 * **Phase 2** — foundation, shell and authentication:
   [`docs/PHASE-2-REPORT.md`](docs/PHASE-2-REPORT.md)
-* **Phase 3A** — departments, employees, attendance and the administrator
+* **Phase 3A** — departments, students, attendance and the administrator
   password reset: [`docs/PHASE-3A-REPORT.md`](docs/PHASE-3A-REPORT.md)
 * **Phase 3B** — overtime, leave & vacation, and the leave → attendance sync:
   [`docs/PHASE-3B-REPORT.md`](docs/PHASE-3B-REPORT.md)

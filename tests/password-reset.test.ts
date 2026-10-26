@@ -6,7 +6,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createAdmin,
-  createEmployee,
+  createStudent,
   signIn,
   startTestApp,
   OWNER_EMAIL,
@@ -105,16 +105,16 @@ describe('forgot password', () => {
     assert.match(sent[0].text, /reset-password\.html\?token=/);
   });
 
-  it('never sends a mail for an employee address', async () => {
-    await createEmployee({ name: 'Employee With Mail', email: 'employee@example.com' });
+  it('never sends a mail for a student address', async () => {
+    await createStudent({ name: 'Student With Mail', email: 'student@example.com' });
 
     sent = [];
     const response = await (await import('supertest')).default(context.app)
       .post('/api/auth/forgot-password')
-      .send({ email: 'employee@example.com' });
+      .send({ email: 'student@example.com' });
 
     assert.equal(response.status, 200);
-    assert.equal(sent.length, 0, 'employees must never be able to trigger a reset');
+    assert.equal(sent.length, 0, 'students must never be able to trigger a reset');
   });
 
   it('validates the payload', async () => {

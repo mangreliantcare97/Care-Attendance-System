@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import request from 'supertest';
 import {
   createAdmin,
-  createEmployee,
+  createStudent,
   signIn,
   startTestApp,
   OWNER_EMAIL,
@@ -90,7 +90,7 @@ describe('holiday-aware leave counting', () => {
 
   it('stores the holiday-aware day count and writes no row on the holiday', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Holiday Counted Person' });
+    const student = await createStudent({ name: 'Holiday Counted Person' });
 
     await createEvent(agent, csrf, {
       type: 'holiday',
@@ -99,7 +99,7 @@ describe('holiday-aware leave counting', () => {
     });
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2030-06-03',
       endDate: '2030-06-09',
@@ -117,11 +117,11 @@ describe('holiday-aware leave counting', () => {
       '2030-06-07',
     ]);
 
-    const allowance = await agent.get(`/api/employees/${employee._id}/allowance?year=2030`);
+    const allowance = await agent.get(`/api/students/${student._id}/allowance?year=2030`);
     assert.equal(allowance.status, 200);
     assert.equal(allowance.body.data.allowance.used, 4);
 
-    const totals = await agent.get(`/api/employees/${employee._id}/leave-totals`);
+    const totals = await agent.get(`/api/students/${student._id}/leave-totals`);
     const year = totals.body.data.totalsByYear.find(
       (entry: { year: number }) => entry.year === 2030,
     );
@@ -130,7 +130,7 @@ describe('holiday-aware leave counting', () => {
 
   it('counts a cross-year leave in each actual year for the allowance and the totals', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Holiday Cross Year Person' });
+    const student = await createStudent({ name: 'Holiday Cross Year Person' });
 
     await createEvent(agent, csrf, {
       type: 'holiday',
@@ -139,7 +139,7 @@ describe('holiday-aware leave counting', () => {
     });
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2030-12-30',
       endDate: '2031-01-02',
@@ -149,15 +149,15 @@ describe('holiday-aware leave counting', () => {
     // 30 + 31 Dec = 2 days, 1 Jan is a holiday, 2 Jan = 1 day.
     assert.equal(created.body.data.leave.days, 3);
 
-    const y2030 = await agent.get(`/api/employees/${employee._id}/allowance?year=2030`);
-    const y2031 = await agent.get(`/api/employees/${employee._id}/allowance?year=2031`);
+    const y2030 = await agent.get(`/api/students/${student._id}/allowance?year=2030`);
+    const y2031 = await agent.get(`/api/students/${student._id}/allowance?year=2031`);
 
     assert.equal(y2030.body.data.allowance.used, 2);
     assert.equal(y2030.body.data.allowance.months[11].used, 2);
     assert.equal(y2031.body.data.allowance.used, 1);
     assert.equal(y2031.body.data.allowance.months[0].used, 1);
 
-    const totals = await agent.get(`/api/employees/${employee._id}/leave-totals`);
+    const totals = await agent.get(`/api/students/${student._id}/leave-totals`);
     const byYear = new Map(
       totals.body.data.totalsByYear.map((entry: { year: number; vacation: number }) => [
         entry.year,
@@ -172,9 +172,9 @@ describe('holiday-aware leave counting', () => {
 describe('holiday allowance summary', () => {
   it('defaults to 28 days and only approved vacation consumes it', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Allowance Math Person' });
+    const student = await createStudent({ name: 'Allowance Math Person' });
 
-    const initial = await agent.get(`/api/employees/${employee._id}/allowance?year=2032`);
+    const initial = await agent.get(`/api/students/${student._id}/allowance?year=2032`);
     assert.equal(initial.status, 200);
     const allowance = initial.body.data.allowance;
     assert.equal(allowance.year, 2032);
@@ -193,7 +193,7 @@ describe('holiday allowance summary', () => {
       true,
     );
 
-    const base = { employeeId: String(employee._id), status: 'approved' };
+    const base = { studentId: String(student._id), status: 'approved' };
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
       ...base,
       type: 'vacation',
@@ -215,21 +215,21 @@ describe('holiday allowance summary', () => {
     });
     // Pending is shown separately; rejected is ignored.
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2032-04-01',
       endDate: '2032-04-03',
       status: 'pending',
     });
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2032-05-04',
       endDate: '2032-05-08',
       status: 'rejected',
     });
 
-    const response = await agent.get(`/api/employees/${employee._id}/allowance?year=2032`);
+    const response = await agent.get(`/api/students/${student._id}/allowance?year=2032`);
     const summary = response.body.data.allowance;
 
     assert.equal(summary.used, 5);
@@ -242,17 +242,17 @@ describe('holiday allowance summary', () => {
 
   it('expires unused days on 31 December and starts the next year at 28', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'No Carry Person' });
+    const student = await createStudent({ name: 'No Carry Person' });
 
     await agent
-      .put(`/api/employees/${employee._id}/allowance/2025`)
+      .put(`/api/students/${student._id}/allowance/2025`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 28, note: 'Full allowance' });
 
     // Monday 3 February to Wednesday 5 March 2025 is 23 working days with no
     // bank holiday in the range.
     const leave = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2025-02-03',
       endDate: '2025-03-05',
@@ -261,7 +261,7 @@ describe('holiday allowance summary', () => {
     assert.equal(leave.status, 200);
     assert.equal(leave.body.data.leave.days, 23);
 
-    const expired = await agent.get(`/api/employees/${employee._id}/allowance?year=2025`);
+    const expired = await agent.get(`/api/students/${student._id}/allowance?year=2025`);
     const expiredSummary = expired.body.data.allowance;
     assert.equal(expiredSummary.allowance, 28);
     assert.equal(expiredSummary.total, 28);
@@ -274,7 +274,7 @@ describe('holiday allowance summary', () => {
 
     // The 2025 unused days are gone. 2026 starts with the full allowance and
     // no vacation has been booked in it.
-    const fresh = await agent.get(`/api/employees/${employee._id}/allowance?year=2026`);
+    const fresh = await agent.get(`/api/students/${student._id}/allowance?year=2026`);
     const freshSummary = fresh.body.data.allowance;
     assert.equal(freshSummary.allowance, 28);
     assert.equal(freshSummary.total, 28);
@@ -303,15 +303,15 @@ describe('holiday allowance summary', () => {
 
   it('shows a past-year over-allowance as red "Over allowance" wording', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Past Over Person' });
+    const student = await createStudent({ name: 'Past Over Person' });
 
     await agent
-      .put(`/api/employees/${employee._id}/allowance/2025`)
+      .put(`/api/students/${student._id}/allowance/2025`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 1, note: '' });
 
     const leave = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2025-06-02',
       endDate: '2025-06-04',
@@ -321,7 +321,7 @@ describe('holiday allowance summary', () => {
     assert.equal(leave.status, 200);
     assert.equal(leave.body.data.leave.days, 3);
 
-    const summary = await agent.get(`/api/employees/${employee._id}/allowance?year=2025`);
+    const summary = await agent.get(`/api/students/${student._id}/allowance?year=2025`);
     const allowance = summary.body.data.allowance;
     assert.equal(allowance.remaining, -2);
     assert.equal(allowance.expired, true);
@@ -335,21 +335,21 @@ describe('holiday allowance summary', () => {
 
   it('does not let unused days from one year rescue the next year', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'No Rescue Person' });
+    const student = await createStudent({ name: 'No Rescue Person' });
 
     await agent
-      .put(`/api/employees/${employee._id}/allowance/2025`)
+      .put(`/api/students/${student._id}/allowance/2025`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 28, note: '' });
     await agent
-      .put(`/api/employees/${employee._id}/allowance/2026`)
+      .put(`/api/students/${student._id}/allowance/2026`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 28, note: '' });
 
     // 29 working days in 2026: even with 28 unused 2025 days, this is one day
     // over the 2026 allowance.
     const refused = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2026-01-05',
       endDate: '2026-02-12',
@@ -364,19 +364,19 @@ describe('holiday allowance summary', () => {
     assert.equal(y2026.remaining, -1);
     assertNoCarryOver(refused.body);
 
-    const y2025 = await agent.get(`/api/employees/${employee._id}/allowance?year=2025`);
+    const y2025 = await agent.get(`/api/students/${student._id}/allowance?year=2025`);
     assert.equal(y2025.body.data.allowance.remaining, 28);
   });
 
-  it('edits the allowance and note and keeps a per-employee row', async () => {
+  it('edits the allowance and note and keeps a per-student row', async () => {
     const { agent, csrf } = await signIn(context.app);
     const { AdminModel } = await import('../src/models/Admin.ts');
     const { LeaveAllowanceModel } = await import('../src/models/LeaveAllowance.ts');
-    const employee = await createEmployee({ name: 'Allowance Edit Person' });
+    const student = await createStudent({ name: 'Allowance Edit Person' });
     const owner = await AdminModel.findOne({ email: OWNER_EMAIL });
 
     const response = await agent
-      .put(`/api/employees/${employee._id}/allowance/2033`)
+      .put(`/api/students/${student._id}/allowance/2033`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 24, note: 'Part-time agreement' });
 
@@ -389,21 +389,21 @@ describe('holiday allowance summary', () => {
     assert.equal(summary.remaining, 24);
     assertNoCarryOver(response.body);
 
-    const row = await LeaveAllowanceModel.findOne({ employeeId: employee._id, year: 2033 });
+    const row = await LeaveAllowanceModel.findOne({ studentId: student._id, year: 2033 });
     assert.ok(row);
     assert.equal(String(row?.createdBy), String(owner?._id));
     assert.equal(String(row?.updatedBy), String(owner?._id));
 
     // A second write updates the same row instead of adding another one.
     await agent
-      .put(`/api/employees/${employee._id}/allowance/2033`)
+      .put(`/api/students/${student._id}/allowance/2033`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 20, note: '' });
 
-    assert.equal(await LeaveAllowanceModel.countDocuments({ employeeId: employee._id, year: 2033 }), 1);
+    assert.equal(await LeaveAllowanceModel.countDocuments({ studentId: student._id, year: 2033 }), 1);
 
-    // Another year of the same employee still uses the environment default.
-    const other = await agent.get(`/api/employees/${employee._id}/allowance?year=2034`);
+    // Another year of the same student still uses the environment default.
+    const other = await agent.get(`/api/students/${student._id}/allowance?year=2034`);
     assert.equal(other.body.data.allowance.allowance, 28);
     assert.equal(other.body.data.allowance.total, 28);
     assertNoCarryOver(other.body);
@@ -414,10 +414,10 @@ describe('holiday allowance carry-over migration', () => {
   it('removes only carryOver and is idempotent', async () => {
     const { removeCarryOverField } = await import('../src/services/allowanceMigration.ts');
     const { LeaveAllowanceModel } = await import('../src/models/LeaveAllowance.ts');
-    const employee = await createEmployee({ name: 'Migration Person' });
+    const student = await createStudent({ name: 'Migration Person' });
 
     const inserted = await LeaveAllowanceModel.collection.insertOne({
-      employeeId: employee._id,
+      studentId: student._id,
       year: 2044,
       allowance: 21,
       carryOver: 2,
@@ -454,10 +454,10 @@ describe('holiday allowance carry-over migration', () => {
 describe('holiday allowance month breakdown', () => {
   it('groups the counted days of a month by leave and clips both ends', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Allowance Month Person' });
+    const student = await createStudent({ name: 'Allowance Month Person' });
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       category: 'annual',
       reason: 'Winter break',
@@ -469,7 +469,7 @@ describe('holiday allowance month breakdown', () => {
     assert.equal(created.body.data.leave.days, 6);
 
     const january = await agent.get(
-      `/api/employees/${employee._id}/allowance/month?year=2032&month=1`,
+      `/api/students/${student._id}/allowance/month?year=2032&month=1`,
     );
     assert.equal(january.status, 200);
     assert.equal(january.body.data.month.total, 2);
@@ -484,7 +484,7 @@ describe('holiday allowance month breakdown', () => {
     assert.deepEqual(jan.dates, ['2032-01-29', '2032-01-30']);
 
     const february = await agent.get(
-      `/api/employees/${employee._id}/allowance/month?year=2032&month=2`,
+      `/api/students/${student._id}/allowance/month?year=2032&month=2`,
     );
     const feb = february.body.data.month.leaves[0];
     assert.equal(february.body.data.month.total, 4);
@@ -494,13 +494,13 @@ describe('holiday allowance month breakdown', () => {
     assert.deepEqual(feb.dates, ['2032-02-02', '2032-02-03', '2032-02-04', '2032-02-05']);
 
     const march = await agent.get(
-      `/api/employees/${employee._id}/allowance/month?year=2032&month=3`,
+      `/api/students/${student._id}/allowance/month?year=2032&month=3`,
     );
     assert.equal(march.body.data.month.total, 0);
     assert.deepEqual(march.body.data.month.leaves, []);
 
     // The month totals and the year summary are the same arithmetic.
-    const summary = await agent.get(`/api/employees/${employee._id}/allowance?year=2032`);
+    const summary = await agent.get(`/api/students/${student._id}/allowance?year=2032`);
     const months = summary.body.data.allowance.months;
     assert.equal(summary.body.data.allowance.used, 6);
     assert.equal(months[0].used, january.body.data.month.total);
@@ -515,15 +515,15 @@ describe('holiday allowance month breakdown', () => {
 describe('holiday allowance over-check', () => {
   it('refuses an over-allowance vacation with 409 and books it after confirmation', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Over Allowance Person' });
+    const student = await createStudent({ name: 'Over Allowance Person' });
 
     await agent
-      .put(`/api/employees/${employee._id}/allowance/2033`)
+      .put(`/api/students/${student._id}/allowance/2033`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 2, note: '' });
 
     const payload = {
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2033-03-07',
       endDate: '2033-03-11',
@@ -537,7 +537,7 @@ describe('holiday allowance over-check', () => {
     assert.equal(refused.body.error.details.years[0].remaining, -3);
 
     const { LeaveModel } = await import('../src/models/Leave.ts');
-    assert.equal(await LeaveModel.countDocuments({ employeeId: employee._id }), 0);
+    assert.equal(await LeaveModel.countDocuments({ studentId: student._id }), 0);
 
     const confirmed = await agent
       .post('/api/leaves')
@@ -547,7 +547,7 @@ describe('holiday allowance over-check', () => {
     assert.equal(confirmed.status, 200);
     assert.equal(confirmed.body.data.leave.days, 5);
 
-    const summary = await agent.get(`/api/employees/${employee._id}/allowance?year=2033`);
+    const summary = await agent.get(`/api/students/${student._id}/allowance?year=2033`);
     assert.equal(summary.body.data.allowance.used, 5);
     assert.equal(summary.body.data.allowance.remaining, -3);
     assert.equal(summary.body.data.allowance.remainingLabel, 'Holiday remaining');
@@ -557,15 +557,15 @@ describe('holiday allowance over-check', () => {
 
   it('refuses approving a pending vacation and accepts it when confirmed', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Over Approve Person' });
+    const student = await createStudent({ name: 'Over Approve Person' });
 
     await agent
-      .put(`/api/employees/${employee._id}/allowance/2039`)
+      .put(`/api/students/${student._id}/allowance/2039`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 1, note: '' });
 
     const pending = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2039-07-04',
       endDate: '2039-07-08',
@@ -587,23 +587,23 @@ describe('holiday allowance over-check', () => {
     assert.equal(confirmed.status, 200);
     assert.equal(confirmed.body.data.leave.status, 'approved');
 
-    const summary = await agent.get(`/api/employees/${employee._id}/allowance?year=2039`);
+    const summary = await agent.get(`/api/students/${student._id}/allowance?year=2039`);
     assert.equal(summary.body.data.allowance.used, 5);
     assert.equal(summary.body.data.allowance.remaining, -4);
   });
 
   it('checks a cross-year vacation against each actual year', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Over Cross Year Person' });
+    const student = await createStudent({ name: 'Over Cross Year Person' });
 
     // 2034 has one counted day (Fri 29 Dec) and is deliberately empty.
     await agent
-      .put(`/api/employees/${employee._id}/allowance/2034`)
+      .put(`/api/students/${student._id}/allowance/2034`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 0, note: '' });
 
     const payload = {
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2034-12-29',
       endDate: '2035-01-03',
@@ -611,7 +611,7 @@ describe('holiday allowance over-check', () => {
     };
 
     const preview = await agent.get(
-      `/api/leaves/preview?employeeId=${employee._id}&type=vacation&startDate=2034-12-29&endDate=2035-01-03`,
+      `/api/leaves/preview?studentId=${student._id}&type=vacation&startDate=2034-12-29&endDate=2035-01-03`,
     );
     assert.equal(preview.status, 200);
     assert.equal(preview.body.data.preview.years.length, 2);
@@ -646,8 +646,8 @@ describe('holiday allowance over-check', () => {
     assert.equal(confirmed.status, 200);
     assert.equal(confirmed.body.data.leave.days, 4);
 
-    const y2034Summary = await agent.get(`/api/employees/${employee._id}/allowance?year=2034`);
-    const y2035Summary = await agent.get(`/api/employees/${employee._id}/allowance?year=2035`);
+    const y2034Summary = await agent.get(`/api/students/${student._id}/allowance?year=2034`);
+    const y2035Summary = await agent.get(`/api/students/${student._id}/allowance?year=2035`);
     assert.equal(y2034Summary.body.data.allowance.used, 1);
     assert.equal(y2034Summary.body.data.allowance.remaining, -1);
     assert.equal(y2035Summary.body.data.allowance.used, 3);
@@ -656,15 +656,15 @@ describe('holiday allowance over-check', () => {
 
   it('excludes the edited leave from its own check', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Over Edit Person' });
+    const student = await createStudent({ name: 'Over Edit Person' });
 
     await agent
-      .put(`/api/employees/${employee._id}/allowance/2033`)
+      .put(`/api/students/${student._id}/allowance/2033`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 5, note: '' });
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2033-03-07',
       endDate: '2033-03-11',
@@ -693,21 +693,21 @@ describe('holiday allowance over-check', () => {
     assert.equal(confirmed.status, 200);
     assert.equal(confirmed.body.data.leave.days, 6);
 
-    const summary = await agent.get(`/api/employees/${employee._id}/allowance?year=2033`);
+    const summary = await agent.get(`/api/students/${student._id}/allowance?year=2033`);
     assert.equal(summary.body.data.allowance.remaining, -1);
   });
 
   it('never blocks leave or time off, even with no allowance left', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Over Non Vacation Person' });
+    const student = await createStudent({ name: 'Over Non Vacation Person' });
 
     await agent
-      .put(`/api/employees/${employee._id}/allowance/2038`)
+      .put(`/api/students/${student._id}/allowance/2038`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 0, note: '' });
 
     const leave = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2038-04-05',
       endDate: '2038-04-09',
@@ -716,7 +716,7 @@ describe('holiday allowance over-check', () => {
     assert.equal(leave.status, 200);
 
     const timeOff = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'time_off',
       startDate: '2038-04-12',
       endDate: '2038-04-13',
@@ -725,7 +725,7 @@ describe('holiday allowance over-check', () => {
     assert.equal(timeOff.status, 200);
 
     const preview = await agent.get(
-      `/api/leaves/preview?employeeId=${employee._id}&type=leave&startDate=2038-04-19&endDate=2038-04-20`,
+      `/api/leaves/preview?studentId=${student._id}&type=leave&startDate=2038-04-19&endDate=2038-04-20`,
     );
     assert.equal(preview.status, 200);
     assert.equal(preview.body.data.preview.consumesAllowance, false);
@@ -737,10 +737,10 @@ describe('holiday allowance over-check', () => {
 describe('holiday calendar changes', () => {
   it('recomputes days and attendance rows on create, edit and delete', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Holiday Recompute Person' });
+    const student = await createStudent({ name: 'Holiday Recompute Person' });
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2037-05-04',
       endDate: '2037-05-08',
@@ -798,17 +798,17 @@ describe('holiday calendar changes', () => {
     await reconcileLeave(created.body.data.leave.id);
     assert.equal((await rowsForLeave(created.body.data.leave.id)).length, 5);
 
-    const allowance = await agent.get(`/api/employees/${employee._id}/allowance?year=2037`);
+    const allowance = await agent.get(`/api/students/${student._id}/allowance?year=2037`);
     assert.equal(allowance.body.data.allowance.used, 5);
   });
 
   it('never overwrites or deletes a manual attendance row on a holiday', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Holiday Manual Person' });
+    const student = await createStudent({ name: 'Holiday Manual Person' });
     const { AttendanceModel } = await import('../src/models/Attendance.ts');
 
     const manual = await AttendanceModel.create({
-      employeeId: employee._id,
+      studentId: student._id,
       date: '2037-06-03',
       status: 'present',
       checkIn: '09:00',
@@ -817,7 +817,7 @@ describe('holiday calendar changes', () => {
     });
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2037-06-01',
       endDate: '2037-06-05',
@@ -854,7 +854,7 @@ describe('holiday calendar changes', () => {
 });
 
 describe('holiday allowance overview', () => {
-  it('lists every active employee with month totals, pagination and filters', async () => {
+  it('lists every active student with month totals, pagination and filters', async () => {
     const { agent, csrf } = await signIn(context.app);
     const { DepartmentModel } = await import('../src/models/Department.ts');
 
@@ -862,39 +862,39 @@ describe('holiday allowance overview', () => {
     const other = await DepartmentModel.create({ name: 'Allowance Other Dept' });
     const departmentId = String(department._id);
 
-    const alpha = await createEmployee({
+    const alpha = await createStudent({
       name: 'Overview Alpha',
       departmentId,
     });
-    const beta = await createEmployee({
+    const beta = await createStudent({
       name: 'Overview Beta',
       departmentId,
     });
-    await createEmployee({ name: 'Overview Gamma', departmentId });
-    await createEmployee({ name: 'Overview Inactive', departmentId, status: 'inactive' });
-    await createEmployee({ name: 'Overview Other', departmentId: String(other._id) });
+    await createStudent({ name: 'Overview Gamma', departmentId });
+    await createStudent({ name: 'Overview Inactive', departmentId, status: 'inactive' });
+    await createStudent({ name: 'Overview Other', departmentId: String(other._id) });
 
     await agent
-      .put(`/api/employees/${alpha._id}/allowance/2040`)
+      .put(`/api/students/${alpha._id}/allowance/2040`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 25, note: 'Part-time agreement' });
 
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(alpha._id),
+      studentId: String(alpha._id),
       type: 'vacation',
       startDate: '2040-06-04',
       endDate: '2040-06-08',
       status: 'approved',
     });
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(alpha._id),
+      studentId: String(alpha._id),
       type: 'vacation',
       startDate: '2040-06-11',
       endDate: '2040-06-12',
       status: 'pending',
     });
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(beta._id),
+      studentId: String(beta._id),
       type: 'vacation',
       startDate: '2040-06-04',
       endDate: '2040-06-05',
@@ -932,7 +932,7 @@ describe('holiday allowance overview', () => {
     assert.equal(alphaRow.department, 'Allowance Overview Dept');
     assert.equal(betaRow.used, 2);
 
-    // The month totals cover the returned employees, not one page.
+    // The month totals cover the returned students, not one page.
     assert.equal(list.body.data.monthTotals[5].used, 7);
     assert.equal(
       list.body.data.monthTotals.reduce(
@@ -976,13 +976,13 @@ describe('holiday allowance overview', () => {
     const department = await DepartmentModel.create({ name: 'Allowance Csv Dept' });
     const departmentId = String(department._id);
 
-    await createEmployee({ name: 'Csv Alpha', departmentId });
-    await createEmployee({ name: 'Csv Beta', departmentId });
-    await createEmployee({ name: 'Csv Gamma', departmentId });
-    const formula = await createEmployee({ name: '=cmd|calc', departmentId });
+    await createStudent({ name: 'Csv Alpha', departmentId });
+    await createStudent({ name: 'Csv Beta', departmentId });
+    await createStudent({ name: 'Csv Gamma', departmentId });
+    const formula = await createStudent({ name: '=cmd|calc', departmentId });
 
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(formula._id),
+      studentId: String(formula._id),
       type: 'vacation',
       startDate: '2041-09-02',
       endDate: '2041-09-06',
@@ -1001,7 +1001,7 @@ describe('holiday allowance overview', () => {
     );
     assert.match(
       response.text,
-      /Employee,Department,Position,Year,Holiday allowance,Total,Holiday used,Pending,Holiday remaining,Used in September/,
+      /Student,Department,Position,Year,Holiday allowance,Total,Holiday used,Pending,Holiday remaining,Used in September/,
     );
     assert.equal(response.text.includes('Carry-over'), false);
     assert.equal(response.text.includes('carryOver'), false);
@@ -1009,7 +1009,7 @@ describe('holiday allowance overview', () => {
     for (const name of ['Csv Alpha', 'Csv Beta', 'Csv Gamma', "'=cmd|calc"]) {
       assert.match(response.text, new RegExp(name.replace(/[|]/g, '\\|')));
     }
-    // Five days are counted in September for the formula-named employee.
+    // Five days are counted in September for the formula-named student.
     assert.match(response.text, /'=cmd\|calc,Allowance Csv Dept,,2041,28,28,5,0,23,5/);
   });
 });
@@ -1017,16 +1017,16 @@ describe('holiday allowance overview', () => {
 describe('holiday allowance access control and validation', () => {
   it('needs a session on every new route', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Allowance Auth Person' });
+    const student = await createStudent({ name: 'Allowance Auth Person' });
 
     const anonymous = request(context.app);
     const calls = [
-      anonymous.get(`/api/employees/${employee._id}/allowance?year=2032`),
-      anonymous.get(`/api/employees/${employee._id}/allowance/month?year=2032&month=1`),
+      anonymous.get(`/api/students/${student._id}/allowance?year=2032`),
+      anonymous.get(`/api/students/${student._id}/allowance/month?year=2032&month=1`),
       anonymous.get('/api/leaves/allowances?year=2032'),
       anonymous.get('/api/leaves/allowances/export.csv?year=2032'),
       anonymous.get(
-        `/api/leaves/preview?employeeId=${employee._id}&type=vacation&startDate=2032-01-05&endDate=2032-01-09`,
+        `/api/leaves/preview?studentId=${student._id}&type=vacation&startDate=2032-01-05&endDate=2032-01-09`,
       ),
     ];
 
@@ -1035,14 +1035,14 @@ describe('holiday allowance access control and validation', () => {
     }
 
     const noCsrf = await agent
-      .put(`/api/employees/${employee._id}/allowance/2032`)
+      .put(`/api/students/${student._id}/allowance/2032`)
       .send({ allowance: 20, note: '' });
     assert.equal(noCsrf.status, 403);
     assert.equal(noCsrf.body.error.code, 'csrf_token_mismatch');
 
     // A valid token proves the route itself is reachable.
     const allowed = await agent
-      .put(`/api/employees/${employee._id}/allowance/2032`)
+      .put(`/api/students/${student._id}/allowance/2032`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 20, note: '' });
     assert.equal(allowed.status, 200);
@@ -1050,40 +1050,40 @@ describe('holiday allowance access control and validation', () => {
 
   it('rejects invalid years, months, day counts and ids', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Allowance Zod Person' });
+    const student = await createStudent({ name: 'Allowance Zod Person' });
     const missing = '64b000000000000000000000';
 
-    const badYear = await agent.get(`/api/employees/${employee._id}/allowance?year=abc`);
+    const badYear = await agent.get(`/api/students/${student._id}/allowance?year=abc`);
     assert.equal(badYear.status, 422);
 
     const missingMonth = await agent.get(
-      `/api/employees/${employee._id}/allowance/month?year=2032`,
+      `/api/students/${student._id}/allowance/month?year=2032`,
     );
     assert.equal(missingMonth.status, 422);
 
     const badMonth = await agent.get(
-      `/api/employees/${employee._id}/allowance/month?year=2032&month=13`,
+      `/api/students/${student._id}/allowance/month?year=2032&month=13`,
     );
     assert.equal(badMonth.status, 422);
 
     const badParamYear = await agent
-      .put(`/api/employees/${employee._id}/allowance/1999`)
+      .put(`/api/students/${student._id}/allowance/1999`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 20, note: '' });
     assert.equal(badParamYear.status, 422);
 
     const badIds = [
-      await agent.get(`/api/employees/not-an-id/allowance?year=2032`),
+      await agent.get(`/api/students/not-an-id/allowance?year=2032`),
       await agent.get(`/api/leaves/allowances?year=2032&departmentId=not-an-id`),
       await agent.get(`/api/leaves/allowances?year=2032&page=0`),
       await agent.get(`/api/leaves/allowances?year=2032&perPage=101`),
       await agent.get(`/api/leaves/allowances?year=2032&month=13`),
       await agent.get(`/api/leaves/allowances/export.csv?year=2032&month=13`),
       await agent.get(
-        `/api/leaves/preview?employeeId=${employee._id}&type=vacation&startDate=2032-01-09&endDate=2032-01-05`,
+        `/api/leaves/preview?studentId=${student._id}&type=vacation&startDate=2032-01-09&endDate=2032-01-05`,
       ),
       await agent.get(
-        `/api/leaves/preview?employeeId=${employee._id}&type=holiday&startDate=2032-01-05&endDate=2032-01-09`,
+        `/api/leaves/preview?studentId=${student._id}&type=holiday&startDate=2032-01-05&endDate=2032-01-09`,
       ),
     ];
 
@@ -1101,38 +1101,38 @@ describe('holiday allowance access control and validation', () => {
 
     for (const body of dayCases) {
       const response = await agent
-        .put(`/api/employees/${employee._id}/allowance/2032`)
+        .put(`/api/students/${student._id}/allowance/2032`)
         .set('X-CSRF-Token', csrf)
         .send(body);
       assert.equal(response.status, 422);
     }
 
-    const unknownAllowance = await agent.get(`/api/employees/${missing}/allowance?year=2032`);
+    const unknownAllowance = await agent.get(`/api/students/${missing}/allowance?year=2032`);
     assert.equal(unknownAllowance.status, 404);
 
     const unknownMonth = await agent.get(
-      `/api/employees/${missing}/allowance/month?year=2032&month=1`,
+      `/api/students/${missing}/allowance/month?year=2032&month=1`,
     );
     assert.equal(unknownMonth.status, 404);
 
     const unknownPut = await agent
-      .put(`/api/employees/${missing}/allowance/2032`)
+      .put(`/api/students/${missing}/allowance/2032`)
       .set('X-CSRF-Token', csrf)
       .send({ allowance: 20, note: '' });
     assert.equal(unknownPut.status, 404);
 
     const unknownPreview = await agent.get(
-      `/api/leaves/preview?employeeId=${missing}&type=vacation&startDate=2032-01-05&endDate=2032-01-09`,
+      `/api/leaves/preview?studentId=${missing}&type=vacation&startDate=2032-01-05&endDate=2032-01-09`,
     );
     assert.equal(unknownPreview.status, 422);
   });
 
   it('previews the counted days, skipped dates and remaining allowance', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Allowance Preview Person' });
+    const student = await createStudent({ name: 'Allowance Preview Person' });
 
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2042-11-03',
       endDate: '2042-11-04',
@@ -1140,7 +1140,7 @@ describe('holiday allowance access control and validation', () => {
     });
 
     const response = await agent.get(
-      `/api/leaves/preview?employeeId=${employee._id}&type=vacation&startDate=2042-11-02&endDate=2042-11-08`,
+      `/api/leaves/preview?studentId=${student._id}&type=vacation&startDate=2042-11-02&endDate=2042-11-08`,
     );
 
     assert.equal(response.status, 200);

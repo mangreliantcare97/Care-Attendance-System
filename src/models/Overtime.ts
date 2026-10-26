@@ -4,7 +4,7 @@ import { applyJsonTransform, DATE_PATTERN } from './plugins.ts';
 /** Overtime is a real calendar day (`YYYY-MM-DD`), not a timestamp. */
 const overtimeSchema = new Schema(
   {
-    employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
+    studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true },
     date: { type: String, required: true, match: DATE_PATTERN },
     hours: {
       type: Number,
@@ -24,7 +24,7 @@ const overtimeSchema = new Schema(
   { timestamps: true },
 );
 
-overtimeSchema.index({ employeeId: 1, date: 1 });
+overtimeSchema.index({ studentId: 1, date: 1 });
 overtimeSchema.index({ date: 1 });
 
 applyJsonTransform(overtimeSchema);

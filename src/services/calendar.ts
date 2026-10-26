@@ -36,8 +36,8 @@ export interface CalendarItem {
   end: string;
   allDay: true;
   url?: string;
-  employeeId?: string;
-  employeeName?: string;
+  studentId?: string;
+  studentName?: string;
 }
 
 function assertEventRange(startDate: string, endDate: string): void {
@@ -98,7 +98,7 @@ export async function calendarFeed(start: string, end: string): Promise<Calendar
       startDate: { $lte: end },
       endDate: { $gte: start },
     })
-      .populate('employeeId', 'name')
+      .populate('studentId', 'name')
       .sort({ startDate: 1, createdAt: 1 }),
   ]);
 
@@ -122,9 +122,9 @@ export async function calendarFeed(start: string, end: string): Promise<Calendar
   }
 
   for (const leave of leaves) {
-    const employee = leave.employeeId as unknown as { _id: unknown; name?: string } | null;
-    const employeeId = employee?._id ? String(employee._id) : String(leave.employeeId);
-    const employeeName = employee?.name ?? 'Employee';
+    const student = leave.studentId as unknown as { _id: unknown; name?: string } | null;
+    const studentId = student?._id ? String(student._id) : String(leave.studentId);
+    const studentName = student?.name ?? 'Student';
     const type = leave.type as LeaveType;
     const label = LEAVE_LABELS[type] ?? 'Leave';
 
@@ -132,16 +132,16 @@ export async function calendarFeed(start: string, end: string): Promise<Calendar
       id: String(leave._id),
       kind: 'leave',
       type,
-      title: `${employeeName} — ${label}`,
-      description: `${label} for ${employeeName}, ${leave.startDate} to ${leave.endDate}`,
+      title: `${studentName} — ${label}`,
+      description: `${label} for ${studentName}, ${leave.startDate} to ${leave.endDate}`,
       startDate: leave.startDate,
       endDate: leave.endDate,
       start: leave.startDate,
       end: addDays(leave.endDate, 1),
       allDay: true,
       url: '/leaves.html',
-      employeeId,
-      employeeName,
+      studentId,
+      studentName,
     });
   }
 

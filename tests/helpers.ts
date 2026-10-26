@@ -100,16 +100,16 @@ export async function signIn(
   };
 }
 
-/** Create an employee directly in the database. */
-export async function createEmployee(input: {
+/** Create a student directly in the database. */
+export async function createStudent(input: {
   name: string;
   email?: string | null;
   status?: 'active' | 'inactive' | 'terminated';
   departmentId?: string | null;
 }) {
-  const { EmployeeModel } = await import('../src/models/Employee.ts');
+  const { StudentModel } = await import('../src/models/Student.ts');
 
-  return EmployeeModel.create({
+  return StudentModel.create({
     name: input.name,
     email: input.email ?? null,
     status: input.status ?? 'active',

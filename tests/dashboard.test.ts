@@ -1,5 +1,5 @@
 /**
- * Dashboard: cards vs. the daily sheet, non-working days, Top Employees
+ * Dashboard: cards vs. the daily sheet, non-working days, Top Students
  * (including a tie and leave exclusion), the year/month series and departments.
  */
 import { after, before, describe, it } from 'node:test';
@@ -31,15 +31,15 @@ async function createDepartment(name: string) {
   return DepartmentModel.create({ name });
 }
 
-async function createEmployee(input: {
+async function createStudent(input: {
   name: string;
   status?: 'active' | 'inactive';
   departmentId?: string;
   position?: string;
   photo?: { data: string; mime: string; size: number };
 }) {
-  const { EmployeeModel } = await import('../src/models/Employee.ts');
-  return EmployeeModel.create({
+  const { StudentModel } = await import('../src/models/Student.ts');
+  return StudentModel.create({
     name: input.name,
     status: input.status ?? 'active',
     departmentId: input.departmentId ?? null,
@@ -49,12 +49,12 @@ async function createEmployee(input: {
 }
 
 async function createAttendance(
-  employeeId: string,
+  studentId: string,
   entries: Array<{ date: string; status: string }>,
 ) {
   const { AttendanceModel } = await import('../src/models/Attendance.ts');
   return AttendanceModel.insertMany(
-    entries.map((entry) => ({ employeeId, date: entry.date, status: entry.status })),
+    entries.map((entry) => ({ studentId, date: entry.date, status: entry.status })),
   );
 }
 
@@ -64,34 +64,34 @@ describe('dashboard', () => {
     assert.equal(response.status, 401);
   });
 
-  it('shows the same counts as the daily sheet and counts only active employees', async () => {
+  it('shows the same counts as the daily sheet and counts only active students', async () => {
     const { agent } = await signIn(context.app);
 
     const departmentA = await createDepartment('Summary Department A');
     const departmentB = await createDepartment('Summary Department B');
 
-    const present = await createEmployee({
+    const present = await createStudent({
       name: 'Summary Present',
       departmentId: String(departmentA._id),
     });
-    const late = await createEmployee({
+    const late = await createStudent({
       name: 'Summary Late',
       departmentId: String(departmentA._id),
     });
-    const absent = await createEmployee({
+    const absent = await createStudent({
       name: 'Summary Absent',
       departmentId: String(departmentA._id),
     });
-    const onLeave = await createEmployee({
+    const onLeave = await createStudent({
       name: 'Summary On Leave',
       departmentId: String(departmentB._id),
     });
-    const vacation = await createEmployee({
+    const vacation = await createStudent({
       name: 'Summary Vacation',
       departmentId: String(departmentB._id),
     });
-    await createEmployee({ name: 'Summary Unmarked', departmentId: String(departmentB._id) });
-    await createEmployee({
+    await createStudent({ name: 'Summary Unmarked', departmentId: String(departmentB._id) });
+    await createStudent({
       name: 'Summary Inactive',
       departmentId: String(departmentB._id),
       status: 'inactive',
@@ -107,7 +107,7 @@ describe('dashboard', () => {
     const sheetResponse = await agent.get(`/api/attendance/sheet?date=${date}`);
     assert.equal(sheetResponse.status, 200);
 
-    const sheet = sheetResponse.body.data.employees as Array<{
+    const sheet = sheetResponse.body.data.students as Array<{
       record: { status: string } | null;
     }>;
     const sheetCounts = {
@@ -129,7 +129,7 @@ describe('dashboard', () => {
     const summary = response.body.data;
 
     assert.equal(summary.date, date);
-    assert.equal(summary.totalEmployees, sheet.length);
+    assert.equal(summary.totalStudents, sheet.length);
     assert.equal(summary.present, sheetCounts.present);
     assert.equal(summary.late, sheetCounts.late);
     assert.equal(summary.absent, sheetCounts.absent);
@@ -142,9 +142,9 @@ describe('dashboard', () => {
     }
 
     const byName = new Map(
-      summary.departments.map((department: { name: string; activeEmployees: number }) => [
+      summary.departments.map((department: { name: string; activeStudents: number }) => [
         department.name,
-        department.activeEmployees,
+        department.activeStudents,
       ]),
     );
     assert.equal(byName.get('Summary Department A'), 3);
@@ -197,42 +197,42 @@ describe('dashboard', () => {
     }
   });
 
-  it('orders Top Employees by the hand-calculated score, tie-breaks and excludes leave days', async () => {
+  it('orders Top Students by the hand-calculated score, tie-breaks and excludes leave days', async () => {
     const { agent } = await signIn(context.app);
     const department = await createDepartment('Top Department');
 
-    const bob = await createEmployee({
+    const bob = await createStudent({
       name: 'Top Bob',
       departmentId: String(department._id),
       position: 'Engineer',
       photo: { data: 'secret-photo-data', mime: 'image/png', size: 17 },
     });
-    const alice = await createEmployee({
+    const alice = await createStudent({
       name: 'Top Alice',
       departmentId: String(department._id),
       position: 'Analyst',
     });
-    const carol = await createEmployee({
+    const carol = await createStudent({
       name: 'Top Carol',
       departmentId: String(department._id),
       position: 'Coordinator',
     });
-    const dave = await createEmployee({
+    const dave = await createStudent({
       name: 'Top Dave',
       departmentId: String(department._id),
       position: 'Assistant',
     });
-    const eve = await createEmployee({
+    const eve = await createStudent({
       name: 'Top Eve',
       departmentId: String(department._id),
       position: 'Assistant',
     });
-    const inactive = await createEmployee({
+    const inactive = await createStudent({
       name: 'Top Inactive',
       departmentId: String(department._id),
       status: 'inactive',
     });
-    const leaveOnly = await createEmployee({
+    const leaveOnly = await createStudent({
       name: 'Top Leave Only',
       departmentId: String(department._id),
     });
@@ -291,7 +291,7 @@ describe('dashboard', () => {
     const response = await agent.get('/api/dashboard/month?month=2026-04');
     assert.equal(response.status, 200);
 
-    const top = response.body.data.topEmployees;
+    const top = response.body.data.topStudents;
     assert.deepEqual(
       top.map((row: { name: string }) => row.name),
       ['Top Bob', 'Top Alice', 'Top Dave', 'Top Carol', 'Top Eve'],
@@ -326,7 +326,7 @@ describe('dashboard', () => {
     assert.equal(days.length, 30);
 
     const aprilFirst = days.find((day) => day.date === '2026-04-01');
-    // Present: Bob, Alice, Carol, Dave and the inactive employee (the charts
+    // Present: Bob, Alice, Carol, Dave and the inactive student (the charts
     // include historical records); Gina on leave; Eve absent.
     assert.equal(aprilFirst?.attendance, 5);
     assert.equal(aprilFirst?.absence, 1);
@@ -339,9 +339,9 @@ describe('dashboard', () => {
 
   it('builds twelve month buckets with the three series', async () => {
     const { agent } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Year Person' });
+    const student = await createStudent({ name: 'Year Person' });
 
-    await createAttendance(String(employee._id), [
+    await createAttendance(String(student._id), [
       { date: '2025-01-06', status: 'present' },
       { date: '2025-01-07', status: 'late' },
       { date: '2025-01-08', status: 'absent' },

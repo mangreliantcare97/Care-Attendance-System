@@ -1,12 +1,12 @@
 /**
- * Attach local profile photos to employees.
+ * Attach local profile photos to students.
  *
- * The history seeder deliberately creates employees **without** photos (that is
+ * The history seeder deliberately creates students **without** photos (that is
  * asserted in `seed/seed-history-data.ts`). This script is the companion step
- * for local/demo review: it reads every image in `public/images/employees/` and
- * stores it on the employee whose name matches the file name.
+ * for local/demo review: it reads every image in `public/images/students/` and
+ * stores it on the student whose name matches the file name.
  *
- * Matching rule: `amelia-bennett.jpg` → employee "Amelia Bennett".
+ * Matching rule: `amelia-bennett.jpg` → student "Amelia Bennett".
  *
  * It is idempotent, only touches `photo`, and reports anything it cannot match.
  *
@@ -17,10 +17,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connectDatabase, disconnectDatabase } from '../src/config/db.ts';
 import { env } from '../src/config/env.ts';
-import { EmployeeModel } from '../src/models/Employee.ts';
-import { detectImageMime, ALLOWED_PHOTO_MIME } from '../src/services/employees.ts';
+import { StudentModel } from '../src/models/Student.ts';
+import { detectImageMime, ALLOWED_PHOTO_MIME } from '../src/services/students.ts';
 
-const PHOTO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public', 'images', 'employees');
+const PHOTO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public', 'images', 'students');
 
 /** `amelia-bennett` → `amelia bennett` so it can be compared to a name. */
 function slugToName(slug: string): string {
@@ -49,17 +49,17 @@ async function main(): Promise<void> {
   await connectDatabase();
 
   try {
-    const employees = await EmployeeModel.find().select('name').sort({ name: 1 });
-    const byName = new Map(employees.map((employee) => [employee.name.toLowerCase(), employee]));
+    const students = await StudentModel.find().select('name').sort({ name: 1 });
+    const byName = new Map(students.map((student) => [student.name.toLowerCase(), student]));
 
     let attached = 0;
     const unmatchedFiles: string[] = [];
 
     for (const file of files) {
       const slug = path.basename(file, path.extname(file));
-      const employee = byName.get(slugToName(slug));
+      const student = byName.get(slugToName(slug));
 
-      if (!employee) {
+      if (!student) {
         unmatchedFiles.push(file);
         continue;
       }
@@ -72,21 +72,21 @@ async function main(): Promise<void> {
         continue;
       }
 
-      if (buffer.length > env.employeePhotoMaxBytes) {
-        console.error(`[seed:photos] ${file} is over the ${Math.round(env.employeePhotoMaxBytes / 1024)} KB limit �?" skipped`);
+      if (buffer.length > env.studentPhotoMaxBytes) {
+        console.error(`[seed:photos] ${file} is over the ${Math.round(env.studentPhotoMaxBytes / 1024)} KB limit �?" skipped`);
         continue;
       }
 
-      employee.set({ photo: { data: buffer.toString('base64'), mime, size: buffer.length } });
-      await employee.save();
+      student.set({ photo: { data: buffer.toString('base64'), mime, size: buffer.length } });
+      await student.save();
       attached += 1;
-      console.log(`[seed:photos] ${employee.name} ← ${file}`);
+      console.log(`[seed:photos] ${student.name} ← ${file}`);
     }
 
-    const withoutPhoto = employees.filter((employee) => !employee.photo?.data).map((employee) => employee.name);
+    const withoutPhoto = students.filter((student) => !student.photo?.data).map((student) => student.name);
 
-    console.log(`\n[seed:photos] attached ${attached} of ${files.length} image(s) to ${employees.length} employee(s).`);
-    if (unmatchedFiles.length) console.log(`[seed:photos] no employee matched: ${unmatchedFiles.join(', ')}`);
+    console.log(`\n[seed:photos] attached ${attached} of ${files.length} image(s) to ${students.length} student(s).`);
+    if (unmatchedFiles.length) console.log(`[seed:photos] no student matched: ${unmatchedFiles.join(', ')}`);
     if (withoutPhoto.length) console.log(`[seed:photos] still without a photo: ${withoutPhoto.join(', ')}`);
   } finally {
     await disconnectDatabase();

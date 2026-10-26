@@ -9,7 +9,7 @@ export const ATTENDANCE_SOURCES = ['manual', 'leave_sync'] as const;
 export type AttendanceSource = (typeof ATTENDANCE_SOURCES)[number];
 
 /**
- * One attendance row per employee per calendar day.
+ * One attendance row per student per calendar day.
  *
  * `date` is a plain `YYYY-MM-DD` string — the calendar day is a fact about the
  * calendar, not an instant in time, so it must not shift with the server's UTC
@@ -17,7 +17,7 @@ export type AttendanceSource = (typeof ATTENDANCE_SOURCES)[number];
  */
 const attendanceSchema = new Schema(
   {
-    employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
+    studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true },
     date: { type: String, required: true, match: DATE_PATTERN },
     status: { type: String, enum: ATTENDANCE_STATUSES, required: true },
     checkIn: { type: String, default: null, match: TIME_PATTERN },
@@ -38,8 +38,8 @@ const attendanceSchema = new Schema(
   { timestamps: true },
 );
 
-/** One row per employee per day. */
-attendanceSchema.index({ employeeId: 1, date: 1 }, { unique: true });
+/** One row per student per day. */
+attendanceSchema.index({ studentId: 1, date: 1 }, { unique: true });
 attendanceSchema.index({ date: 1 });
 attendanceSchema.index({ date: 1, status: 1 });
 attendanceSchema.index({ source: 1 });

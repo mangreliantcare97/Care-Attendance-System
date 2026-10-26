@@ -1,5 +1,5 @@
 /**
- * Employee photos.
+ * Student photos.
  *
  * The browser scales the picture down before it is uploaded, so the request
  * stays small. The server checks the size and the type again — this is a

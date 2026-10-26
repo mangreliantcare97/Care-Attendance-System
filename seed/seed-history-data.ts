@@ -15,7 +15,7 @@ import { env } from '../src/config/env.ts';
 import { AdminModel } from '../src/models/Admin.ts';
 import { AttendanceModel } from '../src/models/Attendance.ts';
 import { DepartmentModel } from '../src/models/Department.ts';
-import { EmployeeModel } from '../src/models/Employee.ts';
+import { StudentModel } from '../src/models/Student.ts';
 import { EventModel, EVENT_TYPES, type EventType } from '../src/models/Event.ts';
 import { LeaveModel, type LeaveStatus, type LeaveType } from '../src/models/Leave.ts';
 import { LeaveAllowanceModel } from '../src/models/LeaveAllowance.ts';
@@ -25,7 +25,7 @@ import {
   dashboardMonth,
   dashboardSummary,
   dashboardYear,
-  type TopEmployee,
+  type TopStudent,
 } from '../src/services/dashboard.ts';
 import {
   addDays,
@@ -83,7 +83,7 @@ export interface SeedDepartmentDefinition {
   description: string;
 }
 
-export interface SeedEmployeeDefinition {
+export interface SeedStudentDefinition {
   key: string;
   name: string;
   email: string | null;
@@ -93,7 +93,7 @@ export interface SeedEmployeeDefinition {
   hireDate: string;
   status: 'active' | 'inactive' | 'terminated';
   profile: BehaviourProfile;
-  /** Not stored by the Employee model; used to bound generated records. */
+  /** Not stored by the Student model; used to bound generated records. */
   leftDate?: string;
 }
 
@@ -126,14 +126,14 @@ export const SEED_HISTORY_DEPARTMENTS: readonly SeedDepartmentDefinition[] = [
 ] as const;
 
 /**
- * 26 employees: Operations 7, Finance 5, HR 4, Sales 6, IT 4.
+ * 26 students: Operations 7, Finance 5, HR 4, Sales 6, IT 4.
  *
  * Three started in 2025 and two in 2026. One left on 30 June 2025, one left on
  * 14 August 2026, and one was made inactive on 31 March 2026. Five
  * deliberately have no email address. The leaving/deactivation date is
- * metadata because the existing Employee schema has no such field.
+ * metadata because the existing Student schema has no such field.
  */
-export const SEED_HISTORY_EMPLOYEES: readonly SeedEmployeeDefinition[] = [
+export const SEED_HISTORY_STUDENTS: readonly SeedStudentDefinition[] = [
   {
     key: 'amelia-bennett',
     name: 'Amelia Bennett',
@@ -427,8 +427,8 @@ export const SEED_HISTORY_EMPLOYEES: readonly SeedEmployeeDefinition[] = [
 
 interface LeavePlan {
   key: string;
-  /** Preferred employee lookup. Older plans fall back to the first name in key. */
-  employeeKey?: string;
+  /** Preferred student lookup. Older plans fall back to the first name in key. */
+  studentKey?: string;
   type: LeaveType;
   category: string | null;
   startDate: string;
@@ -769,7 +769,7 @@ export const SEED_2025_APPROVED_LEAVES: readonly LeavePlan[] = [
 export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   {
     key: 'amelia-2026-jan',
-    employeeKey: 'amelia-bennett',
+    studentKey: 'amelia-bennett',
     type: 'leave',
     category: 'sick',
     startDate: '2026-01-12',
@@ -778,7 +778,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'harry-2026-jan',
-    employeeKey: 'harry-nelson',
+    studentKey: 'harry-nelson',
     type: 'leave',
     category: 'sick',
     startDate: '2026-01-19',
@@ -787,7 +787,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'liam-2026-jan',
-    employeeKey: 'liam-ellis',
+    studentKey: 'liam-ellis',
     type: 'leave',
     category: 'sick',
     startDate: '2026-01-26',
@@ -796,7 +796,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'noah-2026-feb',
-    employeeKey: 'noah-carter',
+    studentKey: 'noah-carter',
     type: 'leave',
     category: 'sick',
     startDate: '2026-02-02',
@@ -805,7 +805,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'isla-2026-feb',
-    employeeKey: 'isla-dawson',
+    studentKey: 'isla-dawson',
     type: 'leave',
     category: 'personal',
     startDate: '2026-02-09',
@@ -814,7 +814,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'leo-2026-feb',
-    employeeKey: 'leo-palmer',
+    studentKey: 'leo-palmer',
     type: 'time_off',
     category: null,
     startDate: '2026-02-16',
@@ -823,7 +823,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'ethan-2026-feb',
-    employeeKey: 'ethan-jackson',
+    studentKey: 'ethan-jackson',
     type: 'leave',
     category: 'sick',
     startDate: '2026-02-23',
@@ -832,7 +832,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'mason-2026-mar',
-    employeeKey: 'mason-graham',
+    studentKey: 'mason-graham',
     type: 'leave',
     category: 'casual',
     startDate: '2026-03-09',
@@ -841,7 +841,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'freya-2026-mar',
-    employeeKey: 'freya-reed',
+    studentKey: 'freya-reed',
     type: 'leave',
     category: 'casual',
     startDate: '2026-03-16',
@@ -850,7 +850,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'lucas-2026-apr',
-    employeeKey: 'lucas-lawson',
+    studentKey: 'lucas-lawson',
     type: 'leave',
     category: 'personal',
     startDate: '2026-04-13',
@@ -859,7 +859,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'ruby-2026-apr',
-    employeeKey: 'ruby-walker',
+    studentKey: 'ruby-walker',
     type: 'leave',
     category: 'sick',
     startDate: '2026-04-20',
@@ -868,7 +868,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'ruby-2026-easter',
-    employeeKey: 'ruby-walker',
+    studentKey: 'ruby-walker',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-04-02',
@@ -877,7 +877,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'amelia-2026-feb',
-    employeeKey: 'amelia-bennett',
+    studentKey: 'amelia-bennett',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-02-02',
@@ -887,7 +887,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'mia-2026-jan',
-    employeeKey: 'mia-knight',
+    studentKey: 'mia-knight',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-01-05',
@@ -896,7 +896,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'lucas-2026-jan',
-    employeeKey: 'lucas-lawson',
+    studentKey: 'lucas-lawson',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-01-05',
@@ -905,7 +905,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'lucas-2026-oct',
-    employeeKey: 'lucas-lawson',
+    studentKey: 'lucas-lawson',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-10-05',
@@ -914,7 +914,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'ethan-2026-jan',
-    employeeKey: 'ethan-jackson',
+    studentKey: 'ethan-jackson',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-01-12',
@@ -923,7 +923,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'ethan-2026-oct',
-    employeeKey: 'ethan-jackson',
+    studentKey: 'ethan-jackson',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-10-12',
@@ -932,7 +932,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'grace-2026-may',
-    employeeKey: 'grace-morgan',
+    studentKey: 'grace-morgan',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-05-04',
@@ -941,7 +941,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'amelia-2026-jun',
-    employeeKey: 'amelia-bennett',
+    studentKey: 'amelia-bennett',
     type: 'time_off',
     category: null,
     startDate: '2026-06-01',
@@ -950,7 +950,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'grace-2026-jun',
-    employeeKey: 'grace-morgan',
+    studentKey: 'grace-morgan',
     type: 'time_off',
     category: null,
     startDate: '2026-06-15',
@@ -959,7 +959,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'henry-2026-jun',
-    employeeKey: 'henry-young',
+    studentKey: 'henry-young',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-06-22',
@@ -968,7 +968,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'noah-2026-jul',
-    employeeKey: 'noah-carter',
+    studentKey: 'noah-carter',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-07-06',
@@ -977,7 +977,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'jack-2026-jul',
-    employeeKey: 'jack-shaw',
+    studentKey: 'jack-shaw',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-07-13',
@@ -986,7 +986,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'ruby-2026-jul',
-    employeeKey: 'ruby-walker',
+    studentKey: 'ruby-walker',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-07-13',
@@ -995,7 +995,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'olivia-2026-jul',
-    employeeKey: 'olivia-irwin',
+    studentKey: 'olivia-irwin',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-07-20',
@@ -1004,7 +1004,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'chloe-2026-jul',
-    employeeKey: 'chloe-owen',
+    studentKey: 'chloe-owen',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-07-27',
@@ -1013,7 +1013,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'sophia-2026-aug',
-    employeeKey: 'sophia-foster',
+    studentKey: 'sophia-foster',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-08-03',
@@ -1022,7 +1022,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'mia-2026-aug',
-    employeeKey: 'mia-knight',
+    studentKey: 'mia-knight',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-08-10',
@@ -1031,7 +1031,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'maya-2026-aug',
-    employeeKey: 'maya-patel',
+    studentKey: 'maya-patel',
     type: 'leave',
     category: 'casual',
     startDate: '2026-08-17',
@@ -1040,7 +1040,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'archie-2026-aug',
-    employeeKey: 'archie-quinn',
+    studentKey: 'archie-quinn',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-08-24',
@@ -1049,7 +1049,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'ella-2026-sep',
-    employeeKey: 'ella-turner',
+    studentKey: 'ella-turner',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-09-07',
@@ -1058,7 +1058,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'oliver-2026-sep',
-    employeeKey: 'oliver-grant',
+    studentKey: 'oliver-grant',
     type: 'leave',
     category: 'sick',
     startDate: '2026-09-14',
@@ -1067,7 +1067,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'theo-2026-sep',
-    employeeKey: 'theo-cooper',
+    studentKey: 'theo-cooper',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-09-21',
@@ -1076,7 +1076,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'olivia-2026-oct',
-    employeeKey: 'olivia-irwin',
+    studentKey: 'olivia-irwin',
     type: 'leave',
     category: 'casual',
     startDate: '2026-10-05',
@@ -1085,7 +1085,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'ava-2026-oct',
-    employeeKey: 'ava-hughes',
+    studentKey: 'ava-hughes',
     type: 'leave',
     category: 'sick',
     startDate: '2026-10-12',
@@ -1094,7 +1094,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'mason-2026-oct',
-    employeeKey: 'mason-graham',
+    studentKey: 'mason-graham',
     type: 'time_off',
     category: null,
     startDate: '2026-10-14',
@@ -1103,7 +1103,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'amelia-2026-oct-future',
-    employeeKey: 'amelia-bennett',
+    studentKey: 'amelia-bennett',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-10-21',
@@ -1113,7 +1113,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'noah-2026-oct-future',
-    employeeKey: 'noah-carter',
+    studentKey: 'noah-carter',
     type: 'time_off',
     category: null,
     startDate: '2026-10-21',
@@ -1122,7 +1122,7 @@ export const SEED_2026_APPROVED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'isla-2026-dec',
-    employeeKey: 'isla-dawson',
+    studentKey: 'isla-dawson',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-12-21',
@@ -1225,7 +1225,7 @@ export const SEED_2025_REJECTED_LEAVES: readonly LeavePlan[] = [
 export const SEED_2026_PENDING_LEAVES: readonly LeavePlan[] = [
   {
     key: 'noah-2026-pending',
-    employeeKey: 'noah-carter',
+    studentKey: 'noah-carter',
     type: 'leave',
     category: 'casual',
     startDate: '2026-02-16',
@@ -1234,7 +1234,7 @@ export const SEED_2026_PENDING_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'mia-2026-pending',
-    employeeKey: 'mia-knight',
+    studentKey: 'mia-knight',
     type: 'time_off',
     category: null,
     startDate: '2026-06-03',
@@ -1243,7 +1243,7 @@ export const SEED_2026_PENDING_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'ava-2026-pending',
-    employeeKey: 'ava-hughes',
+    studentKey: 'ava-hughes',
     type: 'leave',
     category: 'personal',
     startDate: '2026-11-09',
@@ -1252,7 +1252,7 @@ export const SEED_2026_PENDING_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'theo-2026-pending',
-    employeeKey: 'theo-cooper',
+    studentKey: 'theo-cooper',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-12-07',
@@ -1264,7 +1264,7 @@ export const SEED_2026_PENDING_LEAVES: readonly LeavePlan[] = [
 export const SEED_2026_REJECTED_LEAVES: readonly LeavePlan[] = [
   {
     key: 'isla-2026-rejected',
-    employeeKey: 'isla-dawson',
+    studentKey: 'isla-dawson',
     type: 'leave',
     category: 'casual',
     startDate: '2026-03-23',
@@ -1273,7 +1273,7 @@ export const SEED_2026_REJECTED_LEAVES: readonly LeavePlan[] = [
   },
   {
     key: 'lucas-2026-rejected',
-    employeeKey: 'lucas-lawson',
+    studentKey: 'lucas-lawson',
     type: 'vacation',
     category: 'annual',
     startDate: '2026-08-10',
@@ -1293,7 +1293,7 @@ export const SEED_HISTORY_REJECTED_LEAVES: readonly LeavePlan[] = [
 ] as const;
 
 export interface AllowancePlan {
-  employeeKey: string;
+  studentKey: string;
   year: number;
   allowance: number;
   note: string;
@@ -1312,8 +1312,8 @@ const ALLOWANCE_2026_OVERRIDES: Record<string, { allowance?: number; note?: stri
 /**
  * Allowance rows that go beyond the environment default.
  *
- * 2026 has a row for every employee so the overview, the profile and the CSV
- * exercise real stored values (28 days unless the employee has an override).
+ * 2026 has a row for every student so the overview, the profile and the CSV
+ * exercise real stored values (28 days unless the student has an override).
  * There is no carry-over: unused days expire on 31 December and each calendar
  * year starts from its own allowance. The three 2025 rows are pro-rata
  * allowances for mid-year hires; they are stored values, never recalculated by
@@ -1321,27 +1321,27 @@ const ALLOWANCE_2026_OVERRIDES: Record<string, { allowance?: number; note?: stri
  */
 export const SEED_HISTORY_ALLOWANCES: readonly AllowancePlan[] = [
   {
-    employeeKey: 'evie-barker',
+    studentKey: 'evie-barker',
     year: 2025,
     allowance: 25.5,
     note: 'Pro-rata allowance for a February 2025 start.',
   },
   {
-    employeeKey: 'theo-cooper',
+    studentKey: 'theo-cooper',
     year: 2025,
     allowance: 14,
     note: 'Pro-rata allowance for a July 2025 start.',
   },
   {
-    employeeKey: 'ava-hughes',
+    studentKey: 'ava-hughes',
     year: 2025,
     allowance: 9.5,
     note: 'Pro-rata allowance for a September 2025 start.',
   },
-  ...SEED_HISTORY_EMPLOYEES.map((employee) => {
-    const override = ALLOWANCE_2026_OVERRIDES[employee.key];
+  ...SEED_HISTORY_STUDENTS.map((student) => {
+    const override = ALLOWANCE_2026_OVERRIDES[student.key];
     return {
-      employeeKey: employee.key,
+      studentKey: student.key,
       year: 2026,
       allowance: override?.allowance ?? 28,
       note: override?.note ?? '',
@@ -1352,8 +1352,8 @@ export const SEED_HISTORY_ALLOWANCES: readonly AllowancePlan[] = [
 interface LeaveInfo {
   id: string;
   key: string;
-  employeeId: string;
-  employeeName: string;
+  studentId: string;
+  studentName: string;
   type: LeaveType;
   category: string | null;
   startDate: string;
@@ -1363,7 +1363,7 @@ interface LeaveInfo {
   reason: string;
 }
 
-export interface SeedEmployeeRecord {
+export interface SeedStudentRecord {
   id: string;
   key: string;
   name: string;
@@ -1433,8 +1433,8 @@ export interface SeedYearStat {
 
 export interface SeedTopCheck {
   month: string;
-  expected: TopEmployee[];
-  actual: TopEmployee[];
+  expected: TopStudent[];
+  actual: TopStudent[];
   matches: boolean;
 }
 
@@ -1448,7 +1448,7 @@ export interface SeedDashboardYearCheck {
 }
 
 export interface SeedAllowanceCheck {
-  employeeId: string;
+  studentId: string;
   name: string;
   year: number;
   allowance: number;
@@ -1475,7 +1475,7 @@ export interface SeedVerification {
   dashboardToday: {
     date: string;
     matches: boolean;
-    totalEmployees: number;
+    totalStudents: number;
     notMarked: number;
     expectedNotMarked: number;
     onLeave: number;
@@ -1504,10 +1504,10 @@ export interface SeedHistoryResult {
   resetDeleted: Record<string, number>;
   counts: {
     departments: number;
-    employees: number;
-    activeEmployees: number;
-    inactiveEmployees: number;
-    terminatedEmployees: number;
+    students: number;
+    activeStudents: number;
+    inactiveStudents: number;
+    terminatedStudents: number;
     newHires: number;
     newHires2025: number;
     newHires2026: number;
@@ -1531,7 +1531,7 @@ export interface SeedHistoryResult {
     events2026: number;
     leaveAllowances: number;
   };
-  employees: SeedEmployeeRecord[];
+  students: SeedStudentRecord[];
   approvedLeaves: LeaveInfo[];
   pendingLeaves: LeaveInfo[];
   rejectedLeaves: LeaveInfo[];
@@ -1546,7 +1546,7 @@ export const SEED_HISTORY_RESET_COLLECTIONS = [
   'leaves',
   'leaveallowances',
   'events',
-  'employees',
+  'students',
   'departments',
 ] as const;
 
@@ -1558,7 +1558,7 @@ export async function resetSeedCollections(): Promise<Record<string, number>> {
   deleted.leaves = (await LeaveModel.deleteMany({})).deletedCount ?? 0;
   deleted.leaveallowances = (await LeaveAllowanceModel.deleteMany({})).deletedCount ?? 0;
   deleted.events = (await EventModel.deleteMany({})).deletedCount ?? 0;
-  deleted.employees = (await EmployeeModel.deleteMany({})).deletedCount ?? 0;
+  deleted.students = (await StudentModel.deleteMany({})).deletedCount ?? 0;
   deleted.departments = (await DepartmentModel.deleteMany({})).deletedCount ?? 0;
 
   return deleted;
@@ -1842,12 +1842,12 @@ function makeEventSeeds(): EventSeed[] {
       'Submit remaining annual leave requests for the current holiday year.',
     );
 
-    for (const employee of SEED_HISTORY_EMPLOYEES.filter((entry) =>
+    for (const student of SEED_HISTORY_STUDENTS.filter((entry) =>
       entry.hireDate.startsWith(`${year}-`),
     )) {
-      const date = addMonthsClamped(employee.hireDate, 3);
+      const date = addMonthsClamped(student.hireDate, 3);
       add(
-        `Probation review due: ${employee.name}`,
+        `Probation review due: ${student.name}`,
         'deadline',
         date,
         date,
@@ -2004,14 +2004,14 @@ function makeEventSeeds(): EventSeed[] {
       'Clocks go back at 02:00. Date-only HR records keep the same date.',
     );
 
-    for (const employee of SEED_HISTORY_EMPLOYEES.filter((entry) =>
+    for (const student of SEED_HISTORY_STUDENTS.filter((entry) =>
       entry.hireDate.startsWith(`${year}-`),
     )) {
       add(
-        `New starter induction: ${employee.name}`,
+        `New starter induction: ${student.name}`,
         'event',
-        employee.hireDate,
-        employee.hireDate,
+        student.hireDate,
+        student.hireDate,
         'Induction and system access setup.',
       );
     }
@@ -2023,11 +2023,11 @@ function makeEventSeeds(): EventSeed[] {
 async function loadLeaveInfo(
   plans: readonly LeavePlan[],
   idsByKey: Map<string, string>,
-  employeeById: Map<string, SeedEmployeeRecord>,
+  studentById: Map<string, SeedStudentRecord>,
 ): Promise<LeaveInfo[]> {
   const ids = [...idsByKey.values()].map((id) => new Types.ObjectId(id));
   const rows = await LeaveModel.find({ _id: { $in: ids } })
-    .select('employeeId type category startDate endDate days status reason')
+    .select('studentId type category startDate endDate days status reason')
     .lean();
 
   const rowById = new Map(rows.map((row) => [String(row._id), row]));
@@ -2035,17 +2035,17 @@ async function loadLeaveInfo(
   return plans.map((plan) => {
     const id = idsByKey.get(plan.key);
     const row = id ? rowById.get(id) : undefined;
-    const employee = row ? employeeById.get(String(row.employeeId)) : undefined;
+    const student = row ? studentById.get(String(row.studentId)) : undefined;
 
-    if (!row || !employee) {
+    if (!row || !student) {
       throw new Error(`Could not reload leave ${plan.key}.`);
     }
 
     return {
       id: String(row._id),
       key: plan.key,
-      employeeId: String(row.employeeId),
-      employeeName: employee.name,
+      studentId: String(row.studentId),
+      studentName: student.name,
       type: row.type as LeaveType,
       category: (row.category as string | null) ?? null,
       startDate: row.startDate,
@@ -2058,17 +2058,17 @@ async function loadLeaveInfo(
 }
 
 /**
- * The days on which this employee should have a manual attendance record.
+ * The days on which this student should have a manual attendance record.
  *
  * The history deliberately stops on `SEED_HISTORY_LAST_MARKED`; approved
  * future leaves may still create `leave_sync` rows after that date. Nothing is
- * generated for an employee after their leaving/deactivation date.
+ * generated for a student after their leaving/deactivation date.
  */
-function employeeExpectedDates(employee: SeedEmployeeRecord): string[] {
-  const start = employee.hireDate > SEED_HISTORY_START ? employee.hireDate : SEED_HISTORY_START;
+function studentExpectedDates(student: SeedStudentRecord): string[] {
+  const start = student.hireDate > SEED_HISTORY_START ? student.hireDate : SEED_HISTORY_START;
   const end =
-    employee.leftDate && employee.leftDate < SEED_HISTORY_LAST_MARKED
-      ? employee.leftDate
+    student.leftDate && student.leftDate < SEED_HISTORY_LAST_MARKED
+      ? student.leftDate
       : SEED_HISTORY_LAST_MARKED;
 
   if (end < start) return [];
@@ -2076,8 +2076,8 @@ function employeeExpectedDates(employee: SeedEmployeeRecord): string[] {
   return workingDaysBetween(start, end).filter((date) => !isEnglandBankHoliday(date));
 }
 
-function keyFor(employeeId: string, date: string): string {
-  return `${employeeId}|${date}`;
+function keyFor(studentId: string, date: string): string {
+  return `${studentId}|${date}`;
 }
 
 function eventEdgeCases(
@@ -2116,50 +2116,50 @@ function eventEdgeCases(
   });
 }
 
-async function rawTopEmployees(
+async function rawTopStudents(
   month: string,
-  employees: SeedEmployeeRecord[],
-): Promise<TopEmployee[]> {
+  students: SeedStudentRecord[],
+): Promise<TopStudent[]> {
   const bounds = monthBounds(Number(month.slice(0, 4)), Number(month.slice(5, 7)));
   const rows = await AttendanceModel.find({
     date: { $gte: bounds.start, $lte: bounds.end },
     status: { $in: ['present', 'late', 'absent'] },
   })
-    .select('employeeId status')
+    .select('studentId status')
     .lean();
 
   const activeById = new Map(
-    employees.filter((employee) => employee.status === 'active').map((employee) => [employee.id, employee]),
+    students.filter((student) => student.status === 'active').map((student) => [student.id, student]),
   );
-  const byEmployee = new Map<
+  const byStudent = new Map<
     string,
-    { present: number; late: number; absent: number; employee: SeedEmployeeRecord }
+    { present: number; late: number; absent: number; student: SeedStudentRecord }
   >();
 
   for (const row of rows) {
-    const employeeId = String(row.employeeId);
-    const employee = activeById.get(employeeId);
-    if (!employee) continue;
+    const studentId = String(row.studentId);
+    const student = activeById.get(studentId);
+    if (!student) continue;
 
-    const entry = byEmployee.get(employeeId) ?? {
+    const entry = byStudent.get(studentId) ?? {
       present: 0,
       late: 0,
       absent: 0,
-      employee,
+      student,
     };
 
     if (row.status === 'present') entry.present += 1;
     if (row.status === 'late') entry.late += 1;
     if (row.status === 'absent') entry.absent += 1;
-    byEmployee.set(employeeId, entry);
+    byStudent.set(studentId, entry);
   }
 
-  return [...byEmployee.values()]
+  return [...byStudent.values()]
     .map((entry) => ({
-      employeeId: entry.employee.id,
-      name: entry.employee.name,
-      position: entry.employee.position,
-      department: entry.employee.departmentName,
+      studentId: entry.student.id,
+      name: entry.student.name,
+      position: entry.student.position,
+      department: entry.student.departmentName,
       present: entry.present,
       late: entry.late,
       absent: entry.absent,
@@ -2174,14 +2174,14 @@ async function rawTopEmployees(
     .slice(0, 5);
 }
 
-function sameTopEmployees(a: TopEmployee[], b: TopEmployee[]): boolean {
+function sameTopStudents(a: TopStudent[], b: TopStudent[]): boolean {
   if (a.length !== b.length) return false;
 
   return a.every((entry, index) => {
     const other = b[index];
     return (
       Boolean(other) &&
-      entry.employeeId === other?.employeeId &&
+      entry.studentId === other?.studentId &&
       entry.name === other?.name &&
       entry.position === other?.position &&
       entry.department === other?.department &&
@@ -2194,7 +2194,7 @@ function sameTopEmployees(a: TopEmployee[], b: TopEmployee[]): boolean {
 }
 
 async function verifySeedData(
-  employees: SeedEmployeeRecord[],
+  students: SeedStudentRecord[],
   approvedLeaves: LeaveInfo[],
   pendingLeaves: LeaveInfo[],
   rejectedLeaves: LeaveInfo[],
@@ -2205,7 +2205,7 @@ async function verifySeedData(
   const attendance = await AttendanceModel.find().lean();
   const overtime = await OvertimeModel.find().lean();
   const eventRows = await EventModel.find().lean();
-  const employeeRows = await EmployeeModel.find().select('name email status hireDate photo').lean();
+  const studentRows = await StudentModel.find().select('name email status hireDate photo').lean();
   const allowanceRows = await LeaveAllowanceModel.find().lean();
 
   function check(condition: boolean, label: string, detail: string): void {
@@ -2215,7 +2215,7 @@ async function verifySeedData(
     assertions.push(label);
   }
 
-  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+  const studentById = new Map(students.map((student) => [student.id, student]));
   const approvedIds = new Set(approvedLeaves.map((leave) => leave.id));
   const pendingIds = new Set(pendingLeaves.map((leave) => leave.id));
   const rejectedIds = new Set(rejectedLeaves.map((leave) => leave.id));
@@ -2235,43 +2235,43 @@ async function verifySeedData(
   };
 
   for (const row of attendance) {
-    const key = `${String(row.employeeId)}|${row.date}`;
+    const key = `${String(row.studentId)}|${row.date}`;
     if (attendanceByKey.has(key)) duplicateKeys.add(key);
     attendanceByKey.set(key, row);
     leaveStatus[row.status] = (leaveStatus[row.status] ?? 0) + 1;
   }
 
-  check(duplicateKeys.size === 0, 'attendance-unique', `${duplicateKeys.size} duplicate employee/date key(s)`);
+  check(duplicateKeys.size === 0, 'attendance-unique', `${duplicateKeys.size} duplicate student/date key(s)`);
 
-  const employeesWithPhotos = employeeRows.filter((employee) => Boolean(employee.photo?.data));
-  check(employeeRows.length === 26, 'employee-count', `${employeeRows.length} employees`);
-  check(employeesWithPhotos.length === 0, 'employee-no-photos', `${employeesWithPhotos.length} employee(s) have photos`);
+  const studentsWithPhotos = studentRows.filter((student) => Boolean(student.photo?.data));
+  check(studentRows.length === 26, 'student-count', `${studentRows.length} students`);
+  check(studentsWithPhotos.length === 0, 'student-no-photos', `${studentsWithPhotos.length} student(s) have photos`);
 
-  const activeEmployees = employees.filter((employee) => employee.status === 'active');
-  const inactiveEmployees = employees.filter((employee) => employee.status === 'inactive');
-  const terminatedEmployees = employees.filter((employee) => employee.status === 'terminated');
-  check(activeEmployees.length >= 20, 'active-employee-minimum', `${activeEmployees.length} active employees`);
-  check(inactiveEmployees.length === 1, 'inactive-employee', `${inactiveEmployees.length} inactive employees`);
-  check(terminatedEmployees.length === 2, 'terminated-employees', `${terminatedEmployees.length} terminated employees`);
+  const activeStudents = students.filter((student) => student.status === 'active');
+  const inactiveStudents = students.filter((student) => student.status === 'inactive');
+  const terminatedStudents = students.filter((student) => student.status === 'terminated');
+  check(activeStudents.length >= 20, 'active-student-minimum', `${activeStudents.length} active students`);
+  check(inactiveStudents.length === 1, 'inactive-student', `${inactiveStudents.length} inactive students`);
+  check(terminatedStudents.length === 2, 'terminated-students', `${terminatedStudents.length} terminated students`);
   check(
-    employees.filter((employee) => employee.hireDate.startsWith('2025-')).length === 3,
+    students.filter((student) => student.hireDate.startsWith('2025-')).length === 3,
     '2025-new-hires',
-    'expected exactly three employees hired during 2025',
+    'expected exactly three students hired during 2025',
   );
   check(
-    employees.filter((employee) => employee.hireDate.startsWith('2026-')).length === 2,
+    students.filter((student) => student.hireDate.startsWith('2026-')).length === 2,
     '2026-new-hires',
-    'expected exactly two employees hired during 2026',
+    'expected exactly two students hired during 2026',
   );
   check(
-    [...inactiveEmployees, ...terminatedEmployees].every((employee) => Boolean(employee.leftDate)),
+    [...inactiveStudents, ...terminatedStudents].every((student) => Boolean(student.leftDate)),
     'leavers-have-dates',
-    'an inactive/terminated employee has no leaving/deactivation date',
+    'an inactive/terminated student has no leaving/deactivation date',
   );
 
   const departmentCounts = new Map<string, number>();
-  for (const employee of employees) {
-    departmentCounts.set(employee.departmentName, (departmentCounts.get(employee.departmentName) ?? 0) + 1);
+  for (const student of students) {
+    departmentCounts.set(student.departmentName, (departmentCounts.get(student.departmentName) ?? 0) + 1);
   }
   check(departmentCounts.size === 5, 'department-count', `${departmentCounts.size} departments`);
   check(
@@ -2280,24 +2280,24 @@ async function verifySeedData(
     [...departmentCounts.entries()].map(([name, count]) => `${name}:${count}`).join(', '),
   );
 
-  const emails = employees.map((employee) => employee.email).filter((email): email is string => Boolean(email));
-  check(new Set(emails).size === emails.length, 'employee-emails-unique', 'duplicate employee email');
-  check(employees.some((employee) => employee.email === null), 'employee-null-emails', 'no employee has an empty email');
+  const emails = students.map((student) => student.email).filter((email): email is string => Boolean(email));
+  check(new Set(emails).size === emails.length, 'student-emails-unique', 'duplicate student email');
+  check(students.some((student) => student.email === null), 'student-null-emails', 'no student has an empty email');
 
-  const allowanceKeys = allowanceRows.map((row) => `${String(row.employeeId)}|${row.year}`);
+  const allowanceKeys = allowanceRows.map((row) => `${String(row.studentId)}|${row.year}`);
   const allowance2026 = allowanceRows.filter((row) => row.year === 2026);
   const allowance2025 = allowanceRows.filter((row) => row.year === 2025);
-  const allowanceEmployee = (key: string, year: number) =>
+  const allowanceStudent = (key: string, year: number) =>
     allowanceRows.find(
       (row) =>
-        String(row.employeeId) === employees.find((employee) => employee.key === key)?.id &&
+        String(row.studentId) === students.find((student) => student.key === key)?.id &&
         row.year === year,
     );
   check(allowanceRows.length === 29, 'allowance-row-count', `${allowanceRows.length}`);
   check(
     new Set(allowanceKeys).size === allowanceRows.length,
-    'allowance-employee-year-unique',
-    'duplicate allowance row for one employee and year',
+    'allowance-student-year-unique',
+    'duplicate allowance row for one student and year',
   );
   check(
     allowance2026.length === 26 && allowance2025.length === 3,
@@ -2310,10 +2310,10 @@ async function verifySeedData(
     'an allowance is outside 0-100',
   );
   check(
-    allowanceEmployee('oliver-grant', 2026)?.allowance === 21 &&
-      allowanceEmployee('evie-barker', 2025)?.allowance === 25.5 &&
-      allowanceEmployee('theo-cooper', 2025)?.allowance === 14 &&
-      allowanceEmployee('ava-hughes', 2025)?.allowance === 9.5,
+    allowanceStudent('oliver-grant', 2026)?.allowance === 21 &&
+      allowanceStudent('evie-barker', 2025)?.allowance === 25.5 &&
+      allowanceStudent('theo-cooper', 2025)?.allowance === 14 &&
+      allowanceStudent('ava-hughes', 2025)?.allowance === 9.5,
     'allowance-pro-rata-values',
     'the stored pro-rata/override allowances differ from the designed values',
   );
@@ -2331,41 +2331,41 @@ async function verifySeedData(
         Number(date.slice(0, 4)) === year && isWorkingDay(date) && !holidayEventDates.has(date),
     ).length;
 
-  const allowanceUsage = (employeeId: string, leaves: LeaveInfo[], year: number): number => {
+  const allowanceUsage = (studentId: string, leaves: LeaveInfo[], year: number): number => {
     let count = 0;
     for (const leave of leaves) {
-      if (leave.employeeId !== employeeId || leave.type !== 'vacation') continue;
+      if (leave.studentId !== studentId || leave.type !== 'vacation') continue;
       count += countedLeaveDaysInYear(leave, year);
     }
     return count;
   };
 
   const allowanceChecks: SeedAllowanceCheck[] = [];
-  for (const employee of employees) {
+  for (const student of students) {
     for (const year of [2025, 2026]) {
       const row = allowanceRows.find(
-        (candidate) => String(candidate.employeeId) === employee.id && candidate.year === year,
+        (candidate) => String(candidate.studentId) === student.id && candidate.year === year,
       );
       const allowance = row?.allowance ?? env.annualAllowanceDefault;
       const total = allowance;
-      const used = allowanceUsage(employee.id, approvedLeaves, year);
+      const used = allowanceUsage(student.id, approvedLeaves, year);
       allowanceChecks.push({
-        employeeId: employee.id,
-        name: employee.name,
+        studentId: student.id,
+        name: student.name,
         year,
         allowance,
         total,
         used,
-        pending: allowanceUsage(employee.id, pendingLeaves, year),
+        pending: allowanceUsage(student.id, pendingLeaves, year),
         remaining: total - used,
       });
     }
   }
 
   check(
-    allowanceChecks.length === employees.length * 2,
+    allowanceChecks.length === students.length * 2,
     'allowance-check-coverage',
-    `${allowanceChecks.length} employee/year row(s) for ${employees.length} employees`,
+    `${allowanceChecks.length} student/year row(s) for ${students.length} students`,
   );
   const allowanceCheck = (name: string, year: number) =>
     allowanceChecks.find((row) => row.name === name && row.year === year);
@@ -2452,10 +2452,10 @@ async function verifySeedData(
   );
 
   const outOfEmployment = attendance.filter((row) => {
-    const employee = employeeById.get(String(row.employeeId));
-    if (!employee) return true;
-    if (row.date < employee.hireDate) return true;
-    if (employee.leftDate && row.date > employee.leftDate) return true;
+    const student = studentById.get(String(row.studentId));
+    if (!student) return true;
+    if (row.date < student.hireDate) return true;
+    if (student.leftDate && row.date > student.leftDate) return true;
     return false;
   });
   check(
@@ -2502,19 +2502,19 @@ async function verifySeedData(
   );
 
   const overlappingLeaves: string[] = [];
-  const leavesByEmployee = new Map<string, LeaveInfo[]>();
+  const leavesByStudent = new Map<string, LeaveInfo[]>();
   for (const leave of approvedLeaves) {
-    const list = leavesByEmployee.get(leave.employeeId) ?? [];
+    const list = leavesByStudent.get(leave.studentId) ?? [];
     list.push(leave);
-    leavesByEmployee.set(leave.employeeId, list);
+    leavesByStudent.set(leave.studentId, list);
   }
-  for (const [employeeId, leaves] of leavesByEmployee) {
+  for (const [studentId, leaves] of leavesByStudent) {
     leaves.sort((a, b) => a.startDate.localeCompare(b.startDate));
     for (let index = 1; index < leaves.length; index += 1) {
       const previous = leaves[index - 1];
       const current = leaves[index];
       if (previous && current && current.startDate <= previous.endDate) {
-        overlappingLeaves.push(`${employeeId}:${previous.key}/${current.key}`);
+        overlappingLeaves.push(`${studentId}:${previous.key}/${current.key}`);
       }
     }
   }
@@ -2542,10 +2542,10 @@ async function verifySeedData(
   );
 
   const employmentLeaveErrors = allLeaves.filter((leave) => {
-    const employee = employeeById.get(leave.employeeId);
-    if (!employee) return true;
-    if (leave.startDate < employee.hireDate) return true;
-    if (employee.leftDate && leave.endDate > employee.leftDate) return true;
+    const student = studentById.get(leave.studentId);
+    if (!student) return true;
+    if (leave.startDate < student.hireDate) return true;
+    if (student.leftDate && leave.endDate > student.leftDate) return true;
     if (leave.startDate < SEED_HISTORY_START || leave.endDate > SEED_HISTORY_END) return true;
     return false;
   });
@@ -2598,7 +2598,7 @@ async function verifySeedData(
   );
   check(
     futureLeavesToday.length === 2 &&
-      new Set(futureLeavesToday.map((leave) => leave.employeeId)).size === 2,
+      new Set(futureLeavesToday.map((leave) => leave.studentId)).size === 2,
     'two-leaves-spanning-today',
     `${futureLeavesToday.length} future leave(s) span 2026-10-21`,
   );
@@ -2617,16 +2617,16 @@ async function verifySeedData(
     `${nextDayRows.length} row(s), ${nextDayRows.filter((row) => row.source !== 'leave_sync').length} manual`,
   );
 
-  const approvedByEmployee = new Map<string, LeaveInfo[]>();
+  const approvedByStudent = new Map<string, LeaveInfo[]>();
   for (const leave of approvedLeaves) {
-    const list = approvedByEmployee.get(leave.employeeId) ?? [];
+    const list = approvedByStudent.get(leave.studentId) ?? [];
     list.push(leave);
-    approvedByEmployee.set(leave.employeeId, list);
+    approvedByStudent.set(leave.studentId, list);
   }
   const manualLeaveOverrides = manualRows.filter(
     (row) =>
       !holidayEventDates.has(row.date) &&
-      (approvedByEmployee.get(String(row.employeeId)) ?? []).some(
+      (approvedByStudent.get(String(row.studentId)) ?? []).some(
         (leave) => leave.startDate <= row.date && leave.endDate >= row.date,
       ),
   );
@@ -2661,10 +2661,10 @@ async function verifySeedData(
   check(rejectedRows.length === 0, 'rejected-leaves-no-attendance', `${rejectedRows.length} rejected rows`);
 
   let longestAbsenceRun = 0;
-  for (const employee of employees) {
+  for (const student of students) {
     let run = 0;
-    for (const date of employeeExpectedDates(employee)) {
-      const row = attendanceByKey.get(keyFor(employee.id, date));
+    for (const date of studentExpectedDates(student)) {
+      const row = attendanceByKey.get(keyFor(student.id, date));
       if (row?.status === 'absent') {
         run += 1;
         longestAbsenceRun = Math.max(longestAbsenceRun, run);
@@ -2678,7 +2678,7 @@ async function verifySeedData(
   const overtimeByDay = new Map<string, number>();
   const invalidOvertime: string[] = [];
   for (const row of overtime) {
-    const key = `${String(row.employeeId)}|${row.date}`;
+    const key = `${String(row.studentId)}|${row.date}`;
     overtimeByDay.set(key, (overtimeByDay.get(key) ?? 0) + row.hours);
     const attendanceRow = attendanceByKey.get(key);
     if (!attendanceRow || !['present', 'late'].includes(attendanceRow.status)) {
@@ -2812,8 +2812,8 @@ async function verifySeedData(
   check(outOfRangeEvents.length === 0, 'events-in-history-range', `${outOfRangeEvents.length} event(s)`);
 
   const manualAttendance = manualRows.length;
-  const expectedSlots = employees.reduce(
-    (sum, employee) => sum + employeeExpectedDates(employee).length,
+  const expectedSlots = students.reduce(
+    (sum, student) => sum + studentExpectedDates(student).length,
     0,
   );
   const targetUnmarked = Math.max(1, Math.round(expectedSlots * 0.003));
@@ -2859,11 +2859,11 @@ async function verifySeedData(
       let expectedMonthSlots = 0;
       let notMarked = 0;
 
-      for (const employee of employees) {
-        for (const date of employeeExpectedDates(employee)) {
+      for (const student of students) {
+        for (const date of studentExpectedDates(student)) {
           if (date.slice(0, 7) !== monthKey) continue;
           expectedMonthSlots += 1;
-          if (!attendanceByKey.has(keyFor(employee.id, date))) notMarked += 1;
+          if (!attendanceByKey.has(keyFor(student.id, date))) notMarked += 1;
         }
       }
 
@@ -2998,11 +2998,11 @@ async function verifySeedData(
 
   const topChecks: SeedTopCheck[] = [];
   for (const month of ['2025-03', '2026-09']) {
-    const expected = await rawTopEmployees(month, employees);
-    const actual = (await dashboardMonth(month)).topEmployees;
-    const matches = sameTopEmployees(expected, actual);
+    const expected = await rawTopStudents(month, students);
+    const actual = (await dashboardMonth(month)).topStudents;
+    const matches = sameTopStudents(expected, actual);
     topChecks.push({ month, expected, actual, matches });
-    check(matches, `top-employees-${month}`, 'hand calculation differs from dashboard service');
+    check(matches, `top-students-${month}`, 'hand calculation differs from dashboard service');
   }
 
   const dashboardYears: SeedDashboardYearCheck[] = [];
@@ -3050,10 +3050,10 @@ async function verifySeedData(
   }
 
   const todaySummary = await dashboardSummary('2026-10-21');
-  const expectedNotMarked = activeEmployees.length - todaySummary.onLeave;
+  const expectedNotMarked = activeStudents.length - todaySummary.onLeave;
   const todayMatches =
     todaySummary.date === '2026-10-21' &&
-    todaySummary.totalEmployees === activeEmployees.length &&
+    todaySummary.totalStudents === activeStudents.length &&
     todaySummary.present === 0 &&
     todaySummary.late === 0 &&
     todaySummary.absent === 0 &&
@@ -3117,7 +3117,7 @@ async function verifySeedData(
     dashboardToday: {
       date: todaySummary.date,
       matches: todayMatches,
-      totalEmployees: todaySummary.totalEmployees,
+      totalStudents: todaySummary.totalStudents,
       notMarked: todaySummary.notMarked ?? 0,
       expectedNotMarked,
       onLeave: todaySummary.onLeave,
@@ -3143,9 +3143,9 @@ async function verifySeedData(
 
 /** Canonical business-data checksum. ObjectIds and timestamps are excluded. */
 export async function computeSeedChecksum(): Promise<string> {
-  const [departments, employees, attendance, leaves, overtime, events, allowances] = await Promise.all([
+  const [departments, students, attendance, leaves, overtime, events, allowances] = await Promise.all([
     DepartmentModel.find().lean(),
-    EmployeeModel.find().select('name email phone departmentId position hireDate status').lean(),
+    StudentModel.find().select('name email phone departmentId position hireDate status').lean(),
     AttendanceModel.find().lean(),
     LeaveModel.find().lean(),
     OvertimeModel.find().lean(),
@@ -3154,14 +3154,14 @@ export async function computeSeedChecksum(): Promise<string> {
   ]);
 
   const departmentById = new Map(departments.map((row) => [String(row._id), row.name]));
-  const employeeById = new Map(employees.map((row) => [String(row._id), row]));
+  const studentById = new Map(students.map((row) => [String(row._id), row]));
   const leaveSignatureById = new Map(
     leaves.map((row) => {
-      const employee = employeeById.get(String(row.employeeId));
+      const student = studentById.get(String(row.studentId));
       return [
         String(row._id),
         [
-          employee?.name ?? 'missing',
+          student?.name ?? 'missing',
           row.type,
           row.category ?? '',
           row.startDate,
@@ -3180,10 +3180,10 @@ export async function computeSeedChecksum(): Promise<string> {
     rows.push(['department', row.name, row.location ?? '', row.description ?? ''].join('|'));
   }
 
-  for (const row of employees) {
+  for (const row of students) {
     rows.push(
       [
-        'employee',
+        'student',
         row.name,
         row.email ?? '',
         row.phone ?? '',
@@ -3196,7 +3196,7 @@ export async function computeSeedChecksum(): Promise<string> {
   }
 
   for (const row of attendance) {
-    const employee = employeeById.get(String(row.employeeId));
+    const student = studentById.get(String(row.studentId));
     const leaveSignature =
       row.source === 'leave_sync' && row.leaveId
         ? leaveSignatureById.get(String(row.leaveId)) ?? 'orphan-leave'
@@ -3204,7 +3204,7 @@ export async function computeSeedChecksum(): Promise<string> {
     rows.push(
       [
         'attendance',
-        employee?.name ?? 'missing',
+        student?.name ?? 'missing',
         row.date,
         row.status,
         row.checkIn ?? '',
@@ -3221,9 +3221,9 @@ export async function computeSeedChecksum(): Promise<string> {
   }
 
   for (const row of overtime) {
-    const employee = employeeById.get(String(row.employeeId));
+    const student = studentById.get(String(row.studentId));
     rows.push(
-      ['overtime', employee?.name ?? 'missing', row.date, String(row.hours), row.note ?? ''].join('|'),
+      ['overtime', student?.name ?? 'missing', row.date, String(row.hours), row.note ?? ''].join('|'),
     );
   }
 
@@ -3241,11 +3241,11 @@ export async function computeSeedChecksum(): Promise<string> {
   }
 
   for (const row of allowances) {
-    const employee = employeeById.get(String(row.employeeId));
+    const student = studentById.get(String(row.studentId));
     rows.push(
       [
         'allowance',
-        employee?.name ?? 'missing',
+        student?.name ?? 'missing',
         row.year,
         row.allowance,
         row.note ?? '',
@@ -3273,7 +3273,7 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
     throw new Error('An active administrator is required before generating the history data.');
   }
 
-  const existingEmployees = await EmployeeModel.countDocuments();
+  const existingStudents = await StudentModel.countDocuments();
   const otherCounts = await Promise.all([
     DepartmentModel.countDocuments(),
     AttendanceModel.countDocuments(),
@@ -3284,21 +3284,21 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
   ]);
   const hasOtherData = otherCounts.some((count) => count > 0);
 
-  if (existingEmployees > 0 && !options.reset) {
+  if (existingStudents > 0 && !options.reset) {
     throw new Error(
-      `The database already contains ${existingEmployees} employee(s). Re-run with -- --reset to replace only the seed data collections.`,
+      `The database already contains ${existingStudents} student(s). Re-run with -- --reset to replace only the seed data collections.`,
     );
   }
 
-  if (existingEmployees === 0 && hasOtherData && !options.reset) {
+  if (existingStudents === 0 && hasOtherData && !options.reset) {
     throw new Error(
-      'The database contains orphaned seed collections. Re-run with -- --reset to clear only attendance, overtime, leaves, events, employees and departments.',
+      'The database contains orphaned seed collections. Re-run with -- --reset to clear only attendance, overtime, leaves, events, students and departments.',
     );
   }
 
   const resetDeleted = options.reset
     ? await resetSeedCollections()
-    : { attendance: 0, overtime: 0, leaves: 0, leaveallowances: 0, events: 0, employees: 0, departments: 0 };
+    : { attendance: 0, overtime: 0, leaves: 0, leaveallowances: 0, events: 0, students: 0, departments: 0 };
 
   const adminObjectId = new Types.ObjectId(options.adminId);
   const random = makeSeededRandom(SEED_HISTORY_RANDOM_SEED);
@@ -3315,40 +3315,40 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
     departmentDocs.map((department) => [department.name, String(department._id)]),
   );
 
-  // ---- employees --------------------------------------------------------
-  const employeeRows = SEED_HISTORY_EMPLOYEES.map((employee) => ({
-    name: employee.name,
-    email: employee.email,
-    phone: employee.phone,
-    departmentId: departmentByName.get(employee.department),
-    position: employee.position,
-    hireDate: employee.hireDate,
-    status: employee.status,
+  // ---- students --------------------------------------------------------
+  const studentRows = SEED_HISTORY_STUDENTS.map((student) => ({
+    name: student.name,
+    email: student.email,
+    phone: student.phone,
+    departmentId: departmentByName.get(student.department),
+    position: student.position,
+    hireDate: student.hireDate,
+    status: student.status,
   }));
-  const employeeDocs = await EmployeeModel.insertMany(employeeRows);
-  const employeeByName = new Map(employeeDocs.map((employee) => [employee.name, employee]));
+  const studentDocs = await StudentModel.insertMany(studentRows);
+  const studentByName = new Map(studentDocs.map((student) => [student.name, student]));
 
-  const employees: SeedEmployeeRecord[] = SEED_HISTORY_EMPLOYEES.map((employee) => {
-    const doc = employeeByName.get(employee.name);
-    if (!doc) throw new Error(`Could not create employee ${employee.key}.`);
+  const students: SeedStudentRecord[] = SEED_HISTORY_STUDENTS.map((student) => {
+    const doc = studentByName.get(student.name);
+    if (!doc) throw new Error(`Could not create student ${student.key}.`);
 
     return {
       id: String(doc._id),
-      key: employee.key,
-      name: employee.name,
-      email: employee.email,
-      phone: employee.phone,
+      key: student.key,
+      name: student.name,
+      email: student.email,
+      phone: student.phone,
       departmentId: String(doc.departmentId),
-      departmentName: employee.department,
-      position: employee.position,
-      hireDate: employee.hireDate,
-      status: employee.status,
-      profile: employee.profile,
-      leftDate: employee.leftDate ?? null,
+      departmentName: student.department,
+      position: student.position,
+      hireDate: student.hireDate,
+      status: student.status,
+      profile: student.profile,
+      leftDate: student.leftDate ?? null,
     };
   });
-  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
-  const employeeByKey = new Map(employees.map((employee) => [employee.key, employee]));
+  const studentById = new Map(students.map((student) => [student.id, student]));
+  const studentByKey = new Map(students.map((student) => [student.key, student]));
 
   // ---- events -----------------------------------------------------------
   // The holiday events are inserted **before** the leaves: the leave service
@@ -3367,13 +3367,13 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
   // Inserted before the leaves too: the leave service checks the over-allowance
   // guard when it creates an approved vacation.
   const allowanceRows = SEED_HISTORY_ALLOWANCES.map((plan) => {
-    const employee = employeeByKey.get(plan.employeeKey);
-    if (!employee) {
-      throw new Error(`Could not resolve employee for allowance ${plan.employeeKey}/${plan.year}.`);
+    const student = studentByKey.get(plan.studentKey);
+    if (!student) {
+      throw new Error(`Could not resolve student for allowance ${plan.studentKey}/${plan.year}.`);
     }
 
     return {
-      employeeId: new Types.ObjectId(employee.id),
+      studentId: new Types.ObjectId(student.id),
       year: plan.year,
       allowance: plan.allowance,
       note: plan.note,
@@ -3408,21 +3408,21 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
   ];
 
   for (const entry of allPlans) {
-    const leaveEmployee = entry.plan.employeeKey
-      ? employeeByKey.get(entry.plan.employeeKey)
-      : employees.find(
+    const leaveStudent = entry.plan.studentKey
+      ? studentByKey.get(entry.plan.studentKey)
+      : students.find(
           (candidate) =>
             candidate.name.split(' ')[0]?.toLowerCase() ===
             entry.plan.key.split('-')[0]?.toLowerCase(),
         );
 
-    if (!leaveEmployee) {
-      throw new Error(`Could not resolve employee for leave ${entry.plan.key}.`);
+    if (!leaveStudent) {
+      throw new Error(`Could not resolve student for leave ${entry.plan.key}.`);
     }
 
     const leave = (await createLeave(
       {
-        employeeId: leaveEmployee.id,
+        studentId: leaveStudent.id,
         type: entry.plan.type,
         category: entry.plan.category,
         startDate: entry.plan.startDate,
@@ -3440,17 +3440,17 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
   const approvedLeaves = await loadLeaveInfo(
     SEED_HISTORY_APPROVED_LEAVES,
     approvedIdsByKey,
-    employeeById,
+    studentById,
   );
   const pendingLeaves = await loadLeaveInfo(
     SEED_HISTORY_PENDING_LEAVES,
     pendingIdsByKey,
-    employeeById,
+    studentById,
   );
   const rejectedLeaves = await loadLeaveInfo(
     SEED_HISTORY_REJECTED_LEAVES,
     rejectedIdsByKey,
-    employeeById,
+    studentById,
   );
 
   // The sync rows are created by the real reconcile function. The seed actor
@@ -3463,14 +3463,14 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
 
   // ---- attendance -------------------------------------------------------
   const leaveSyncRows = await AttendanceModel.find({ source: 'leave_sync' })
-    .select('employeeId date')
+    .select('studentId date')
     .lean();
-  const leaveKeys = new Set(leaveSyncRows.map((row) => keyFor(String(row.employeeId), row.date)));
+  const leaveKeys = new Set(leaveSyncRows.map((row) => keyFor(String(row.studentId), row.date)));
 
-  const expectedDatesByEmployee = new Map(
-    employees.map((employee) => [employee.id, employeeExpectedDates(employee)]),
+  const expectedDatesByStudent = new Map(
+    students.map((student) => [student.id, studentExpectedDates(student)]),
   );
-  const expectedSlots = [...expectedDatesByEmployee.values()].reduce(
+  const expectedSlots = [...expectedDatesByStudent.values()].reduce(
     (sum, dates) => sum + dates.length,
     0,
   );
@@ -3478,13 +3478,13 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
   const absenceKeys = new Set<string>();
   const lateKeys = new Set<string>();
 
-  for (const employee of employees) {
-    const expectedDates = expectedDatesByEmployee.get(employee.id) ?? [];
+  for (const student of students) {
+    const expectedDates = expectedDatesByStudent.get(student.id) ?? [];
     if (expectedDates.length === 0) continue;
 
-    const config = PROFILE_CONFIG[employee.profile];
+    const config = PROFILE_CONFIG[student.profile];
     const runCount = random.int(config.absenceRuns[0], config.absenceRuns[1]);
-    const employmentEnd = employee.leftDate ?? SEED_HISTORY_LAST_MARKED;
+    const employmentEnd = student.leftDate ?? SEED_HISTORY_LAST_MARKED;
 
     for (let runIndex = 0; runIndex < runCount; runIndex += 1) {
       for (let attempt = 0; attempt < 80; attempt += 1) {
@@ -3496,7 +3496,7 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
 
         while (run.length < length && cursor <= employmentEnd) {
           if (isWorkingDay(cursor) && !isEnglandBankHoliday(cursor)) {
-            const key = keyFor(employee.id, cursor);
+            const key = keyFor(student.id, cursor);
             if (leaveKeys.has(key) || absenceKeys.has(key)) {
               blocked = true;
               break;
@@ -3511,8 +3511,8 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
           const before = startIndex > 0 ? expectedDates[startIndex - 1] : null;
           const after = expectedDates[startIndex + run.length] ?? null;
           if (
-            (before && absenceKeys.has(keyFor(employee.id, before))) ||
-            (after && absenceKeys.has(keyFor(employee.id, after)))
+            (before && absenceKeys.has(keyFor(student.id, before))) ||
+            (after && absenceKeys.has(keyFor(student.id, after)))
           ) {
             blocked = true;
           }
@@ -3526,19 +3526,19 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
     }
 
     for (const date of expectedDates) {
-      const key = keyFor(employee.id, date);
+      const key = keyFor(student.id, date);
       if (leaveKeys.has(key) || absenceKeys.has(key)) continue;
       if (random.next() < config.lateChance) lateKeys.add(key);
     }
   }
 
-  const presentOrLatePool = employees.flatMap((employee) =>
-    (expectedDatesByEmployee.get(employee.id) ?? [])
+  const presentOrLatePool = students.flatMap((student) =>
+    (expectedDatesByStudent.get(student.id) ?? [])
       .filter((date) => {
-        const key = keyFor(employee.id, date);
+        const key = keyFor(student.id, date);
         return !leaveKeys.has(key) && !absenceKeys.has(key);
       })
-      .map((date) => keyFor(employee.id, date)),
+      .map((date) => keyFor(student.id, date)),
   );
   const deliberatelyUnmarked = Math.min(
     presentOrLatePool.length,
@@ -3552,9 +3552,9 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
 
   const attendanceRows: Array<Record<string, unknown>> = [];
 
-  for (const employee of employees) {
-    for (const date of expectedDatesByEmployee.get(employee.id) ?? []) {
-      const key = keyFor(employee.id, date);
+  for (const student of students) {
+    for (const date of expectedDatesByStudent.get(student.id) ?? []) {
+      const key = keyFor(student.id, date);
       if (leaveKeys.has(key) || unmarkedKeys.has(key)) continue;
 
       const isAbsent = absenceKeys.has(key);
@@ -3568,7 +3568,7 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
       if (isLate && random.next() < 0.6) note = random.pick(LATE_NOTES);
 
       attendanceRows.push({
-        employeeId: new Types.ObjectId(employee.id),
+        studentId: new Types.ObjectId(student.id),
         date,
         status,
         checkIn: isAbsent ? null : timeString(startMinutes),
@@ -3601,14 +3601,14 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
     }
 
     await AttendanceModel.deleteOne({
-      employeeId: new Types.ObjectId(leave.employeeId),
+      studentId: new Types.ObjectId(leave.studentId),
       date: override.date,
       source: 'leave_sync',
       leaveId: new Types.ObjectId(leave.id),
     });
 
     attendanceRows.push({
-      employeeId: new Types.ObjectId(leave.employeeId),
+      studentId: new Types.ObjectId(leave.studentId),
       date: override.date,
       status: 'present',
       checkIn: '08:45',
@@ -3632,7 +3632,7 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
     const date = String(row.date);
     const month = date.slice(0, 7);
     const list = workedByMonth.get(month) ?? [];
-    list.push(keyFor(String(row.employeeId), date));
+    list.push(keyFor(String(row.studentId), date));
     workedByMonth.set(month, list);
   }
 
@@ -3656,10 +3656,10 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
       }
 
       for (const key of candidates.slice(0, target)) {
-        const [employeeId, date] = key.split('|');
-        if (!employeeId || !date) continue;
+        const [studentId, date] = key.split('|');
+        if (!studentId || !date) continue;
         overtimeRows.push({
-          employeeId: new Types.ObjectId(employeeId),
+          studentId: new Types.ObjectId(studentId),
           date,
           hours: random.pick([0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4] as const),
           note: random.pick(OVERTIME_NOTES),
@@ -3686,7 +3686,7 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
   const eventsWithEdges = eventEdgeCases(events, approvedLeaves);
 
   const verification = await verifySeedData(
-    employees,
+    students,
     approvedLeaves,
     pendingLeaves,
     rejectedLeaves,
@@ -3715,15 +3715,15 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
     resetDeleted,
     counts: {
       departments: departmentDocs.length,
-      employees: employees.length,
-      activeEmployees: employees.filter((employee) => employee.status === 'active').length,
-      inactiveEmployees: employees.filter((employee) => employee.status === 'inactive').length,
-      terminatedEmployees: employees.filter((employee) => employee.status === 'terminated').length,
-      newHires: employees.filter(
-        (employee) => employee.hireDate.startsWith('2025-') || employee.hireDate.startsWith('2026-'),
+      students: students.length,
+      activeStudents: students.filter((student) => student.status === 'active').length,
+      inactiveStudents: students.filter((student) => student.status === 'inactive').length,
+      terminatedStudents: students.filter((student) => student.status === 'terminated').length,
+      newHires: students.filter(
+        (student) => student.hireDate.startsWith('2025-') || student.hireDate.startsWith('2026-'),
       ).length,
-      newHires2025: employees.filter((employee) => employee.hireDate.startsWith('2025-')).length,
-      newHires2026: employees.filter((employee) => employee.hireDate.startsWith('2026-')).length,
+      newHires2025: students.filter((student) => student.hireDate.startsWith('2025-')).length,
+      newHires2026: students.filter((student) => student.hireDate.startsWith('2026-')).length,
       attendance: await AttendanceModel.countDocuments(),
       manualAttendance: await AttendanceModel.countDocuments({ source: 'manual' }),
       leaveAttendance: await AttendanceModel.countDocuments({ source: 'leave_sync' }),
@@ -3744,7 +3744,7 @@ export async function seedHistoryData(options: SeedHistoryOptions): Promise<Seed
       events2026: events2026.length,
       leaveAllowances: await LeaveAllowanceModel.countDocuments(),
     },
-    employees,
+    students,
     approvedLeaves,
     pendingLeaves,
     rejectedLeaves,

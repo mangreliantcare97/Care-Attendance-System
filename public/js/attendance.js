@@ -30,7 +30,7 @@
   var state = {
     date: '',
     today: '',
-    employees: [],
+    students: [],
     loading: false,
     saving: false,
     visibleCount: 0,
@@ -59,8 +59,8 @@
     return (parts[0].slice(0, 1) + parts[parts.length - 1].slice(0, 1)).toUpperCase();
   }
 
-  function departmentOf(employee) {
-    var department = employee && employee.departmentId;
+  function departmentOf(student) {
+    var department = student && student.departmentId;
     if (!department) return { id: '', name: '' };
     if (typeof department === 'string') return { id: department, name: '' };
     return {
@@ -79,33 +79,33 @@
     };
   }
 
-  function currentValues(employee) {
+  function currentValues(student) {
     return {
-      status: employee.status || '',
-      checkIn: employee.checkIn || '',
-      checkOut: employee.checkOut || '',
-      note: employee.note || '',
+      status: student.status || '',
+      checkIn: student.checkIn || '',
+      checkOut: student.checkOut || '',
+      note: student.note || '',
     };
   }
 
-  function isDirty(employee) {
-    var current = currentValues(employee);
-    if (!employee.initial) return Boolean(current.status);
+  function isDirty(student) {
+    var current = currentValues(student);
+    if (!student.initial) return Boolean(current.status);
 
     return (
-      current.status !== employee.initial.status ||
-      current.checkIn !== employee.initial.checkIn ||
-      current.checkOut !== employee.initial.checkOut ||
-      current.note !== employee.initial.note
+      current.status !== student.initial.status ||
+      current.checkIn !== student.initial.checkIn ||
+      current.checkOut !== student.initial.checkOut ||
+      current.note !== student.initial.note
     );
   }
 
-  function dirtyEmployees() {
-    return state.employees.filter(isDirty);
+  function dirtyStudents() {
+    return state.students.filter(isDirty);
   }
 
   function hasDirty() {
-    return dirtyEmployees().length > 0;
+    return dirtyStudents().length > 0;
   }
 
   function updateCounters() {
@@ -117,14 +117,14 @@
       absent: 0,
     };
 
-    state.employees.forEach(function (employee) {
-      var marked = Boolean(employee.initial || employee.status);
+    state.students.forEach(function (student) {
+      var marked = Boolean(student.initial || student.status);
       if (marked) counts.marked += 1;
       else counts.notMarked += 1;
 
-      if (employee.status === 'present') counts.present += 1;
-      if (employee.status === 'late') counts.late += 1;
-      if (employee.status === 'absent') counts.absent += 1;
+      if (student.status === 'present') counts.present += 1;
+      if (student.status === 'late') counts.late += 1;
+      if (student.status === 'absent') counts.absent += 1;
     });
 
     Object.keys(counts).forEach(function (key) {
@@ -135,18 +135,18 @@
 
   function updateMarkAllAvailability() {
     if (!markAllButton) return;
-    var eligible = state.employees.filter(function (employee) {
-      return !employee.initial && !employee.status;
+    var eligible = state.students.filter(function (student) {
+      return !student.initial && !student.status;
     }).length;
     markAllButton.disabled = state.loading || state.saving || eligible === 0;
     markAllButton.title =
       eligible === 0
-        ? 'Every employee already has a saved mark or an unsaved change.'
-        : 'Mark ' + eligible + ' employee' + (eligible === 1 ? '' : 's') + ' as Present.';
+        ? 'Every student already has a saved mark or an unsaved change.'
+        : 'Mark ' + eligible + ' student' + (eligible === 1 ? '' : 's') + ' as Present.';
   }
 
   function updateSaveBar() {
-    var dirty = dirtyEmployees().length;
+    var dirty = dirtyStudents().length;
     var busy = state.loading || state.saving;
 
     saveButton.disabled = busy || dirty === 0;
@@ -162,19 +162,19 @@
     updateMarkAllAvailability();
   }
 
-  function updateRow(employee) {
-    if (!employee.row) return;
+  function updateRow(student) {
+    if (!student.row) return;
 
-    var dirty = isDirty(employee);
-    employee.row.classList.toggle('is-changed', dirty);
-    employee.row.classList.toggle('is-unmarked', !employee.initial && !employee.status);
+    var dirty = isDirty(student);
+    student.row.classList.toggle('is-changed', dirty);
+    student.row.classList.toggle('is-unmarked', !student.initial && !student.status);
 
-    var badge = employee.stateBadge;
+    var badge = student.stateBadge;
     if (badge) {
       if (dirty) {
         badge.textContent = 'Changed';
         badge.className = 'badge-soft badge-soft-warning state-badge';
-      } else if (employee.initial) {
+      } else if (student.initial) {
         badge.textContent = 'Saved';
         badge.className = 'badge-soft badge-soft-success state-badge';
       } else {
@@ -183,36 +183,36 @@
       }
     }
 
-    for (var index = 0; index < employee.statusInputs.length; index += 1) {
-      employee.statusInputs[index].checked = employee.statusInputs[index].value === employee.status;
+    for (var index = 0; index < student.statusInputs.length; index += 1) {
+      student.statusInputs[index].checked = student.statusInputs[index].value === student.status;
     }
 
-    var disabled = !employee.status;
-    if (employee.checkInInput) {
-      employee.checkInInput.disabled = disabled;
-      if (document.activeElement !== employee.checkInInput) employee.checkInInput.value = employee.checkIn;
+    var disabled = !student.status;
+    if (student.checkInInput) {
+      student.checkInInput.disabled = disabled;
+      if (document.activeElement !== student.checkInInput) student.checkInInput.value = student.checkIn;
     }
-    if (employee.checkOutInput) {
-      employee.checkOutInput.disabled = disabled;
-      if (document.activeElement !== employee.checkOutInput) employee.checkOutInput.value = employee.checkOut;
+    if (student.checkOutInput) {
+      student.checkOutInput.disabled = disabled;
+      if (document.activeElement !== student.checkOutInput) student.checkOutInput.value = student.checkOut;
     }
-    if (employee.noteInput) {
-      employee.noteInput.disabled = disabled;
-      if (document.activeElement !== employee.noteInput) employee.noteInput.value = employee.note;
+    if (student.noteInput) {
+      student.noteInput.disabled = disabled;
+      if (document.activeElement !== student.noteInput) student.noteInput.value = student.note;
     }
   }
 
-  function readInput(employee, input) {
+  function readInput(student, input) {
     if (!input) return;
-    if (input === employee.checkInInput) employee.checkIn = input.value;
-    if (input === employee.checkOutInput) employee.checkOut = input.value;
-    if (input === employee.noteInput) employee.note = input.value;
-    updateRow(employee);
+    if (input === student.checkInInput) student.checkIn = input.value;
+    if (input === student.checkOutInput) student.checkOut = input.value;
+    if (input === student.noteInput) student.note = input.value;
+    updateRow(student);
     updateCounters();
     updateSaveBar();
   }
 
-  function makeInputCell(employee, label, type, value, maxLength) {
+  function makeInputCell(student, label, type, value, maxLength) {
     var cell = document.createElement('td');
     cell.className = type === 'time' ? 'time-cell' : 'note-cell';
     cell.setAttribute('data-label', label);
@@ -221,51 +221,51 @@
     input.type = type;
     input.className = 'form-control form-control-sm';
     input.value = value || '';
-    input.setAttribute('aria-label', label + ' for ' + employee.name);
+    input.setAttribute('aria-label', label + ' for ' + student.name);
     if (maxLength) input.maxLength = maxLength;
-    input.disabled = !employee.status;
+    input.disabled = !student.status;
 
     cell.appendChild(input);
     return { cell: cell, input: input };
   }
 
-  function renderEmployees() {
+  function renderStudents() {
     body.textContent = '';
 
-    if (!state.employees.length) {
+    if (!state.students.length) {
       window.HrmDom.renderListState(body, 7, {
         type: 'empty',
-        message: 'No active employees to mark.',
-        help: 'Add an active employee first, then reload this sheet.',
+        message: 'No active students to mark.',
+        help: 'Add an active student first, then reload this sheet.',
       });
       return;
     }
 
     var fragment = document.createDocumentFragment();
 
-    state.employees.forEach(function (employee) {
+    state.students.forEach(function (student) {
       var row = document.createElement('tr');
       row.className = 'attendance-row';
-      row.setAttribute('data-employee-id', employee.id);
+      row.setAttribute('data-student-id', student.id);
 
-      var employeeCell = document.createElement('td');
-      employeeCell.className = 'employee-cell';
-      var meta = [employee.position, employee.departmentName].filter(Boolean).join(' · ');
-      employeeCell.innerHTML = html`
-        <div class="attendance-employee">
-          <span class="avatar-initials" aria-hidden="true">${initials(employee.name)}</span>
-          <div class="attendance-employee-text">
-            <strong>${employee.name}</strong>
-            ${meta ? html`<span class="employee-card-meta">${meta}</span>` : ''}
+      var studentCell = document.createElement('td');
+      studentCell.className = 'student-cell';
+      var meta = [student.position, student.departmentName].filter(Boolean).join(' · ');
+      studentCell.innerHTML = html`
+        <div class="attendance-student">
+          <span class="avatar-initials" aria-hidden="true">${initials(student.name)}</span>
+          <div class="attendance-student-text">
+            <strong>${student.name}</strong>
+            ${meta ? html`<span class="student-card-meta">${meta}</span>` : ''}
           </div>
         </div>
       `;
-      row.appendChild(employeeCell);
+      row.appendChild(studentCell);
 
       var departmentCell = document.createElement('td');
       departmentCell.className = 'department-cell';
       departmentCell.setAttribute('data-label', 'Department');
-      departmentCell.textContent = employee.departmentName || '—';
+      departmentCell.textContent = student.departmentName || '—';
       row.appendChild(departmentCell);
 
       var statusCell = document.createElement('td');
@@ -273,9 +273,9 @@
       var group = document.createElement('div');
       group.className = 'status-segmented';
       group.setAttribute('role', 'group');
-      group.setAttribute('aria-label', 'Status for ' + employee.name);
+      group.setAttribute('aria-label', 'Status for ' + student.name);
 
-      employee.statusInputs = [];
+      student.statusInputs = [];
       STATUSES.forEach(function (status) {
         var label = document.createElement('label');
         label.className = 'status-segment';
@@ -283,10 +283,10 @@
         var input = document.createElement('input');
         input.type = 'radio';
         input.className = 'status-radio';
-        input.name = 'status-' + employee.id;
+        input.name = 'status-' + student.id;
         input.value = status.value;
-        input.id = 'status-' + employee.id + '-' + status.value;
-        input.checked = employee.status === status.value;
+        input.id = 'status-' + student.id + '-' + status.value;
+        input.checked = student.status === status.value;
 
         var visible = document.createElement('span');
         visible.className = 'status-segment-label';
@@ -295,22 +295,22 @@
         label.appendChild(input);
         label.appendChild(visible);
         group.appendChild(label);
-        employee.statusInputs.push(input);
+        student.statusInputs.push(input);
       });
       statusCell.appendChild(group);
       row.appendChild(statusCell);
 
-      var checkIn = makeInputCell(employee, 'Check in', 'time', employee.checkIn);
-      employee.checkInInput = checkIn.input;
+      var checkIn = makeInputCell(student, 'Check in', 'time', student.checkIn);
+      student.checkInInput = checkIn.input;
       row.appendChild(checkIn.cell);
 
-      var checkOut = makeInputCell(employee, 'Check out', 'time', employee.checkOut);
-      employee.checkOutInput = checkOut.input;
+      var checkOut = makeInputCell(student, 'Check out', 'time', student.checkOut);
+      student.checkOutInput = checkOut.input;
       row.appendChild(checkOut.cell);
 
-      var note = makeInputCell(employee, 'Note', 'text', employee.note, 500);
+      var note = makeInputCell(student, 'Note', 'text', student.note, 500);
       note.input.placeholder = 'Optional note';
-      employee.noteInput = note.input;
+      student.noteInput = note.input;
       row.appendChild(note.cell);
 
       var stateCell = document.createElement('td');
@@ -321,11 +321,11 @@
       badge.textContent = 'Not marked';
       stateCell.appendChild(badge);
       row.appendChild(stateCell);
-      employee.stateBadge = badge;
-      employee.row = row;
+      student.stateBadge = badge;
+      student.row = row;
 
       fragment.appendChild(row);
-      updateRow(employee);
+      updateRow(student);
     });
 
     var filterEmpty = document.createElement('tr');
@@ -334,7 +334,7 @@
     var filterCell = document.createElement('td');
     filterCell.colSpan = 7;
     filterCell.className = 'text-center py-4 text-muted';
-    filterCell.textContent = 'No employees match this filter. Clear the search or choose another department.';
+    filterCell.textContent = 'No students match this filter. Clear the search or choose another department.';
     filterEmpty.appendChild(filterCell);
     fragment.appendChild(filterEmpty);
 
@@ -346,10 +346,10 @@
     var departments = [];
     var seen = {};
 
-    state.employees.forEach(function (employee) {
-      if (!employee.departmentId || seen[employee.departmentId]) return;
-      seen[employee.departmentId] = true;
-      departments.push({ id: employee.departmentId, name: employee.departmentName || 'Unnamed department' });
+    state.students.forEach(function (student) {
+      if (!student.departmentId || seen[student.departmentId]) return;
+      seen[student.departmentId] = true;
+      departments.push({ id: student.departmentId, name: student.departmentName || 'Unnamed department' });
     });
 
     departments.sort(function (left, right) {
@@ -373,7 +373,7 @@
   }
 
   function applyFilters() {
-    if (!state.employees.length) {
+    if (!state.students.length) {
       state.visibleCount = 0;
       sheetSummary.textContent = '';
       return;
@@ -383,11 +383,11 @@
     var department = departmentSelect.value;
     var visible = 0;
 
-    state.employees.forEach(function (employee) {
-      var matchesName = !query || employee.name.toLowerCase().indexOf(query) !== -1;
-      var matchesDepartment = !department || employee.departmentId === department;
+    state.students.forEach(function (student) {
+      var matchesName = !query || student.name.toLowerCase().indexOf(query) !== -1;
+      var matchesDepartment = !department || student.departmentId === department;
       var matches = matchesName && matchesDepartment;
-      employee.row.hidden = !matches;
+      student.row.hidden = !matches;
       if (matches) visible += 1;
     });
 
@@ -395,7 +395,7 @@
     var filterEmpty = document.getElementById('sheet-filter-empty');
     if (filterEmpty) filterEmpty.classList.toggle('d-none', visible !== 0);
     sheetSummary.textContent =
-      visible + ' of ' + state.employees.length + ' employee' + (state.employees.length === 1 ? '' : 's') + ' shown';
+      visible + ' of ' + state.students.length + ' student' + (state.students.length === 1 ? '' : 's') + ' shown';
   }
 
   function setDateLabel() {
@@ -431,7 +431,7 @@
     }
 
     state.loading = true;
-    state.employees = [];
+    state.students = [];
     updateSaveBar();
     updateCounters();
     showLoadingState();
@@ -448,15 +448,15 @@
       dateInput.max = data.today || todayLocal();
       setDateLabel();
 
-      state.employees = data.employees.map(function (item) {
-        var employee = item.employee || {};
-        var department = departmentOf(employee);
+      state.students = data.students.map(function (item) {
+        var student = item.student || {};
+        var department = departmentOf(student);
         var initial = normaliseRecord(item.record);
 
         return {
-          id: String(employee.id || employee._id || ''),
-          name: employee.name || 'Unnamed employee',
-          position: employee.position || '',
+          id: String(student.id || student._id || ''),
+          name: student.name || 'Unnamed student',
+          position: student.position || '',
           departmentId: department.id,
           departmentName: department.name,
           initial: initial,
@@ -474,7 +474,7 @@
       });
 
       rebuildDepartments();
-      renderEmployees();
+      renderStudents();
       applyFilters();
       updateCounters();
       updateSaveBar();
@@ -484,7 +484,7 @@
         window.history.replaceState(null, '', nextUrl);
       }
     } catch (error) {
-      state.employees = [];
+      state.students = [];
       window.HrmDom.renderListState(body, 7, {
         type: 'error',
         message: error.message,
@@ -507,8 +507,8 @@
   async function saveSheet() {
     if (state.saving || state.loading) return;
 
-    var changed = dirtyEmployees().filter(function (employee) {
-      return Boolean(employee.status);
+    var changed = dirtyStudents().filter(function (student) {
+      return Boolean(student.status);
     });
 
     if (!changed.length) {
@@ -516,13 +516,13 @@
       return;
     }
 
-    var entries = changed.map(function (employee) {
+    var entries = changed.map(function (student) {
       return {
-        employeeId: employee.id,
-        status: employee.status,
-        checkIn: employee.checkIn || null,
-        checkOut: employee.checkOut || null,
-        note: employee.note || null,
+        studentId: student.id,
+        status: student.status,
+        checkIn: student.checkIn || null,
+        checkOut: student.checkOut || null,
+        note: student.note || null,
       };
     });
 
@@ -536,9 +536,9 @@
         entries: entries,
       });
 
-      changed.forEach(function (employee) {
-        employee.initial = currentValues(employee);
-        updateRow(employee);
+      changed.forEach(function (student) {
+        student.initial = currentValues(student);
+        updateRow(student);
       });
 
       updateCounters();
@@ -559,21 +559,21 @@
   }
 
   async function markAllPresent() {
-    var eligible = state.employees.filter(function (employee) {
-      return !employee.initial && !employee.status;
+    var eligible = state.students.filter(function (student) {
+      return !student.initial && !student.status;
     });
 
     if (!eligible.length) {
-      window.HrmToast.info('Every employee already has a mark or an unsaved change.');
+      window.HrmToast.info('Every student already has a mark or an unsaved change.');
       return;
     }
 
     var confirmed = await window.HrmConfirm({
-      title: 'Mark employees present?',
+      title: 'Mark students present?',
       message:
         'Mark ' +
         eligible.length +
-        ' unmarked employee' +
+        ' unmarked student' +
         (eligible.length === 1 ? '' : 's') +
         ' as Present for ' +
         state.date +
@@ -584,46 +584,46 @@
 
     if (!confirmed) return;
 
-    eligible.forEach(function (employee) {
-      employee.status = 'present';
-      updateRow(employee);
+    eligible.forEach(function (student) {
+      student.status = 'present';
+      updateRow(student);
     });
 
     updateCounters();
     updateSaveBar();
-    window.HrmToast.success('Marked ' + eligible.length + ' employee' + (eligible.length === 1 ? '' : 's') + ' present.');
+    window.HrmToast.success('Marked ' + eligible.length + ' student' + (eligible.length === 1 ? '' : 's') + ' present.');
   }
 
   body.addEventListener('change', function (event) {
     var radio = event.target.closest('.status-radio');
     if (!radio) return;
-    var row = radio.closest('[data-employee-id]');
+    var row = radio.closest('[data-student-id]');
     if (!row) return;
-    var employee = state.employees.find(function (item) {
-      return item.id === row.getAttribute('data-employee-id');
+    var student = state.students.find(function (item) {
+      return item.id === row.getAttribute('data-student-id');
     });
-    if (!employee) return;
+    if (!student) return;
 
-    employee.status = radio.value;
-    updateRow(employee);
+    student.status = radio.value;
+    updateRow(student);
     updateCounters();
     updateSaveBar();
   });
 
   body.addEventListener('input', function (event) {
-    var row = event.target.closest('[data-employee-id]');
+    var row = event.target.closest('[data-student-id]');
     if (!row) return;
-    var employee = state.employees.find(function (item) {
-      return item.id === row.getAttribute('data-employee-id');
+    var student = state.students.find(function (item) {
+      return item.id === row.getAttribute('data-student-id');
     });
-    if (!employee) return;
+    if (!student) return;
 
     if (
-      event.target === employee.checkInInput ||
-      event.target === employee.checkOutInput ||
-      event.target === employee.noteInput
+      event.target === student.checkInInput ||
+      event.target === student.checkOutInput ||
+      event.target === student.noteInput
     ) {
-      readInput(employee, event.target);
+      readInput(student, event.target);
     }
   });
 

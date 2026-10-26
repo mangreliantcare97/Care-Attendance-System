@@ -23,13 +23,13 @@ import {
  *    `time_off` become `on_leave`
  */
 export interface DesiredAttendanceRow {
-  employeeId: string;
+  studentId: string;
   date: string;
   status: 'on_leave' | 'vacation';
 }
 
 export interface LeaveLike {
-  employeeId: unknown;
+  studentId: unknown;
   type: LeaveType;
   startDate: string;
   endDate: string;
@@ -47,14 +47,14 @@ export function desiredRowsForLeave(
   const status = leave.type === 'vacation' ? 'vacation' : 'on_leave';
 
   return countedDatesForLeave(leave, holidayDates).map((date) => ({
-    employeeId: String(leave.employeeId),
+    studentId: String(leave.studentId),
     date,
     status,
   }));
 }
 
 /**
- * Did Mongo refuse a write because a row for that employee and day already
+ * Did Mongo refuse a write because a row for that student and day already
  * exists (the unique index)? That is expected, not an error — it means a
  * manual row owns the day.
  */
@@ -85,12 +85,12 @@ function isDuplicateKeyError(error: unknown): boolean {
  *
  * It only ever touches rows with `source: 'leave_sync'` and this exact
  * `leaveId`:
- *  - rows for another employee or a day no longer in the range are deleted
+ *  - rows for another student or a day no longer in the range are deleted
  *  - rows for a day that is still in the range get the current status
  *  - missing days are inserted
  *
  * A row that already exists for a day — most importantly a `source: 'manual'`
- * row — is never overwritten or deleted. The unique `(employeeId, date)`
+ * row — is never overwritten or deleted. The unique `(studentId, date)`
  * index turns that case into a duplicate-key conflict, which is ignored.
  */
 export async function reconcileLeave(leaveId: string): Promise<{ inserted: number; deleted: number }> {
@@ -115,7 +115,7 @@ export async function reconcileLeave(leaveId: string): Promise<{ inserted: numbe
 
   const desired = desiredRowsForLeave(
     {
-      employeeId: leave.employeeId,
+      studentId: leave.studentId,
       type: leave.type as LeaveType,
       startDate: leave.startDate,
       endDate: leave.endDate,
@@ -125,15 +125,15 @@ export async function reconcileLeave(leaveId: string): Promise<{ inserted: numbe
   );
 
   const targetLeaveId = new Types.ObjectId(leaveId);
-  const employeeId = new Types.ObjectId(String(leave.employeeId));
+  const studentId = new Types.ObjectId(String(leave.studentId));
   const keepDates = desired.map((row) => row.date);
 
   // 1. Delete the rows this leave owns that are no longer wanted — either the
-  //    day left the range or the leave moved to another employee.
+  //    day left the range or the leave moved to another student.
   const removed = await AttendanceModel.deleteMany({
     source: 'leave_sync',
     leaveId: targetLeaveId,
-    $or: [{ employeeId: { $ne: employeeId } }, { date: { $nin: keepDates } }],
+    $or: [{ studentId: { $ne: studentId } }, { date: { $nin: keepDates } }],
   });
 
   // 2. Refresh the status of the rows that stay (the type may have changed).
@@ -149,7 +149,7 @@ export async function reconcileLeave(leaveId: string): Promise<{ inserted: numbe
   let inserted = 0;
 
   if (desired.length > 0) {
-    const existing = await AttendanceModel.find({ employeeId, date: { $in: keepDates } })
+    const existing = await AttendanceModel.find({ studentId, date: { $in: keepDates } })
       .select('date')
       .lean();
     const existingDates = new Set(existing.map((row) => row.date));
@@ -160,7 +160,7 @@ export async function reconcileLeave(leaveId: string): Promise<{ inserted: numbe
         await AttendanceModel.bulkWrite(
           missing.map((row) => ({
             updateOne: {
-              filter: { employeeId, date: row.date, source: 'leave_sync', leaveId: targetLeaveId },
+              filter: { studentId, date: row.date, source: 'leave_sync', leaveId: targetLeaveId },
               update: {
                 $setOnInsert: { status: row.status, note: '', createdBy: null, updatedBy: null },
               },

@@ -2,7 +2,7 @@ import { Router, type RequestHandler } from 'express';
 import { createAuthRouter, type AuthRouterOptions } from './auth.ts';
 import { adminsRouter } from './admins.ts';
 import { departmentsRouter } from './departments.ts';
-import { employeesRouter } from './employees.ts';
+import { studentsRouter } from './students.ts';
 import { attendanceRouter } from './attendance.ts';
 import { overtimeRouter } from './overtime.ts';
 import { leavesRouter } from './leaves.ts';
@@ -59,7 +59,7 @@ export function createApiRouter(options: ApiRouterOptions = {}): Router {
   );
   router.use('/admins', adminsRouter);
   router.use('/departments', departmentsRouter);
-  router.use('/employees', employeesRouter);
+  router.use('/students', studentsRouter);
   router.use('/attendance', attendanceRouter);
   router.use('/overtime', overtimeRouter);
   router.use('/leaves', leavesRouter);

@@ -1,6 +1,6 @@
 /**
  * Leave & vacation: working-day calculation, the overlap rule, the
- * leave → attendance sync and the employee delete guard.
+ * leave → attendance sync and the student delete guard.
  *
  * The sync tests inspect the attendance collection directly: the API is the
  * only writer of `leave_sync` rows, so the database is the source of truth.
@@ -9,7 +9,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createAdmin,
-  createEmployee,
+  createStudent,
   signIn,
   startTestApp,
   OWNER_EMAIL,
@@ -43,10 +43,10 @@ describe('leaves', () => {
 
   it('refuses a state changing request without a CSRF token', async () => {
     const { agent } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave CSRF Person' });
+    const student = await createStudent({ name: 'Leave CSRF Person' });
 
     const response = await agent.post('/api/leaves').send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2026-06-01',
       endDate: '2026-06-05',
@@ -58,10 +58,10 @@ describe('leaves', () => {
 
   it('computes days as working days in the inclusive range', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Days Person' });
+    const student = await createStudent({ name: 'Leave Days Person' });
 
     const response = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2026-06-01',
       endDate: '2026-06-07',
@@ -73,7 +73,7 @@ describe('leaves', () => {
     assert.equal(response.body.data.leave.days, 5);
 
     const weekend = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'time_off',
       startDate: '2026-06-13',
       endDate: '2026-06-14',
@@ -86,8 +86,8 @@ describe('leaves', () => {
 
   it('rejects a reversed range and a range longer than 366 days', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Range Person' });
-    const payload = { employeeId: String(employee._id), type: 'leave' };
+    const student = await createStudent({ name: 'Leave Range Person' });
+    const payload = { studentId: String(student._id), type: 'leave' };
 
     const reversed = await agent
       .post('/api/leaves')
@@ -106,10 +106,10 @@ describe('leaves', () => {
     assert.equal(tooLong.body.error.code, 'leave_span_too_long');
   });
 
-  it('rejects an overlap with an approved leave of the same employee', async () => {
+  it('rejects an overlap with an approved leave of the same student', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Overlap Person' });
-    const payload = { employeeId: String(employee._id), type: 'leave' };
+    const student = await createStudent({ name: 'Leave Overlap Person' });
+    const payload = { studentId: String(student._id), type: 'leave' };
 
     const approved = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
       ...payload,
@@ -156,10 +156,10 @@ describe('leaves', () => {
 
   it('creates attendance rows only on working days of an approved leave', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Sync Person' });
+    const student = await createStudent({ name: 'Leave Sync Person' });
 
     const response = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2026-08-03',
       endDate: '2026-08-09',
@@ -183,8 +183,8 @@ describe('leaves', () => {
 
   it('maps vacation to the vacation status and writes nothing for pending or rejected leaves', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Status Person' });
-    const payload = { employeeId: String(employee._id), type: 'vacation' };
+    const student = await createStudent({ name: 'Leave Status Person' });
+    const payload = { studentId: String(student._id), type: 'vacation' };
 
     const approved = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
       ...payload,
@@ -217,8 +217,8 @@ describe('leaves', () => {
 
   it('removes only the rows of the leave that is rejected', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Reject Person' });
-    const payload = { employeeId: String(employee._id), type: 'leave', status: 'approved' };
+    const student = await createStudent({ name: 'Leave Reject Person' });
+    const payload = { studentId: String(student._id), type: 'leave', status: 'approved' };
 
     const first = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
       ...payload,
@@ -243,11 +243,11 @@ describe('leaves', () => {
 
   it('never overwrites or deletes a manual attendance row', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Manual Person' });
+    const student = await createStudent({ name: 'Leave Manual Person' });
     const { AttendanceModel } = await import('../src/models/Attendance.ts');
 
     const manual = await AttendanceModel.create({
-      employeeId: employee._id,
+      studentId: student._id,
       date: '2026-11-04',
       status: 'present',
       checkIn: '09:00',
@@ -256,7 +256,7 @@ describe('leaves', () => {
     });
 
     const response = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2026-11-02',
       endDate: '2026-11-06',
@@ -283,17 +283,17 @@ describe('leaves', () => {
       .delete(`/api/leaves/${response.body.data.leave.id}`)
       .set('X-CSRF-Token', csrf);
 
-    assert.equal(await AttendanceModel.countDocuments({ employeeId: employee._id }), 1);
+    assert.equal(await AttendanceModel.countDocuments({ studentId: student._id }), 1);
     assert.equal(await AttendanceModel.countDocuments({ _id: manual._id }), 1);
   });
 
   it('detaches a sync row when it is edited manually and keeps it afterwards', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Detach Person' });
+    const student = await createStudent({ name: 'Leave Detach Person' });
     const { AttendanceModel } = await import('../src/models/Attendance.ts');
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'vacation',
       startDate: '2027-01-04',
       endDate: '2027-01-08',
@@ -318,16 +318,16 @@ describe('leaves', () => {
       .send({ status: 'rejected' });
 
     assert.equal(await rowsForLeave(created.body.data.leave.id).then((rows) => rows.length), 0);
-    assert.equal(await AttendanceModel.countDocuments({ employeeId: employee._id }), 1);
+    assert.equal(await AttendanceModel.countDocuments({ studentId: student._id }), 1);
     assert.equal(await AttendanceModel.countDocuments({ _id: leaveRows[0]._id }), 1);
   });
 
   it('adds and removes the right days when the dates change', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Edit Dates Person' });
+    const student = await createStudent({ name: 'Leave Edit Dates Person' });
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2027-02-01',
       endDate: '2027-02-03',
@@ -355,13 +355,13 @@ describe('leaves', () => {
     );
   });
 
-  it('cleans the old employee when a leave is moved to another employee', async () => {
+  it('cleans the old student when a leave is moved to another student', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const first = await createEmployee({ name: 'Leave Move From' });
-    const second = await createEmployee({ name: 'Leave Move To' });
+    const first = await createStudent({ name: 'Leave Move From' });
+    const second = await createStudent({ name: 'Leave Move To' });
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(first._id),
+      studentId: String(first._id),
       type: 'leave',
       startDate: '2027-03-01',
       endDate: '2027-03-05',
@@ -373,23 +373,23 @@ describe('leaves', () => {
     const response = await agent
       .patch(`/api/leaves/${created.body.data.leave.id}`)
       .set('X-CSRF-Token', csrf)
-      .send({ employeeId: String(second._id) });
+      .send({ studentId: String(second._id) });
 
     assert.equal(response.status, 200);
 
     const rows = await rowsForLeave(created.body.data.leave.id);
     assert.equal(rows.length, 5);
     for (const row of rows) {
-      assert.equal(String(row.employeeId), String(second._id));
+      assert.equal(String(row.studentId), String(second._id));
     }
   });
 
   it('removes all of its rows when a leave is deleted', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Delete Person' });
+    const student = await createStudent({ name: 'Leave Delete Person' });
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2027-04-05',
       endDate: '2027-04-09',
@@ -412,11 +412,11 @@ describe('leaves', () => {
 
   it('is idempotent when reconciled twice', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Idempotent Person' });
+    const student = await createStudent({ name: 'Leave Idempotent Person' });
     const { reconcileLeave } = await import('../src/services/attendanceSync.ts');
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2027-05-03',
       endDate: '2027-05-07',
@@ -435,29 +435,29 @@ describe('leaves', () => {
     );
   });
 
-  it('keeps two employees independent', async () => {
+  it('keeps two students independent', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const first = await createEmployee({ name: 'Leave Indep Alpha' });
-    const second = await createEmployee({ name: 'Leave Indep Beta' });
+    const first = await createStudent({ name: 'Leave Indep Alpha' });
+    const second = await createStudent({ name: 'Leave Indep Beta' });
 
     const payload = { type: 'leave', startDate: '2027-06-07', endDate: '2027-06-11', status: 'approved' };
 
     const a = await agent
       .post('/api/leaves')
       .set('X-CSRF-Token', csrf)
-      .send({ ...payload, employeeId: String(first._id) });
+      .send({ ...payload, studentId: String(first._id) });
     const b = await agent
       .post('/api/leaves')
       .set('X-CSRF-Token', csrf)
-      .send({ ...payload, employeeId: String(second._id) });
+      .send({ ...payload, studentId: String(second._id) });
 
     const rowsA = await rowsForLeave(a.body.data.leave.id);
     const rowsB = await rowsForLeave(b.body.data.leave.id);
 
     assert.equal(rowsA.length, 5);
     assert.equal(rowsB.length, 5);
-    assert.equal(String(rowsA[0].employeeId), String(first._id));
-    assert.equal(String(rowsB[0].employeeId), String(second._id));
+    assert.equal(String(rowsA[0].studentId), String(first._id));
+    assert.equal(String(rowsB[0].studentId), String(second._id));
 
     await agent.delete(`/api/leaves/${a.body.data.leave.id}`).set('X-CSRF-Token', csrf);
     assert.equal((await rowsForLeave(a.body.data.leave.id)).length, 0);
@@ -466,8 +466,8 @@ describe('leaves', () => {
 
   it('totals approved working days per year and type', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Totals Person' });
-    const base = { employeeId: String(employee._id), status: 'approved' };
+    const student = await createStudent({ name: 'Leave Totals Person' });
+    const base = { studentId: String(student._id), status: 'approved' };
 
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
       ...base,
@@ -489,14 +489,14 @@ describe('leaves', () => {
     });
     // A pending leave is not part of the totals.
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2026-06-10',
       endDate: '2026-06-12',
       status: 'pending',
     });
 
-    const response = await agent.get(`/api/employees/${employee._id}/leave-totals`);
+    const response = await agent.get(`/api/students/${student._id}/leave-totals`);
     assert.equal(response.status, 200);
 
     const years = response.body.data.totalsByYear;
@@ -510,38 +510,38 @@ describe('leaves', () => {
     assert.equal(y2025.leave, 3);
     assert.equal(y2025.total, 3);
 
-    const history = await agent.get(`/api/employees/${employee._id}/leaves`);
+    const history = await agent.get(`/api/students/${student._id}/leaves`);
     assert.equal(history.body.data.leaves.length, 4);
   });
 
-  it('filters by employee, type and status', async () => {
+  it('filters by student, type and status', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const first = await createEmployee({ name: 'Leave Filter Alpha' });
-    const second = await createEmployee({ name: 'Leave Filter Beta' });
+    const first = await createStudent({ name: 'Leave Filter Alpha' });
+    const second = await createStudent({ name: 'Leave Filter Beta' });
 
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(first._id),
+      studentId: String(first._id),
       type: 'leave',
       startDate: '2027-07-05',
       endDate: '2027-07-06',
       status: 'approved',
     });
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(second._id),
+      studentId: String(second._id),
       type: 'vacation',
       startDate: '2027-07-05',
       endDate: '2027-07-06',
       status: 'approved',
     });
 
-    const byEmployee = await agent.get(`/api/leaves?employeeId=${first._id}`);
-    assert.equal(byEmployee.status, 200);
-    assert.equal(byEmployee.body.data.leaves.length, 1);
-    assert.equal(byEmployee.body.data.leaves[0].employeeId.name, 'Leave Filter Alpha');
+    const byStudent = await agent.get(`/api/leaves?studentId=${first._id}`);
+    assert.equal(byStudent.status, 200);
+    assert.equal(byStudent.body.data.leaves.length, 1);
+    assert.equal(byStudent.body.data.leaves[0].studentId.name, 'Leave Filter Alpha');
 
     const byType = await agent.get('/api/leaves?type=vacation&status=approved');
     const names = byType.body.data.leaves.map(
-      (leave: { employeeId: { name: string } }) => leave.employeeId.name,
+      (leave: { studentId: { name: string } }) => leave.studentId.name,
     );
     assert.equal(names.includes('Leave Filter Beta'), true);
     assert.equal(names.includes('Leave Filter Alpha'), false);
@@ -551,35 +551,35 @@ describe('leaves', () => {
     const { agent, csrf } = await signIn(context.app);
     const { DepartmentModel } = await import('../src/models/Department.ts');
     const department = await DepartmentModel.create({ name: 'Leave Department' });
-    const employee = await createEmployee({
+    const student = await createStudent({
       name: 'Leave Department Person',
       departmentId: String(department._id),
     });
 
     const created = await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2026-08-10',
       endDate: '2026-08-11',
       status: 'approved',
     });
 
-    const list = await agent.get(`/api/leaves?employeeId=${employee._id}`);
-    assert.equal(list.body.data.leaves[0].employeeId.departmentId.name, 'Leave Department');
+    const list = await agent.get(`/api/leaves?studentId=${student._id}`);
+    assert.equal(list.body.data.leaves[0].studentId.departmentId.name, 'Leave Department');
 
     const detail = await agent.get(`/api/leaves/${created.body.data.leave.id}`);
-    assert.equal(detail.body.data.leave.employeeId.departmentId.name, 'Leave Department');
+    assert.equal(detail.body.data.leave.studentId.departmentId.name, 'Leave Department');
 
-    const csv = await agent.get(`/api/leaves/export.csv?employeeId=${employee._id}`);
+    const csv = await agent.get(`/api/leaves/export.csv?studentId=${student._id}`);
     assert.match(csv.text, /Leave Department/);
   });
 
   it('exports a CSV that neutralises formulas', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Csv Person' });
+    const student = await createStudent({ name: 'Leave Csv Person' });
 
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       category: 'casual',
       startDate: '2026-08-04',
@@ -588,20 +588,20 @@ describe('leaves', () => {
       status: 'approved',
     });
 
-    const response = await agent.get(`/api/leaves/export.csv?employeeId=${employee._id}`);
+    const response = await agent.get(`/api/leaves/export.csv?studentId=${student._id}`);
 
     assert.equal(response.status, 200);
     assert.match(response.headers['content-type'], /text\/csv/);
-    assert.match(response.text, /Employee,Department,Type,Category,From,To,Working days,Status,Reason/);
+    assert.match(response.text, /Student,Department,Type,Category,From,To,Working days,Status,Reason/);
     assert.match(response.text, /'=cmd\|calc/);
   });
 
-  it('blocks deleting an employee that has leave records', async () => {
+  it('blocks deleting a student that has leave records', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Leave Guard Person' });
+    const student = await createStudent({ name: 'Leave Guard Person' });
 
     await agent.post('/api/leaves').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       type: 'leave',
       startDate: '2026-12-01',
       endDate: '2026-12-02',
@@ -609,10 +609,10 @@ describe('leaves', () => {
     });
 
     const response = await agent
-      .delete(`/api/employees/${employee._id}`)
+      .delete(`/api/students/${student._id}`)
       .set('X-CSRF-Token', csrf);
 
     assert.equal(response.status, 409);
-    assert.equal(response.body.error.code, 'employee_has_records');
+    assert.equal(response.body.error.code, 'student_has_records');
   });
 });

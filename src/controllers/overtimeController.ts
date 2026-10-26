@@ -13,7 +13,7 @@ export const overtimeIdSchema = z.object({ id: idString });
 export const overtimeQuerySchema = z.object({
   from: dateString.optional(),
   to: dateString.optional(),
-  employeeId: idString.optional(),
+  studentId: idString.optional(),
   departmentId: idString.optional(),
   page: z.coerce.number().int().min(1).optional(),
   perPage: z.coerce.number().int().min(1).max(100).optional(),
@@ -25,7 +25,7 @@ export const overtimeSummarySchema = z.object({
 });
 
 export const createOvertimeSchema = z.object({
-  employeeId: idString,
+  studentId: idString,
   date: dateString,
   hours: z.coerce
     .number()
@@ -74,11 +74,11 @@ export async function exportCsv(req: Request, res: Response): Promise<void> {
   const rows = (await overtime.overtimeRows(query)) as Array<Record<string, unknown>>;
 
   const data = rows.map((record) => {
-    const employee = (record.employeeId ?? {}) as Record<string, unknown>;
-    const department = (employee.departmentId ?? {}) as Record<string, unknown>;
+    const student = (record.studentId ?? {}) as Record<string, unknown>;
+    const department = (student.departmentId ?? {}) as Record<string, unknown>;
 
     return [
-      employee.name ?? '',
+      student.name ?? '',
       department.name ?? '',
       record.date,
       record.hours,
@@ -86,7 +86,7 @@ export async function exportCsv(req: Request, res: Response): Promise<void> {
     ];
   });
 
-  const csv = toCsv(['Employee', 'Department', 'Date', 'Hours', 'Note'], data);
+  const csv = toCsv(['Student', 'Department', 'Date', 'Hours', 'Note'], data);
 
   res.set('Content-Type', 'text/csv; charset=utf-8');
   res.set('Content-Disposition', `attachment; filename="overtime-${Date.now()}.csv"`);
@@ -99,7 +99,7 @@ export async function exportSummaryCsv(req: Request, res: Response): Promise<voi
   const result = await overtime.overtimeSummary(query);
 
   const csv = toCsv(
-    ['Employee', 'Department', 'Entries', 'Total hours'],
+    ['Student', 'Department', 'Entries', 'Total hours'],
     result.rows.map((row) => [row.name, row.department, row.entries, row.totalHours]),
   );
 

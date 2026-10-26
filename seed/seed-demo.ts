@@ -4,9 +4,9 @@
  *   npm run seed:demo
  *
  * The script refuses to run in production and refuses to touch a database that
- * already contains employees. It creates five departments, 25 fake employees,
+ * already contains students. It creates five departments, 25 fake students,
  * three months of attendance with roughly half of the team already marked
- * today, 14 approved leaves across different employees, overtime for the
+ * today, 14 approved leaves across different students, overtime for the
  * current and previous two months, and calendar events.
  *
  * The random generator is seeded with a constant, so the same data is produced
@@ -15,7 +15,7 @@
 import { connectDatabase, disconnectDatabase } from '../src/config/db.ts';
 import { env } from '../src/config/env.ts';
 import { DepartmentModel } from '../src/models/Department.ts';
-import { EmployeeModel } from '../src/models/Employee.ts';
+import { StudentModel } from '../src/models/Student.ts';
 import { AttendanceModel } from '../src/models/Attendance.ts';
 import { LeaveModel, type LeaveType } from '../src/models/Leave.ts';
 import { LeaveAllowanceModel } from '../src/models/LeaveAllowance.ts';
@@ -26,7 +26,7 @@ import { reconcileLeave } from '../src/services/attendanceSync.ts';
 import { addDays, eachDate, isWorkingDay, monthBounds, today } from '../src/utils/dates.ts';
 
 const SEED = 0x5eed1e;
-const EMPLOYEE_COUNT = 25;
+const STUDENT_COUNT = 25;
 
 /** Small deterministic PRNG (mulberry32). */
 function mulberry32(seed: number): () => number {
@@ -164,7 +164,7 @@ function makeUniqueNames(): Array<{ first: string; last: string; name: string }>
   const used = new Set<string>();
   const names: Array<{ first: string; last: string; name: string }> = [];
 
-  while (names.length < EMPLOYEE_COUNT) {
+  while (names.length < STUDENT_COUNT) {
     const first = pick(FIRST_NAMES);
     const last = pick(LAST_NAMES);
     const name = first + ' ' + last;
@@ -187,11 +187,11 @@ async function main(): Promise<void> {
   await connectDatabase();
 
   try {
-    const existingEmployees = await EmployeeModel.countDocuments();
+    const existingStudents = await StudentModel.countDocuments();
 
-    if (existingEmployees > 0) {
+    if (existingStudents > 0) {
       console.error(
-        `[seed:demo] refused: the database already contains ${existingEmployees} employee(s). ` +
+        `[seed:demo] refused: the database already contains ${existingStudents} student(s). ` +
           'Use an empty database (for example MONGODB_URI=mongodb://127.0.0.1:27017/lean-hrm-demo).',
       );
       process.exitCode = 1;
@@ -227,9 +227,9 @@ async function main(): Promise<void> {
       });
     }
 
-    // ---- employees -------------------------------------------------------
+    // ---- students -------------------------------------------------------
     const names = makeUniqueNames();
-    const employees = await EmployeeModel.insertMany(
+    const students = await StudentModel.insertMany(
       names.map((entry, index) => {
         const department = departments[index % departments.length] as (typeof departments)[number];
         return {
@@ -247,8 +247,8 @@ async function main(): Promise<void> {
     // ---- holiday allowances ---------------------------------------------
     const allowanceYear = Number(todayDate.slice(0, 4));
     await LeaveAllowanceModel.insertMany(
-      employees.map((employee) => ({
-        employeeId: employee._id,
+      students.map((student) => ({
+        studentId: student._id,
         year: allowanceYear,
         allowance: 28,
         note: '',
@@ -303,10 +303,10 @@ async function main(): Promise<void> {
     let leaveRows = 0;
 
     for (let index = 0; index < APPROVED_LEAVE_COUNT; index += 1) {
-      // A different employee for every leave. The three age buckets place the
+      // A different student for every leave. The three age buckets place the
       // starts across the oldest, middle and newest month of the demo window.
-      const employee = employees[index];
-      if (!employee) continue;
+      const student = students[index];
+      if (!student) continue;
 
       const bucket = index % 3;
       let start = addDays(todayDate, -randomInt(8 + bucket * 30, 37 + bucket * 30));
@@ -325,7 +325,7 @@ async function main(): Promise<void> {
 
       const type = pick(leaveTypes);
       const leave = await LeaveModel.create({
-        employeeId: employee._id,
+        studentId: student._id,
         type,
         category: type === 'vacation' ? 'annual' : 'casual',
         startDate: start,
@@ -349,18 +349,18 @@ async function main(): Promise<void> {
       date: { $gte: rangeStart, $lte: rangeEnd },
       source: 'leave_sync',
     })
-      .select('employeeId date')
+      .select('studentId date')
       .lean();
     const leaveKeys = new Set(
-      leaveAttendance.map((row) => String(row.employeeId) + '|' + row.date),
+      leaveAttendance.map((row) => String(row.studentId) + '|' + row.date),
     );
 
     const attendanceRows: Array<Record<string, unknown>> = [];
     const dates = eachDate(rangeStart, rangeEnd).filter((date) => isWorkingDay(date));
 
-    for (const employee of employees) {
+    for (const student of students) {
       for (const date of dates) {
-        if (leaveKeys.has(String(employee._id) + '|' + date)) continue;
+        if (leaveKeys.has(String(student._id) + '|' + date)) continue;
 
         const roll = random();
         if (roll >= 0.91) continue; // Some days stay unmarked on purpose.
@@ -374,7 +374,7 @@ async function main(): Promise<void> {
         const checkOut = timeString(randomInt(17, 18), randomInt(0, 30));
 
         attendanceRows.push({
-          employeeId: employee._id,
+          studentId: student._id,
           date,
           status,
           checkIn: status === 'absent' ? null : checkIn,
@@ -392,14 +392,14 @@ async function main(): Promise<void> {
     // ---- today's sheet ---------------------------------------------------
     // Exactly half of the team is marked, so the dashboard "Not marked yet"
     // card and the sheet's mark-all flow have something to show immediately.
-    const todayRows: Array<Record<string, unknown>> = employees.slice(0, 13).map((employee, index) => {
+    const todayRows: Array<Record<string, unknown>> = students.slice(0, 13).map((student, index) => {
       let status: 'present' | 'late' | 'absent' = 'present';
       if (index >= 9 && index < 11) status = 'late';
       if (index >= 11) status = 'absent';
 
       const late = status === 'late';
       return {
-        employeeId: employee._id,
+        studentId: student._id,
         date: todayDate,
         status,
         checkIn:
@@ -416,7 +416,7 @@ async function main(): Promise<void> {
     await AttendanceModel.insertMany(todayRows);
 
     // ---- overtime --------------------------------------------------------
-    // Two entries for eight different employees in each of the current and
+    // Two entries for eight different students in each of the current and
     // previous two calendar months. The current month stops at today.
     const overtimeRows: Array<Record<string, unknown>> = [];
     const currentYear = Number(todayDate.slice(0, 4));
@@ -435,16 +435,16 @@ async function main(): Promise<void> {
       const dates = eachDate(bounds.start, lastDate);
       if (dates.length === 0) continue;
 
-      const employeesThisMonth: typeof employees = [];
+      const studentsThisMonth: typeof students = [];
       for (let index = 0; index < 8; index += 1) {
-        const employee = employees[(monthOffset * 7 + index) % employees.length];
-        if (employee) employeesThisMonth.push(employee);
+        const student = students[(monthOffset * 7 + index) % students.length];
+        if (student) studentsThisMonth.push(student);
       }
 
-      for (const employee of employeesThisMonth) {
+      for (const student of studentsThisMonth) {
         for (let entry = 0; entry < 2; entry += 1) {
           overtimeRows.push({
-            employeeId: employee._id,
+            studentId: student._id,
             date: pick(dates),
             hours: pick([0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4] as const),
             note: pick([
@@ -462,7 +462,7 @@ async function main(): Promise<void> {
 
     console.log('[seed:demo] done — demo data is for local/demo use only.');
     console.log(`  departments: ${departments.length}`);
-    console.log(`  employees:   ${employees.length}`);
+    console.log(`  students:   ${students.length}`);
     console.log(
       `  attendance:  ${attendanceRows.length} historical + ${todayRows.length} today (${rangeStart} … ${todayDate})`,
     );

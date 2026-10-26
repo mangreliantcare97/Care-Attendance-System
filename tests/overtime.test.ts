@@ -1,12 +1,12 @@
 /**
  * Overtime: quarter-hour entries, the 24 hour daily limit, filters, the
- * monthly summary, the CSV export and the employee delete guard.
+ * monthly summary, the CSV export and the student delete guard.
  */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createAdmin,
-  createEmployee,
+  createStudent,
   signIn,
   startTestApp,
   OWNER_EMAIL,
@@ -34,10 +34,10 @@ describe('overtime', () => {
 
   it('refuses a state changing request without a CSRF token', async () => {
     const { agent } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Overtime CSRF Person' });
+    const student = await createStudent({ name: 'Overtime CSRF Person' });
 
     const response = await agent.post('/api/overtime').send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       date: '2026-06-01',
       hours: 2,
     });
@@ -46,12 +46,12 @@ describe('overtime', () => {
     assert.equal(response.body.error.code, 'csrf_token_mismatch');
   });
 
-  it('creates entries and lists them with their employee', async () => {
+  it('creates entries and lists them with their student', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Overtime List Person' });
+    const student = await createStudent({ name: 'Overtime List Person' });
 
     const response = await agent.post('/api/overtime').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       date: '2026-06-02',
       hours: 2.25,
       note: 'Month end',
@@ -64,7 +64,7 @@ describe('overtime', () => {
     assert.equal(list.status, 200);
 
     const record = list.body.data.records.find(
-      (item: { employeeId: { name?: string } }) => item.employeeId?.name === 'Overtime List Person',
+      (item: { studentId: { name?: string } }) => item.studentId?.name === 'Overtime List Person',
     );
 
     assert.ok(record);
@@ -74,8 +74,8 @@ describe('overtime', () => {
 
   it('allows several entries per day but keeps the day total at or below 24', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Overtime Limit Person' });
-    const payload = { employeeId: String(employee._id), date: '2026-06-03' };
+    const student = await createStudent({ name: 'Overtime Limit Person' });
+    const payload = { studentId: String(student._id), date: '2026-06-03' };
 
     const first = await agent
       .post('/api/overtime')
@@ -99,7 +99,7 @@ describe('overtime', () => {
     assert.equal(exact.status, 200);
 
     const { OvertimeModel } = await import('../src/models/Overtime.ts');
-    const entries = await OvertimeModel.find({ employeeId: employee._id, date: '2026-06-03' });
+    const entries = await OvertimeModel.find({ studentId: student._id, date: '2026-06-03' });
 
     assert.equal(entries.length, 2);
     assert.equal(entries.reduce((sum, entry) => sum + entry.hours, 0), 24);
@@ -107,8 +107,8 @@ describe('overtime', () => {
 
   it('rejects a day total above 24 when an entry is edited', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Overtime Edit Limit' });
-    const payload = { employeeId: String(employee._id), date: '2026-06-04' };
+    const student = await createStudent({ name: 'Overtime Edit Limit' });
+    const payload = { studentId: String(student._id), date: '2026-06-04' };
 
     const first = await agent
       .post('/api/overtime')
@@ -136,8 +136,8 @@ describe('overtime', () => {
 
   it('accepts only quarter-hour steps within 0.25 and 24', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Overtime Steps' });
-    const payload = { employeeId: String(employee._id), date: '2026-06-05' };
+    const student = await createStudent({ name: 'Overtime Steps' });
+    const payload = { studentId: String(student._id), date: '2026-06-05' };
 
     const odd = await agent
       .post('/api/overtime')
@@ -159,23 +159,23 @@ describe('overtime', () => {
     assert.equal(quarter.status, 200);
   });
 
-  it('summarises one month per employee', async () => {
+  it('summarises one month per student', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const first = await createEmployee({ name: 'Summary Alpha' });
-    const second = await createEmployee({ name: 'Summary Beta' });
+    const first = await createStudent({ name: 'Summary Alpha' });
+    const second = await createStudent({ name: 'Summary Beta' });
 
     await agent.post('/api/overtime').set('X-CSRF-Token', csrf).send({
-      employeeId: String(first._id),
+      studentId: String(first._id),
       date: '2026-07-01',
       hours: 2,
     });
     await agent.post('/api/overtime').set('X-CSRF-Token', csrf).send({
-      employeeId: String(first._id),
+      studentId: String(first._id),
       date: '2026-07-02',
       hours: 3.5,
     });
     await agent.post('/api/overtime').set('X-CSRF-Token', csrf).send({
-      employeeId: String(second._id),
+      studentId: String(second._id),
       date: '2026-07-03',
       hours: 1,
     });
@@ -199,10 +199,10 @@ describe('overtime', () => {
 
   it('deletes an entry', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Overtime Deletable' });
+    const student = await createStudent({ name: 'Overtime Deletable' });
 
     const created = await agent.post('/api/overtime').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       date: '2026-06-08',
       hours: 2,
     });
@@ -217,10 +217,10 @@ describe('overtime', () => {
 
   it('exports a CSV that neutralises formulas', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Overtime Csv Person' });
+    const student = await createStudent({ name: 'Overtime Csv Person' });
 
     await agent.post('/api/overtime').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       date: '2026-08-01',
       hours: 2,
       note: '=cmd|calc',
@@ -230,29 +230,29 @@ describe('overtime', () => {
 
     assert.equal(response.status, 200);
     assert.match(response.headers['content-type'], /text\/csv/);
-    assert.match(response.text, /Employee,Department,Date,Hours,Note/);
+    assert.match(response.text, /Student,Department,Date,Hours,Note/);
     assert.match(response.text, /'=cmd\|calc/);
 
     const summary = await agent.get('/api/overtime/summary.csv?month=2026-08');
     assert.equal(summary.status, 200);
-    assert.match(summary.text, /Employee,Department,Entries,Total hours/);
+    assert.match(summary.text, /Student,Department,Entries,Total hours/);
   });
 
-  it('blocks deleting an employee that has overtime', async () => {
+  it('blocks deleting a student that has overtime', async () => {
     const { agent, csrf } = await signIn(context.app);
-    const employee = await createEmployee({ name: 'Overtime Guard Person' });
+    const student = await createStudent({ name: 'Overtime Guard Person' });
 
     await agent.post('/api/overtime').set('X-CSRF-Token', csrf).send({
-      employeeId: String(employee._id),
+      studentId: String(student._id),
       date: '2026-09-01',
       hours: 1,
     });
 
     const response = await agent
-      .delete(`/api/employees/${employee._id}`)
+      .delete(`/api/students/${student._id}`)
       .set('X-CSRF-Token', csrf);
 
     assert.equal(response.status, 409);
-    assert.equal(response.body.error.code, 'employee_has_records');
+    assert.equal(response.body.error.code, 'student_has_records');
   });
 });

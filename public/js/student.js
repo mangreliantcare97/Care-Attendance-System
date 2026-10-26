@@ -1,16 +1,16 @@
 /**
- * The employee profile: personal record, attendance and leave history.
+ * The student profile: personal record, attendance and leave history.
  */
 (function () {
   var html = window.HrmDom.html;
 
-  var employeeId = new URLSearchParams(window.location.search).get('id');
+  var studentId = new URLSearchParams(window.location.search).get('id');
   var monthInput = document.getElementById('profile-month');
 
   var allowanceYearSelect = document.getElementById('allowance-year');
   var allowanceMonthSelect = document.getElementById('allowance-month');
   var allowanceEditButton = document.getElementById('allowance-edit');
-  var allowanceEmployee = null;
+  var allowanceStudent = null;
   var allowanceSummary = null;
   var allowanceSummaryRequest = 0;
   var allowanceMonthRequest = 0;
@@ -106,9 +106,9 @@
     return MONTH_NAMES[month - 1] || String(month);
   }
 
-  function buildYearOptions(employee) {
+  function buildYearOptions(student) {
     var current = appToday().year;
-    var hireYear = employee && employee.hireDate ? Number(employee.hireDate.slice(0, 4)) : null;
+    var hireYear = student && student.hireDate ? Number(student.hireDate.slice(0, 4)) : null;
     var min = hireYear && hireYear >= 2000 ? Math.min(hireYear, current) : current;
     var max = Math.max(current + 1, hireYear || 0);
     var previous = Number(allowanceYearSelect.value);
@@ -287,8 +287,8 @@
 
     try {
       var response = await window.HrmApi.get(
-        '/api/employees/' +
-          employeeId +
+        '/api/students/' +
+          studentId +
           '/allowance/month?year=' +
           year +
           '&month=' +
@@ -316,7 +316,7 @@
               html`<td data-label="Category">${leave.category || '—'}</td>`,
               html`<td class="text-center" data-label="Days counted">${formatDays(leave.days)}</td>`,
               html`<td data-label="Reason">${leave.reason || '—'}</td>`,
-              html`<td data-label="Leave"><a href="/leaves.html?employeeId=${employeeId}&from=${leave.startDate}&to=${leave.endDate}">View leave</a></td>`,
+              html`<td data-label="Leave"><a href="/leaves.html?studentId=${studentId}&from=${leave.startDate}&to=${leave.endDate}">View leave</a></td>`,
             ];
           }),
           7,
@@ -370,7 +370,7 @@
   }
 
   async function loadAllowance() {
-    if (!allowanceEmployee) return;
+    if (!allowanceStudent) return;
 
     var year = Number(allowanceYearSelect.value);
     var request = ++allowanceSummaryRequest;
@@ -382,7 +382,7 @@
 
     try {
       var response = await window.HrmApi.get(
-        '/api/employees/' + employeeId + '/allowance?year=' + year,
+        '/api/students/' + studentId + '/allowance?year=' + year,
       );
       if (request !== allowanceSummaryRequest) return;
 
@@ -414,10 +414,10 @@
   }
 
   function proRataHint(allowance) {
-    if (!allowanceEmployee || !allowanceEmployee.hireDate) return '';
+    if (!allowanceStudent || !allowanceStudent.hireDate) return '';
     var year = Number(allowanceYearSelect.value);
-    var hireYear = Number(allowanceEmployee.hireDate.slice(0, 4));
-    var hireMonth = Number(allowanceEmployee.hireDate.slice(5, 7));
+    var hireYear = Number(allowanceStudent.hireDate.slice(0, 4));
+    var hireMonth = Number(allowanceStudent.hireDate.slice(5, 7));
 
     if (hireYear !== year || !(hireMonth > 1)) return '';
 
@@ -442,13 +442,13 @@
   }
 
   function openAllowanceModal() {
-    if (!allowanceSummary || !allowanceEmployee) return;
+    if (!allowanceSummary || !allowanceStudent) return;
 
     var form = document.getElementById('allowance-form');
     window.HrmForms.clear(form);
 
     document.getElementById('allowance-modal-subtitle').textContent =
-      allowanceEmployee.name + ' — ' + allowanceSummary.year;
+      allowanceStudent.name + ' — ' + allowanceSummary.year;
     document.getElementById('allowance-input').value = formatDays(allowanceSummary.allowance);
     document.getElementById('allowance-note').value = allowanceSummary.note || '';
     updateProRataHint();
@@ -462,45 +462,45 @@
     modal.modal('show');
   }
 
-  async function initAllowance(employee) {
-    allowanceEmployee = employee;
-    buildYearOptions(employee);
+  async function initAllowance(student) {
+    allowanceStudent = student;
+    buildYearOptions(student);
     buildMonthOptions(null);
     await loadAllowance();
   }
 
   async function loadProfile() {
-    if (!employeeId) {
-      window.HrmToast.error('No employee was selected.');
+    if (!studentId) {
+      window.HrmToast.error('No student was selected.');
       return;
     }
 
     try {
-      var response = await window.HrmApi.get('/api/employees/' + employeeId);
-      var employee = response.data.employee;
+      var response = await window.HrmApi.get('/api/students/' + studentId);
+      var student = response.data.student;
 
-      document.getElementById('profile-title').textContent = employee.name;
+      document.getElementById('profile-title').textContent = student.name;
       var photo = document.getElementById('profile-photo');
-      photo.src = employee.hasPhoto
-        ? '/api/employees/' + employee.id + '/photo'
+      photo.src = student.hasPhoto
+        ? '/api/students/' + student.id + '/photo'
         : '/assets/img/admin.jpg';
-      photo.alt = employee.hasPhoto ? employee.name : 'No photo';
+      photo.alt = student.hasPhoto ? student.name : 'No photo';
 
-      var department = employee.departmentId && typeof employee.departmentId === 'object'
-        ? employee.departmentId.name
+      var department = student.departmentId && typeof student.departmentId === 'object'
+        ? student.departmentId.name
         : null;
 
       document.getElementById('profile-details').innerHTML = html`${[
-        detail('Name', employee.name),
-        detail('Email', employee.email),
-        detail('Phone', employee.phone),
+        detail('Name', student.name),
+        detail('Email', student.email),
+        detail('Phone', student.phone),
         detail('Department', department),
-        detail('Position', employee.position),
-        detail('Hire date', employee.hireDate),
-        detail('Status', statusBadge(employee.status)),
+        detail('Position', student.position),
+        detail('Hire date', student.hireDate),
+        detail('Status', statusBadge(student.status)),
       ]}`;
 
-      await initAllowance(employee);
+      await initAllowance(student);
     } catch (error) {
       window.HrmToast.error(error.message);
     }
@@ -516,7 +516,7 @@
     });
 
     try {
-      var response = await window.HrmApi.get('/api/employees/' + employeeId + '/attendance?month=' + month);
+      var response = await window.HrmApi.get('/api/students/' + studentId + '/attendance?month=' + month);
       var records = response.data.records;
       var counts = response.data.counts;
 
@@ -582,7 +582,7 @@
     });
 
     try {
-      var response = await window.HrmApi.get('/api/employees/' + employeeId + '/leaves');
+      var response = await window.HrmApi.get('/api/students/' + studentId + '/leaves');
 
       if (!response.data.leaves.length) {
         window.HrmDom.renderListState(body, 7, {
@@ -628,7 +628,7 @@
     });
 
     try {
-      var response = await window.HrmApi.get('/api/employees/' + employeeId + '/leave-totals');
+      var response = await window.HrmApi.get('/api/students/' + studentId + '/leave-totals');
 
       if (!response.data.totalsByYear.length) {
         window.HrmDom.renderListState(body, 5, {
@@ -694,7 +694,7 @@
 
     try {
       await window.HrmApi.request(
-        '/api/employees/' + employeeId + '/allowance/' + year,
+        '/api/students/' + studentId + '/allowance/' + year,
         { method: 'PUT', body: payload },
       );
       window.jQuery('#allowance-modal').modal('hide');

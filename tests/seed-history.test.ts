@@ -19,7 +19,7 @@ import {
   type TestContext,
 } from './helpers.ts';
 import type {
-  SeedEmployeeRecord,
+  SeedStudentRecord,
   SeedHistoryResult,
 } from '../seed/seed-history-data.ts';
 
@@ -68,16 +68,16 @@ after(async () => {
   await context?.stop();
 });
 
-function attendanceKey(employeeId: string, date: string): string {
-  return `${employeeId}|${date}`;
+function attendanceKey(studentId: string, date: string): string {
+  return `${studentId}|${date}`;
 }
 
 function isoWeekday(date: string): number {
   return ((new Date(`${date}T00:00:00.000Z`).getUTCDay() + 6) % 7) + 1;
 }
 
-async function rawTopEmployees(month: string): Promise<Array<{
-  employeeId: string;
+async function rawTopStudents(month: string): Promise<Array<{
+  studentId: string;
   name: string;
   score: number;
   present: number;
@@ -94,25 +94,25 @@ async function rawTopEmployees(month: string): Promise<Array<{
     date: { $gte: start, $lte: end },
     status: { $in: ['present', 'late', 'absent'] },
   })
-    .select('employeeId status')
+    .select('studentId status')
     .lean();
 
   const active = new Map(
-    result.employees
-      .filter((employee) => employee.status === 'active')
-      .map((employee) => [employee.id, employee]),
+    result.students
+      .filter((student) => student.status === 'active')
+      .map((student) => [student.id, student]),
   );
-  const byEmployee = new Map<
+  const byStudent = new Map<
     string,
-    { employee: SeedEmployeeRecord; present: number; late: number; absent: number }
+    { student: SeedStudentRecord; present: number; late: number; absent: number }
   >();
 
   for (const row of rows) {
-    const employeeId = String(row.employeeId);
-    const employee = active.get(employeeId);
-    if (!employee) continue;
-    const entry = byEmployee.get(employeeId) ?? {
-      employee,
+    const studentId = String(row.studentId);
+    const student = active.get(studentId);
+    if (!student) continue;
+    const entry = byStudent.get(studentId) ?? {
+      student,
       present: 0,
       late: 0,
       absent: 0,
@@ -120,13 +120,13 @@ async function rawTopEmployees(month: string): Promise<Array<{
     if (row.status === 'present') entry.present += 1;
     if (row.status === 'late') entry.late += 1;
     if (row.status === 'absent') entry.absent += 1;
-    byEmployee.set(employeeId, entry);
+    byStudent.set(studentId, entry);
   }
 
-  return [...byEmployee.values()]
+  return [...byStudent.values()]
     .map((entry) => ({
-      employeeId: entry.employee.id,
-      name: entry.employee.name,
+      studentId: entry.student.id,
+      name: entry.student.name,
       score: entry.present * 3 - entry.late - entry.absent * 2,
       present: entry.present,
       late: entry.late,
@@ -146,10 +146,10 @@ describe('seed:history generator', () => {
     assert.match(first.checksum, /^[a-f0-9]{64}$/);
     assert.equal(first.checksum, result.checksum);
     assert.equal(result.counts.departments, 5);
-    assert.equal(result.counts.employees, 26);
-    assert.equal(result.counts.activeEmployees, 23);
-    assert.equal(result.counts.inactiveEmployees, 1);
-    assert.equal(result.counts.terminatedEmployees, 2);
+    assert.equal(result.counts.students, 26);
+    assert.equal(result.counts.activeStudents, 23);
+    assert.equal(result.counts.inactiveStudents, 1);
+    assert.equal(result.counts.terminatedStudents, 2);
     assert.equal(result.counts.newHires2025, 3);
     assert.equal(result.counts.newHires2026, 2);
     assert.equal(result.counts.attendance, 10_412);
@@ -166,12 +166,12 @@ describe('seed:history generator', () => {
     assert.ok(result.verification.assertions.length >= 100);
   });
 
-  it('creates the required departments and employees', async () => {
-    const { EmployeeModel } = await import('../src/models/Employee.ts');
+  it('creates the required departments and students', async () => {
+    const { StudentModel } = await import('../src/models/Student.ts');
     const { DepartmentModel } = await import('../src/models/Department.ts');
 
     const departments = await DepartmentModel.find().lean();
-    const employees = await EmployeeModel.find().lean();
+    const students = await StudentModel.find().lean();
 
     assert.equal(departments.length, 5);
     assert.deepEqual(
@@ -182,26 +182,26 @@ describe('seed:history generator', () => {
     const sizes = departments
       .map(
         (department) =>
-          employees.filter((employee) => String(employee.departmentId) === String(department._id))
+          students.filter((student) => String(student.departmentId) === String(department._id))
             .length,
       )
       .sort((a, b) => a - b);
     assert.deepEqual(sizes, [4, 4, 5, 6, 7]);
 
-    assert.equal(employees.length, 26);
-    assert.equal(employees.filter((employee) => employee.status === 'active').length, 23);
-    assert.equal(employees.filter((employee) => employee.status === 'inactive').length, 1);
-    assert.equal(employees.filter((employee) => employee.status === 'terminated').length, 2);
-    assert.equal(employees.filter((employee) => employee.hireDate?.startsWith('2025-')).length, 3);
-    assert.equal(employees.filter((employee) => employee.hireDate?.startsWith('2026-')).length, 2);
-    assert.equal(employees.some((employee) => Boolean(employee.photo?.data)), false);
+    assert.equal(students.length, 26);
+    assert.equal(students.filter((student) => student.status === 'active').length, 23);
+    assert.equal(students.filter((student) => student.status === 'inactive').length, 1);
+    assert.equal(students.filter((student) => student.status === 'terminated').length, 2);
+    assert.equal(students.filter((student) => student.hireDate?.startsWith('2025-')).length, 3);
+    assert.equal(students.filter((student) => student.hireDate?.startsWith('2026-')).length, 2);
+    assert.equal(students.some((student) => Boolean(student.photo?.data)), false);
 
-    const emails = employees.map((employee) => employee.email).filter((email): email is string => Boolean(email));
+    const emails = students.map((student) => student.email).filter((email): email is string => Boolean(email));
     assert.equal(emails.length, 21);
     assert.equal(new Set(emails).size, emails.length);
-    assert.equal(employees.filter((employee) => employee.email === null).length, 5);
+    assert.equal(students.filter((student) => student.email === null).length, 5);
 
-    const byKey = new Map(result.employees.map((employee) => [employee.key, employee]));
+    const byKey = new Map(result.students.map((student) => [student.key, student]));
     assert.equal(byKey.get('oscar-underwood')?.leftDate, '2025-06-30');
     assert.equal(byKey.get('jack-shaw')?.leftDate, '2026-08-14');
     assert.equal(byKey.get('leo-palmer')?.leftDate, '2026-03-31');
@@ -212,23 +212,23 @@ describe('seed:history generator', () => {
   it('writes complete attendance with the required status mix and no invalid rows', async () => {
     const { AttendanceModel } = await import('../src/models/Attendance.ts');
     const rows = await AttendanceModel.find().lean();
-    const employeeById = new Map(result.employees.map((employee) => [employee.id, employee]));
+    const studentById = new Map(result.students.map((student) => [student.id, student]));
     const approvedIds = new Set(result.approvedLeaves.map((leave) => leave.id));
     const pendingIds = new Set(result.pendingLeaves.map((leave) => leave.id));
     const rejectedIds = new Set(result.rejectedLeaves.map((leave) => leave.id));
 
     assert.equal(rows.length, 10_412);
 
-    const keys = rows.map((row) => attendanceKey(String(row.employeeId), row.date));
+    const keys = rows.map((row) => attendanceKey(String(row.studentId), row.date));
     assert.equal(new Set(keys).size, keys.length);
 
     for (const row of rows) {
       assert.ok(isoWeekday(row.date) <= 5, `weekend row ${row.date}`);
 
-      const employee = employeeById.get(String(row.employeeId));
-      assert.ok(employee, 'row must belong to a generated employee');
-      assert.ok(row.date >= employee.hireDate, `${row.date} before hire`);
-      if (employee.leftDate) assert.ok(row.date <= employee.leftDate, `${row.date} after leaving`);
+      const student = studentById.get(String(row.studentId));
+      assert.ok(student, 'row must belong to a generated student');
+      assert.ok(row.date >= student.hireDate, `${row.date} before hire`);
+      if (student.leftDate) assert.ok(row.date <= student.leftDate, `${row.date} after leaving`);
 
       if (row.source === 'leave_sync') {
         assert.ok(row.leaveId);
@@ -303,7 +303,7 @@ describe('seed:history generator', () => {
         !holidayDates.has(row.date) &&
         result.approvedLeaves.some(
           (leave) =>
-            leave.employeeId === String(row.employeeId) &&
+            leave.studentId === String(row.studentId) &&
             leave.startDate <= row.date &&
             leave.endDate >= row.date,
         ),
@@ -359,14 +359,14 @@ describe('seed:history generator', () => {
     // holidays and the Christmas closure do not.
     assert.equal(crossYear[0]?.days, 4);
 
-    const byEmployee = new Map<string, typeof approved>();
+    const byStudent = new Map<string, typeof approved>();
     for (const leave of approved) {
-      const key = String(leave.employeeId);
-      const list = byEmployee.get(key) ?? [];
+      const key = String(leave.studentId);
+      const list = byStudent.get(key) ?? [];
       list.push(leave);
-      byEmployee.set(key, list);
+      byStudent.set(key, list);
     }
-    for (const list of byEmployee.values()) {
+    for (const list of byStudent.values()) {
       list.sort((a, b) => a.startDate.localeCompare(b.startDate));
       for (let index = 1; index < list.length; index += 1) {
         assert.ok(list[index]!.startDate > list[index - 1]!.endDate, 'approved leaves overlap');
@@ -426,7 +426,7 @@ describe('seed:history generator', () => {
     const future = approved.filter((leave) => leave.startDate > MANUAL_AFTER_CUTOFF);
     assert.equal(future.length, 3);
     assert.equal(future.filter((leave) => leave.startDate === '2026-10-21').length, 2);
-    assert.equal(new Set(future.map((leave) => String(leave.employeeId))).size, 3);
+    assert.equal(new Set(future.map((leave) => String(leave.studentId))).size, 3);
     assert.ok(future.some((leave) => leave.startDate.startsWith('2026-12-')));
 
     assert.ok(approved.some((leave) => leave.type === 'leave' && leave.category === 'sick'));
@@ -436,19 +436,19 @@ describe('seed:history generator', () => {
     assert.ok(approved.some((leave) => leave.type === 'time_off'));
   });
 
-  it('stores holiday allowance rows for both years without duplicating an employee year', async () => {
+  it('stores holiday allowance rows for both years without duplicating a student year', async () => {
     const { LeaveAllowanceModel } = await import('../src/models/LeaveAllowance.ts');
     const rows = await LeaveAllowanceModel.find().lean();
-    const byKey = new Map(result.employees.map((employee) => [employee.key, employee.id]));
+    const byKey = new Map(result.students.map((student) => [student.key, student.id]));
 
     assert.equal(rows.length, 29);
     assert.equal(rows.filter((row) => row.year === 2026).length, 26);
     assert.equal(rows.filter((row) => row.year === 2025).length, 3);
-    assert.equal(new Set(rows.map((row) => `${String(row.employeeId)}|${row.year}`)).size, rows.length);
+    assert.equal(new Set(rows.map((row) => `${String(row.studentId)}|${row.year}`)).size, rows.length);
 
     assert.equal(rows.some((row) => Object.hasOwn(row, 'carryOver')), false);
     const byName = (key: string, year: number) =>
-      rows.find((row) => String(row.employeeId) === byKey.get(key) && row.year === year);
+      rows.find((row) => String(row.studentId) === byKey.get(key) && row.year === year);
     assert.equal(byName('amelia-bennett', 2026)?.allowance, 28);
     assert.equal(byName('noah-carter', 2026)?.allowance, 28);
     assert.equal(byName('olivia-irwin', 2026)?.allowance, 28);
@@ -458,7 +458,7 @@ describe('seed:history generator', () => {
     assert.equal(byName('ava-hughes', 2025)?.allowance, 9.5);
   });
 
-  it('prints a holiday allowance balance for every employee in both years', () => {
+  it('prints a holiday allowance balance for every student in both years', () => {
     const checks = result.verification.allowanceChecks;
     assert.equal(checks.length, 52);
 
@@ -504,11 +504,11 @@ describe('seed:history generator', () => {
   it('books overtime only on worked days, in quarter hours, across all 22 months', async () => {
     const { AttendanceModel } = await import('../src/models/Attendance.ts');
     const { OvertimeModel } = await import('../src/models/Overtime.ts');
-    const attendance = await AttendanceModel.find().select('employeeId date status').lean();
+    const attendance = await AttendanceModel.find().select('studentId date status').lean();
     const worked = new Set(
       attendance
         .filter((row) => row.status === 'present' || row.status === 'late')
-        .map((row) => attendanceKey(String(row.employeeId), row.date)),
+        .map((row) => attendanceKey(String(row.studentId), row.date)),
     );
     const overtime = await OvertimeModel.find().lean();
 
@@ -519,10 +519,10 @@ describe('seed:history generator', () => {
 
     const daily = new Map<string, number>();
     for (const row of overtime) {
-      assert.ok(worked.has(attendanceKey(String(row.employeeId), row.date)));
+      assert.ok(worked.has(attendanceKey(String(row.studentId), row.date)));
       assert.ok(row.hours >= 0.5 && row.hours <= 4);
       assert.ok(Math.abs(row.hours * 4 - Math.round(row.hours * 4)) < 1e-9);
-      const key = attendanceKey(String(row.employeeId), row.date);
+      const key = attendanceKey(String(row.studentId), row.date);
       daily.set(key, (daily.get(key) ?? 0) + row.hours);
     }
     for (const total of daily.values()) assert.ok(total <= 24);
@@ -593,14 +593,14 @@ describe('seed:history generator', () => {
     );
   });
 
-  it('refuses to seed on top of existing employees without reset', async () => {
+  it('refuses to seed on top of existing students without reset', async () => {
     const { seedHistoryData } = await import('../seed/seed-history-data.ts');
-    const { EmployeeModel } = await import('../src/models/Employee.ts');
+    const { StudentModel } = await import('../src/models/Student.ts');
     await assert.rejects(
       seedHistoryData({ adminId: result.adminId, reset: false }),
-      /already contains 26 employee/,
+      /already contains 26 student/,
     );
-    assert.equal(await EmployeeModel.countDocuments(), 26);
+    assert.equal(await StudentModel.countDocuments(), 26);
   });
 });
 
@@ -678,8 +678,8 @@ describe('seed:history calendar feed', () => {
         item.kind === 'hr' && item.title === 'Year-end review',
     );
     const leave = day.body.data.events.find(
-      (item: { kind: string; employeeName?: string; type: string }) =>
-        item.kind === 'leave' && item.employeeName === 'Harry Nelson' && item.type === 'vacation',
+      (item: { kind: string; studentName?: string; type: string }) =>
+        item.kind === 'leave' && item.studentName === 'Harry Nelson' && item.type === 'vacation',
     );
     assert.ok(event);
     assert.ok(leave);
@@ -707,7 +707,7 @@ describe('seed:history calendar feed', () => {
     );
     assert.equal(leaves.length, 2);
     assert.deepEqual(
-      leaves.map((leave: { employeeName: string }) => leave.employeeName).sort(),
+      leaves.map((leave: { studentName: string }) => leave.studentName).sort(),
       ['Amelia Bennett', 'Noah Carter'],
     );
     assert.ok(
@@ -720,28 +720,28 @@ describe('seed:history calendar feed', () => {
 });
 
 describe('seed:history dashboard and attendance sheets', () => {
-  it('matches a hand calculation for Top Employees in both years', async () => {
+  it('matches a hand calculation for Top Students in both years', async () => {
     const { agent } = await signIn(context.app);
     for (const month of ['2025-03', '2026-09']) {
       const response = await agent.get(`/api/dashboard/month?month=${month}`);
       assert.equal(response.status, 200);
-      const actual = response.body.data.topEmployees as Array<{
-        employeeId: string;
+      const actual = response.body.data.topStudents as Array<{
+        studentId: string;
         name: string;
         score: number;
         present: number;
         late: number;
         absent: number;
       }>;
-      const expected = await rawTopEmployees(month);
+      const expected = await rawTopStudents(month);
       assert.deepEqual(
-        actual.map((employee) => ({
-          employeeId: employee.employeeId,
-          name: employee.name,
-          score: employee.score,
-          present: employee.present,
-          late: employee.late,
-          absent: employee.absent,
+        actual.map((student) => ({
+          studentId: student.studentId,
+          name: student.name,
+          score: student.score,
+          present: student.present,
+          late: student.late,
+          absent: student.absent,
         })),
         expected,
       );
@@ -791,14 +791,14 @@ describe('seed:history dashboard and attendance sheets', () => {
     assert.equal(summary.date, '2026-10-21');
     assert.equal(summary.isWorkingDay, true);
     assert.equal(summary.isHoliday, false);
-    assert.equal(summary.totalEmployees, 23);
+    assert.equal(summary.totalStudents, 23);
     assert.equal(summary.present, 0);
     assert.equal(summary.late, 0);
     assert.equal(summary.absent, 0);
     assert.equal(summary.onLeave, 2);
     assert.equal(summary.notMarked, 21);
     const departments = new Map(
-      summary.departments.map((department) => [department.name, department.activeEmployees]),
+      summary.departments.map((department) => [department.name, department.activeStudents]),
     );
     assert.equal(departments.get('Operations'), 7);
     assert.equal(departments.get('Finance'), 5);
@@ -809,8 +809,8 @@ describe('seed:history dashboard and attendance sheets', () => {
     const { agent } = await signIn(context.app);
     const lastMarked = await agent.get('/api/attendance/sheet?date=2026-10-20');
     assert.equal(lastMarked.status, 200);
-    assert.equal(lastMarked.body.data.employees.length, 23);
-    const lastMarkedRecords = lastMarked.body.data.employees.filter(
+    assert.equal(lastMarked.body.data.students.length, 23);
+    const lastMarkedRecords = lastMarked.body.data.students.filter(
       (entry: { record: unknown }) => entry.record,
     );
     assert.equal(lastMarkedRecords.length, 23);
@@ -823,8 +823,8 @@ describe('seed:history dashboard and attendance sheets', () => {
 
     const todaySheet = await agent.get('/api/attendance/sheet?date=2026-10-21');
     assert.equal(todaySheet.status, 200);
-    assert.equal(todaySheet.body.data.employees.length, 23);
-    const todayRecords = todaySheet.body.data.employees.filter(
+    assert.equal(todaySheet.body.data.students.length, 23);
+    const todayRecords = todaySheet.body.data.students.filter(
       (entry: { record: unknown }) => entry.record,
     );
     assert.equal(todayRecords.length, 2);
@@ -836,8 +836,8 @@ describe('seed:history dashboard and attendance sheets', () => {
     );
     assert.deepEqual(
       todayRecords
-        .map((entry: { employee: { name: string }; record: { status: string } }) => [
-          entry.employee.name,
+        .map((entry: { student: { name: string }; record: { status: string } }) => [
+          entry.student.name,
           entry.record.status,
         ])
         .sort(),

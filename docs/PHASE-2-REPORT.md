@@ -1,3 +1,5 @@
+Terminology: 'employee' in this document means 'student' since the rename.
+
 # Phase 2 — Foundation, shell and authentication
 
 **Branch:** `rebuild/lean-hrm`

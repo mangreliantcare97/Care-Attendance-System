@@ -79,9 +79,9 @@
                                                         <input type="date" class="form-control" id="filter-to">
                                                     </div>
                                                     <div class="form-group col-md-3 col-lg-2">
-                                                        <label for="filter-employee">Employee</label>
-                                                        <select class="custom-select" id="filter-employee">
-                                                            <option value="">All employees</option>
+                                                        <label for="filter-student">Student</label>
+                                                        <select class="custom-select" id="filter-student">
+                                                            <option value="">All students</option>
                                                         </select>
                                                     </div>
                                                     <div class="form-group col-md-3 col-lg-2">
@@ -136,7 +136,7 @@
                                                 <table class="table table-striped leaves-table">
                                                     <thead>
                                                         <tr>
-                                                            <th>Employee</th>
+                                                            <th>Student</th>
                                                             <th>Department</th>
                                                             <th>Type</th>
                                                             <th>Category</th>
@@ -226,10 +226,10 @@
                                             <p class="small text-muted px-3 pt-3 mb-0 d-none" id="allowances-expired-note"></p>
                                             <div class="table-responsive">
                                                 <table class="table table-striped allowances-table">
-                                                    <caption class="sr-only">Holiday allowance of every active employee</caption>
+                                                    <caption class="sr-only">Holiday allowance of every active student</caption>
                                                     <thead>
                                                         <tr>
-                                                            <th scope="col">Employee</th>
+                                                            <th scope="col">Student</th>
                                                             <th scope="col">Department</th>
                                                             <th scope="col" class="text-center">Allowance</th>
                                                             <th scope="col" class="text-center">Total</th>
@@ -279,9 +279,9 @@
                     <div class="modal-body">
                         <div class="row">
                             <div class="form-group col-md-6">
-                                <label for="leave-employee">Employee</label>
-                                <select class="custom-select" id="leave-employee" name="employeeId" required>
-                                    <option value="">Choose an employee</option>
+                                <label for="leave-student">Student</label>
+                                <select class="custom-select" id="leave-student" name="studentId" required>
+                                    <option value="">Choose a student</option>
                                 </select>
                             </div>
                             <div class="form-group col-md-6">
@@ -322,7 +322,7 @@
                             <textarea class="form-control" id="leave-reason" name="reason" rows="3" maxlength="1000"></textarea>
                         </div>
                         <div class="leave-preview" id="leave-preview" role="status" aria-live="polite">
-                            Choose an employee and dates to see the holiday days.
+                            Choose a student and dates to see the holiday days.
                         </div>
                         <small class="form-text text-muted mt-2">
                             Working days are calculated from the dates (Monday–Friday by default).
@@ -339,7 +339,7 @@
         </div>
     </div>
 
-    <!-- Edit an employee's holiday allowance -->
+    <!-- Edit a student's holiday allowance -->
     <div class="modal fade" id="allowance-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="allowance-modal-title" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">

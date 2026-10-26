@@ -9,9 +9,9 @@
  *  - refuses NODE_ENV=production
  *  - refuses any database whose name does not contain "test" or "demo"
  *  - requires an existing active administrator (created with `npm run seed`)
- *  - refuses to add data to a database that already has employees, unless
+ *  - refuses to add data to a database that already has students, unless
  *    --reset is supplied; --reset deletes only attendance, overtime, leaves,
- *    events, employees and departments, never admins or sessions
+ *    events, students and departments, never admins or sessions
  *
  * The administrative user is read only. This script never creates or changes
  * an administrator.
@@ -39,9 +39,9 @@ function printYearTotals(year: SeedYearStat): void {
 
 function printAllowanceChecks(checks: SeedVerification['allowanceChecks']): void {
   console.log('');
-  console.log('Holiday allowance by employee and year');
+  console.log('Holiday allowance by student and year');
   console.log(
-    `${pad('Employee', 22)}${pad('Year', 6)}${pad('Allowance', 10, true)}` +
+    `${pad('Student', 22)}${pad('Year', 6)}${pad('Allowance', 10, true)}` +
       `${pad('Total', 7, true)}${pad('Used', 7, true)}${pad('Pending', 9, true)}${pad('Remaining', 11, true)}`,
   );
   console.log(line());
@@ -105,8 +105,8 @@ function printResult(result: SeedHistoryResult): void {
   console.log(`  full period:    2025-01-01 -> 2026-12-31 (events and future approved leaves)`);
   console.log(`  departments:    ${counts.departments}`);
   console.log(
-    `  employees:      ${counts.employees} (${counts.activeEmployees} active, ${counts.inactiveEmployees} inactive, ` +
-      `${counts.terminatedEmployees} terminated; ${counts.newHires2025} hired in 2025, ${counts.newHires2026} in 2026)`,
+    `  students:      ${counts.students} (${counts.activeStudents} active, ${counts.inactiveStudents} inactive, ` +
+      `${counts.terminatedStudents} terminated; ${counts.newHires2025} hired in 2025, ${counts.newHires2026} in 2026)`,
   );
   console.log(
     `  attendance:     ${counts.attendance} rows (${counts.manualAttendance} manual, ${counts.leaveAttendance} leave_sync; ` +
@@ -127,7 +127,7 @@ function printResult(result: SeedHistoryResult): void {
     console.log(
       `  attendance=${result.resetDeleted.attendance ?? 0} overtime=${result.resetDeleted.overtime ?? 0} ` +
         `leaves=${result.resetDeleted.leaves ?? 0} events=${result.resetDeleted.events ?? 0} ` +
-        `employees=${result.resetDeleted.employees ?? 0} departments=${result.resetDeleted.departments ?? 0}`,
+        `students=${result.resetDeleted.students ?? 0} departments=${result.resetDeleted.departments ?? 0}`,
     );
     console.log('  admins and sessions were not touched.');
   }
@@ -233,13 +233,13 @@ function printResult(result: SeedHistoryResult): void {
   }
 
   console.log('');
-  console.log('Top Employees hand check');
+  console.log('Top Students hand check');
   for (const check of verification.topChecks) {
     console.log(`  ${check.month} (raw calculation vs dashboard service): ${check.matches ? 'MATCH' : 'MISMATCH'}`);
-    check.expected.forEach((employee, index) => {
+    check.expected.forEach((student, index) => {
       console.log(
-        `    ${index + 1}. ${pad(employee.name, 20)} score ${pad(String(employee.score), 3, true)} ` +
-          `(${employee.present} present / ${employee.late} late / ${employee.absent} absent)`,
+        `    ${index + 1}. ${pad(student.name, 20)} score ${pad(String(student.score), 3, true)} ` +
+          `(${student.present} present / ${student.late} late / ${student.absent} absent)`,
       );
     });
   }
@@ -254,7 +254,7 @@ function printResult(result: SeedHistoryResult): void {
   console.log('Dashboard and attendance-sheet fixed checks');
   console.log(
     `  2026-10-21 summary: ${verification.dashboardToday.matches ? 'MATCH' : 'MISMATCH'} ` +
-      `(active=${verification.dashboardToday.totalEmployees}, on leave=${verification.dashboardToday.onLeave}, ` +
+      `(active=${verification.dashboardToday.totalStudents}, on leave=${verification.dashboardToday.onLeave}, ` +
       `not marked=${verification.dashboardToday.notMarked}, expected=${verification.dashboardToday.expectedNotMarked})`,
   );
   console.log(
@@ -268,7 +268,7 @@ function printResult(result: SeedHistoryResult): void {
   console.log('Documented bank-holiday leave cases');
   for (const leave of verification.holidayLeaves) {
     console.log(
-      `  ${leave.employeeName}: ${leave.startDate} -> ${leave.endDate}, ${leave.days} working days. ` +
+      `  ${leave.studentName}: ${leave.startDate} -> ${leave.endDate}, ${leave.days} working days. ` +
         'The range deliberately includes an England bank holiday; the holiday is skipped, so only the ' +
         'remaining working days count and create attendance rows.',
     );

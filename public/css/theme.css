@@ -1374,7 +1374,7 @@ body[data-page='attendance'] .main-footer {
   box-shadow: inset 3px 0 0 #ffc107;
 }
 
-.attendance-employee {
+.attendance-student {
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -1401,17 +1401,17 @@ body[data-page='attendance'] .main-footer {
   color: #cfe8ff;
 }
 
-.attendance-employee-text {
+.attendance-student-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-.attendance-employee-text strong {
+.attendance-student-text strong {
   color: var(--hrm-text);
 }
 
-.employee-card-meta {
+.student-card-meta {
   display: block;
   color: var(--hrm-text-muted);
   font-size: 0.78rem;
@@ -1642,7 +1642,7 @@ body.sheet-dirty .attendance-save-bar {
     letter-spacing: 0.04em;
   }
 
-  .attendance-table tbody td.employee-cell::before,
+  .attendance-table tbody td.student-cell::before,
   .attendance-table tbody td.status-cell::before {
     display: none;
   }
@@ -1651,7 +1651,7 @@ body.sheet-dirty .attendance-save-bar {
     display: none;
   }
 
-  .attendance-employee {
+  .attendance-student {
     min-width: 0;
     margin-bottom: 0.4rem;
   }
@@ -1806,8 +1806,8 @@ body.sheet-dirty .attendance-save-bar {
   .text-muted,
   .card-title,
   .table,
-  .attendance-employee-text strong,
-  .employee-card-meta {
+  .attendance-student-text strong,
+  .student-card-meta {
     color: #000000 !important;
   }
 
@@ -1906,7 +1906,7 @@ body.sheet-dirty .attendance-save-bar {
 }
 
 /* --------------------------------------------------------------------------
-   Employee and leave list cards on phones
+   Student and leave list cards on phones
    -------------------------------------------------------------------------- */
 
 .list-photo {
@@ -1936,10 +1936,10 @@ body.sheet-dirty .attendance-save-bar {
 }
 
 @media (max-width: 767.98px) {
-  .employees-table,
-  .employees-table tbody,
-  .employees-table tr,
-  .employees-table td,
+  .students-table,
+  .students-table tbody,
+  .students-table tr,
+  .students-table td,
   .leaves-table,
   .leaves-table tbody,
   .leaves-table tr,
@@ -1948,12 +1948,12 @@ body.sheet-dirty .attendance-save-bar {
     width: 100%;
   }
 
-  .employees-table thead,
+  .students-table thead,
   .leaves-table thead {
     display: none;
   }
 
-  .employees-table tbody tr,
+  .students-table tbody tr,
   .leaves-table tbody tr {
     position: relative;
     width: calc(100% - 1.5rem);
@@ -1965,13 +1965,13 @@ body.sheet-dirty .attendance-save-bar {
     box-shadow: var(--hrm-shadow);
   }
 
-  .employees-table tbody td,
+  .students-table tbody td,
   .leaves-table tbody td {
     border: 0;
     padding: 0.18rem 0;
   }
 
-  .employees-table tbody td[data-label]::before,
+  .students-table tbody td[data-label]::before,
   .leaves-table tbody td[data-label]::before {
     content: attr(data-label);
     display: block;
@@ -1983,7 +1983,7 @@ body.sheet-dirty .attendance-save-bar {
     letter-spacing: 0.04em;
   }
 
-  .employees-table tbody td.employee-photo-cell {
+  .students-table tbody td.student-photo-cell {
     position: absolute;
     top: 1rem;
     left: 1rem;
@@ -1992,36 +1992,36 @@ body.sheet-dirty .attendance-save-bar {
     padding: 0;
   }
 
-  .employees-table tbody td.employee-photo-cell::before,
-  .employees-table tbody td.employee-name-cell::before,
-  .employees-table tbody td.employee-actions::before,
-  .leaves-table tbody td.leave-employee-cell::before,
+  .students-table tbody td.student-photo-cell::before,
+  .students-table tbody td.student-name-cell::before,
+  .students-table tbody td.student-actions::before,
+  .leaves-table tbody td.leave-student-cell::before,
   .leaves-table tbody td.leave-actions-cell::before {
     display: none;
   }
 
-  .employees-table tbody td.employee-photo-cell + td,
-  .leaves-table tbody td.leave-employee-cell {
+  .students-table tbody td.student-photo-cell + td,
+  .leaves-table tbody td.leave-student-cell {
     padding-left: 0;
   }
 
-  .employees-table tbody tr {
+  .students-table tbody tr {
     padding-left: 5.25rem;
     min-height: 5.5rem;
   }
 
-  .employees-table .list-photo {
+  .students-table .list-photo {
     width: 3.5rem;
     height: 3.5rem;
     flex-basis: 3.5rem;
   }
 
-  .employees-table tbody td.employee-name-cell {
+  .students-table tbody td.student-name-cell {
     margin-bottom: 0.2rem;
     font-size: 1.05rem;
   }
 
-  .employees-table tbody td.employee-actions,
+  .students-table tbody td.student-actions,
   .leaves-table tbody td.leave-actions-cell {
     display: flex;
     flex-wrap: wrap;
@@ -2029,13 +2029,13 @@ body.sheet-dirty .attendance-save-bar {
     margin-top: 0.5rem;
   }
 
-  .employees-table tbody td.employee-actions .btn,
+  .students-table tbody td.student-actions .btn,
   .leaves-table tbody td.leave-actions-cell .btn {
     min-width: 44px;
     min-height: 44px;
   }
 
-  .leaves-table tbody td.leave-employee-cell {
+  .leaves-table tbody td.leave-student-cell {
     font-size: 1.05rem;
     margin-bottom: 0.3rem;
   }
@@ -2261,12 +2261,12 @@ body.sheet-dirty .attendance-save-bar {
     text-transform: uppercase;
   }
 
-  .allowances-table tbody td.allowance-employee-cell::before,
+  .allowances-table tbody td.allowance-student-cell::before,
   .allowances-table tbody td.allowance-actions-cell::before {
     display: none;
   }
 
-  .allowances-table tbody td.allowance-employee-cell {
+  .allowances-table tbody td.allowance-student-cell {
     margin-bottom: 0.3rem;
     font-size: 1.05rem;
   }

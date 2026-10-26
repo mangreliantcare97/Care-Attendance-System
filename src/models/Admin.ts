@@ -6,7 +6,7 @@ const BCRYPT_ROUNDS = 12;
 
 /**
  * Admins are the only accounts that can log in. They are deliberately kept
- * separate from `employees`, which are HR records and never authenticate.
+ * separate from `students`, which are HR records and never authenticate.
  */
 const adminSchema = new Schema(
   {

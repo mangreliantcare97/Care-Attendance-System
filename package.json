@@ -17,6 +17,7 @@
     "seed:demo": "node seed/seed-demo.ts",
     "seed:photos": "node seed/attach-photos.ts",
     "migrate:allowances": "node seed/migrate-allowances.ts",
+    "migrate:students": "node seed/migrate-students.ts",
     "resync-leaves": "node seed/resync-leaves.ts",
     "reset-admin-password": "node seed/reset-admin-password.ts",
     "test": "node --test --test-force-exit --test-concurrency=1 tests/",

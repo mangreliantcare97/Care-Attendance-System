@@ -1,5 +1,5 @@
 /**
- * Reports: the per-employee attendance summary, rates that exclude leave,
+ * Reports: the per-student attendance summary, rates that exclude leave,
  * totals, pagination, filters and CSV formula escaping.
  */
 import { after, before, describe, it } from 'node:test';
@@ -34,13 +34,13 @@ async function createDepartment(name: string) {
   return DepartmentModel.create({ name });
 }
 
-async function createEmployee(input: {
+async function createStudent(input: {
   name: string;
   departmentId: string;
   position: string;
 }) {
-  const { EmployeeModel } = await import('../src/models/Employee.ts');
-  return EmployeeModel.create({
+  const { StudentModel } = await import('../src/models/Student.ts');
+  return StudentModel.create({
     name: input.name,
     departmentId: input.departmentId,
     position: input.position,
@@ -49,12 +49,12 @@ async function createEmployee(input: {
 }
 
 async function createAttendance(
-  employeeId: string,
+  studentId: string,
   entries: Array<{ date: string; status: string }>,
 ) {
   const { AttendanceModel } = await import('../src/models/Attendance.ts');
   return AttendanceModel.insertMany(
-    entries.map((entry) => ({ employeeId, date: entry.date, status: entry.status })),
+    entries.map((entry) => ({ studentId, date: entry.date, status: entry.status })),
   );
 }
 
@@ -67,29 +67,29 @@ describe('reports', () => {
     assert.equal(response.status, 401);
   });
 
-  it('summarises each employee and computes the rate without leave days', async () => {
+  it('summarises each student and computes the rate without leave days', async () => {
     const { agent } = await signIn(context.app);
     const departmentOne = await createDepartment('Report Department One');
     const departmentTwo = await createDepartment('Report Department Two');
     departmentOneId = String(departmentOne._id);
     departmentTwoId = String(departmentTwo._id);
 
-    const alice = await createEmployee({
+    const alice = await createStudent({
       name: 'Report Alice',
       departmentId: departmentOneId,
       position: 'Analyst',
     });
-    const bob = await createEmployee({
+    const bob = await createStudent({
       name: 'Report Bob',
       departmentId: departmentOneId,
       position: 'Assistant',
     });
-    const carol = await createEmployee({
+    const carol = await createStudent({
       name: '=Formula Person',
       departmentId: departmentTwoId,
       position: 'Coordinator',
     });
-    const dave = await createEmployee({
+    const dave = await createStudent({
       name: 'Report Dave',
       departmentId: departmentTwoId,
       position: 'Engineer',
@@ -188,7 +188,7 @@ describe('reports', () => {
     assert.equal(second.body.data.totals.present, 6);
   });
 
-  it('filters by department and by employee', async () => {
+  it('filters by department and by student', async () => {
     const { agent } = await signIn(context.app);
 
     const department = await agent.get(
@@ -203,14 +203,14 @@ describe('reports', () => {
     assert.equal(department.body.data.totals.vacation, 1);
     assert.equal(department.body.data.totals.rate, 71.4);
 
-    const employee = await agent.get(
-      `/api/reports/attendance-summary?from=2026-02-01&to=2026-02-28&employeeId=${aliceId}`,
+    const student = await agent.get(
+      `/api/reports/attendance-summary?from=2026-02-01&to=2026-02-28&studentId=${aliceId}`,
     );
-    assert.equal(employee.status, 200);
-    assert.equal(employee.body.data.rows.length, 1);
-    assert.equal(employee.body.data.rows[0].name, 'Report Alice');
-    assert.equal(employee.body.data.rows[0].rate, 80);
-    assert.equal(employee.body.data.totals.present, 3);
+    assert.equal(student.status, 200);
+    assert.equal(student.body.data.rows.length, 1);
+    assert.equal(student.body.data.rows[0].name, 'Report Alice');
+    assert.equal(student.body.data.rows[0].rate, 80);
+    assert.equal(student.body.data.totals.present, 3);
   });
 
   it('exports every filtered row as CSV and neutralises formulas', async () => {
@@ -226,7 +226,7 @@ describe('reports', () => {
 
     const csv = response.text;
     assert.equal(csv.charCodeAt(0), 0xfeff);
-    assert.match(csv, /Employee,Department,Position,Present,Late,Absent,On leave,Vacation,Attendance rate \(%\)/);
+    assert.match(csv, /Student,Department,Position,Present,Late,Absent,On leave,Vacation,Attendance rate \(%\)/);
 
     // The export ignores pagination.
     assert.match(csv, /Report Alice/);
