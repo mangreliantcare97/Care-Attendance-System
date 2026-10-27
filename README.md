@@ -230,6 +230,20 @@ There is no `render.yaml` in this repository, so the service name is configured
 in the Render dashboard. Free services sleep after inactivity; Atlas M0 has no
 backups.
 
+### Netlify frontend with Render API
+
+`netlify.toml` publishes the `public/` directory, serves `checkin.html` at `/`,
+and proxies `/api/*` to the Render service at
+`https://care-attendance-system.onrender.com`. If the Render service URL
+changes, update the API rewrite target and redeploy Netlify.
+
+Set Render's `APP_URL` and `APP_BASE_URL` to
+`https://care-attendance-system.netlify.app`. The browser then uses one
+same-origin Netlify URL for pages and API requests, while Netlify proxies API
+traffic to Render. Keep `APP_BASE_URL` aligned with the actual public frontend
+URL; it controls public check-in links, origin validation, and password-reset
+links.
+
 ## Password reset email providers
 
 The app supports Cloudflare Email Service and Brevo transactional email through
