@@ -338,6 +338,11 @@ async function runCurrentSuite(browser, baseUrl, server, mongoUri) {
     const select = document.getElementById('checkin-location');
     return select && !select.disabled && select.options.length === 19;
   }, { timeout: 10000 });
+  const publicLogoLoaded = await page.$eval(
+    '.checkin-brand-mark',
+    (image) => image.getAttribute('src') === '/assets/img/rcl-navlogo.png' && image.complete && image.naturalWidth > 0,
+  );
+  check(publicLogoLoaded, 'public check-in displays the Reliant Care logo');
 
   const fieldErrorIds = [
     'checkin-user-type-error',
@@ -640,6 +645,22 @@ async function runCurrentSuite(browser, baseUrl, server, mongoUri) {
     rows.map((row) => row.textContent.trim()),
   );
   check(entriesLoaded.length >= 2, 'Entries page shows the submitted records', String(entriesLoaded.length));
+
+  await adminPage.locator('#entry-search').fill('E2E Duplicate Person');
+  await adminPage.click('#apply-entry-filters');
+  await adminPage.waitForFunction(
+    () => document.querySelectorAll('#entries-body tr[data-entry-id]').length === 1,
+    { timeout: 10000 },
+  );
+  const checkOutDirection = await adminPage.$eval(
+    '#entries-body tr[data-entry-id] td[data-label="Direction"] .badge',
+    (badge) => ({ label: badge.textContent.trim(), className: badge.className }),
+  );
+  check(
+    checkOutDirection.label === 'Check out' && checkOutDirection.className.includes('badge-warning'),
+    'Entries direction column shows Check out in a yellow badge',
+    JSON.stringify(checkOutDirection),
+  );
 
   await adminPage.locator('#entry-search').fill('E2E Ada Lovelace');
   await adminPage.click('#apply-entry-filters');

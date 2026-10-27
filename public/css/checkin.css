@@ -26,15 +26,7 @@
 .checkin-brand-mark {
   width: 51px;
   height: 39px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  background: var(--hrm-primary);
-  color: #ffffff;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  font-size: 0.95rem;
+  object-fit: contain;
 }
 
 .checkin-brand h1 {

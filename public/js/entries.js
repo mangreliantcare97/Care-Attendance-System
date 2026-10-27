@@ -80,7 +80,7 @@
 
   function directionMarkup(value) {
     return value === 'out'
-      ? html`<span class="badge badge-secondary">Check out</span>`
+      ? html`<span class="badge badge-warning">Check out</span>`
       : html`<span class="badge badge-success">Check in</span>`;
   }
 
