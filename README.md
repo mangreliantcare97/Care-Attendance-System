@@ -65,8 +65,8 @@ header, so a proxy or preview host cannot poison a printed QR code.
 
 | Symptom | Fix |
 |---|---|
-| Public form (/): pressing Submit does nothing / no message | Check browser console/network for errors. Ensure locations are loaded (`npm run seed:locations`). If "No active locations are available" appears, activate locations or run the seeder. If it says "Could not load locations", use Retry or check MongoDB. |
-| Admin Locations page stuck on "Loading locations..." | Check network/console. The page now times out after 15 seconds and shows an error with Retry. Verify you're logged in as admin and MongoDB is up. Run `npm run doctor` to inspect counts. |
+| Public form (/): pressing Submit shows no confirmation | Check the browser Network panel for the POST to `/api/public/entries`. A successful submission opens a confirmation dialog; the form resets only after that dialog closes. |
+| Admin Locations page stuck on "Loading locations..." | A successful list response is rendered after loading completes. A request that does not respond is aborted after 15 seconds and shows an error with Retry. `npm run test:e2e` exercises both paths. Run `npm run doctor` to inspect MongoDB and record counts. |
 
 ### Shared-device warning
 
@@ -169,13 +169,19 @@ postcode and entry counts stay behind the authenticated admin API.
 |---|---|
 | `npm start` | Start the server |
 | `npm run dev` | Start the server with file watching |
-| `npm test` | Run the test suite (in-memory MongoDB) |
-| `npm run test:e2e` | Start the app against a temp DB, seed admin + 18 locations, run browser checks |
+| `npm test` | Run the full test suite |
+| `npm run test:e2e` | Start the app against an isolated `mongodb-memory-server`, seed an admin + 18 locations, and run browser checks |
 | `npm run doctor` | Show DB name, MongoDB reachability, admins, locations (active/total), entries and next steps |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed` | Create/update the administrator from the environment |
 | `npm run seed:locations` | Insert the 18 locations from `seed/locations.json` (idempotent) |
 | `npm run reset-admin-password -- <email>` | Emergency password recovery (see below) |
+
+`npm run test:e2e` does not use a local MongoDB server or the database configured
+in `.env`. It requires Chrome; set `CHROME_BIN` if Chrome is not at the standard
+Windows installation path. It writes the browser evidence to `.verify/`,
+including empty/invalid/filled forms, success and error dialogs, the duplicate
+message and the Locations table.
 
 ## Configuration
 

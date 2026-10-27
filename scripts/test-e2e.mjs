@@ -1,294 +1,729 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { once } from 'node:events';
+import { mkdir, readFile } from 'node:fs/promises';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import puppeteer from 'puppeteer-core';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const appRoot = path.resolve(process.env.E2E_APP_ROOT || root);
 const shotsDir = path.join(root, '.verify');
+const mutation = process.env.E2E_MUTATION || '';
+const baseline = process.env.E2E_BASELINE === '1';
+const timezone = 'Europe/London';
 
-async function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+const failures = [];
+const milliseconds = (value) => new Promise((resolve) => setTimeout(resolve, value));
 
-async function waitForServer(port, timeoutMs = 60000) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
+function check(condition, message, detail = '') {
+  const suffix = detail ? ` — ${detail}` : '';
+  if (condition) {
+    console.log(`  PASS ${message}${suffix}`);
+  } else {
+    console.log(`  FAIL ${message}${suffix}`);
+    failures.push(message);
+  }
+}
+
+async function freePort() {
+  const socket = net.createServer();
+  await new Promise((resolve, reject) => {
+    socket.once('error', reject);
+    socket.listen(0, '127.0.0.1', resolve);
+  });
+  const address = socket.address();
+  if (!address || typeof address === 'string') throw new Error('Could not allocate a test port.');
+  await new Promise((resolve, reject) => socket.close((error) => (error ? reject(error) : resolve())));
+  return address.port;
+}
+
+async function waitForServer(url, child, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline && child.exitCode === null) {
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/health`);
-      if (res.ok) return true;
-    } catch {}
-    await wait(500);
+      const response = await fetch(url);
+      if (response.ok) return true;
+    } catch {
+      // The server is still starting.
+    }
+    await milliseconds(250);
   }
   return false;
 }
 
+async function stopChild(child) {
+  if (!child || child.exitCode !== null) return;
+  const closed = once(child, 'close');
+  child.kill('SIGTERM');
+  await Promise.race([closed, milliseconds(5000)]);
+  if (child.exitCode === null) {
+    child.kill('SIGKILL');
+    await Promise.race([once(child, 'close'), milliseconds(2000)]);
+  }
+}
+
+async function runChild(args, env, cwd) {
+  const child = spawn(process.execPath, args, { cwd, env, stdio: 'inherit' });
+  const [code, signal] = await once(child, 'close');
+  if (code !== 0) throw new Error(`${path.basename(args[0])} exited with ${code ?? signal ?? 'unknown status'}.`);
+}
+
+function trackPage(page, label) {
+  const events = [];
+  const requests = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith('/api/')) requests.push(`${request.method()} ${url.pathname}`);
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error') events.push(`console.error: ${message.text()}`);
+  });
+  page.on('pageerror', (error) => events.push(`pageerror: ${error.message}`));
+  page.on('requestfailed', (request) => {
+    events.push(`requestfailed: ${request.url()} (${request.failure()?.errorText || 'unknown'})`);
+  });
+  page.on('response', (response) => {
+    const responseUrl = new URL(response.url());
+    if (responseUrl.pathname.startsWith('/api/')) requests.push(`${response.status()} ${responseUrl.pathname}`);
+    if (response.status() < 400) return;
+    const url = response.url();
+    if (response.status() === 401 && url.includes('/api/auth/me')) return;
+    events.push(`HTTP ${response.status()}: ${url}`);
+  });
+  return { label, events, requests };
+}
+
+async function faultRequests(page, mode, checkinScript) {
+  if (!mode) return;
+  await page.setRequestInterception(true);
+  page.on('request', async (request) => {
+    const url = new URL(request.url());
+    try {
+      if (mode === 'hang-locations' && url.pathname === '/api/locations') {
+        console.log(`  intentionally held request open: ${request.method()} ${url.pathname}`);
+        return;
+      }
+      if (mode === 'submit-handler' && url.pathname === '/js/checkin.js') {
+        const from = "form.addEventListener('submit', handleSubmit);";
+        const to = "form.addEventListener('submit', missingSubmitHandler);";
+        if (!checkinScript.includes(from)) throw new Error('Could not locate the submit binding for mutation.');
+        await request.respond({
+          status: 200,
+          contentType: 'application/javascript',
+          body: checkinScript.replace(from, to),
+        });
+        return;
+      }
+      if (mode === 'missing-script' && url.pathname === '/js/checkin.js') {
+        await request.respond({ status: 404, contentType: 'text/plain', body: 'Not Found' });
+        return;
+      }
+      if (mode === 'locations-500' && url.pathname === '/api/public/locations') {
+        await request.respond({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: false, error: { code: 'test_failure', message: 'Injected 500' } }),
+        });
+        return;
+      }
+      await request.continue();
+    } catch (error) {
+      console.error(`Request mutation failed: ${error.message}`);
+      if (!request.isInterceptResolutionHandled()) await request.abort('failed');
+    }
+  });
+}
+
+async function openPage(browser, width, height, mode = '') {
+  const page = await browser.newPage();
+  await page.setViewport({ width, height, deviceScaleFactor: 1 });
+  const telemetry = trackPage(page, `${width}x${height}`);
+  const script = mode ? await readFile(path.join(appRoot, 'public', 'js', 'checkin.js'), 'utf8') : '';
+  await faultRequests(page, mode, script);
+  return { page, telemetry };
+}
+
+async function waitForDialog(page) {
+  await page.waitForFunction(() => {
+    const dialog = document.getElementById('checkin-dialog');
+    return dialog && !dialog.classList.contains('d-none');
+  }, { timeout: 8000 });
+}
+
+async function chooseLocation(page, selector = '#checkin-location', index = 1) {
+  await page.waitForFunction((id) => {
+    const select = document.querySelector(id);
+    return select && select.options.length > 1 && !select.disabled;
+  }, { timeout: 10000 }, selector);
+  const value = await page.$eval(selector, (select, optionIndex) => select.options[optionIndex]?.value || '', index);
+  if (!value) throw new Error(`No location option ${index} in ${selector}.`);
+  await page.select(selector, value);
+  return value;
+}
+
+async function fillCurrentEntry(page, { name, direction = 'in', locationIndex = 1, notes = 'Automated e2e entry' }) {
+  await page.select('#checkin-user-type', 'staff');
+  await page.type('#checkin-name', name);
+  await page.select('#checkin-direction', direction);
+  await page.click('#checkin-now');
+  const time = await page.$eval('#checkin-time-choice', (element) => element.textContent.replace('Time: ', ''));
+  const locationId = await chooseLocation(page, '#checkin-location', locationIndex);
+  await page.type('#checkin-notes', notes);
+  return { time, locationId };
+}
+
+function londonDate() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+async function screenshot(page, filename) {
+  await page.screenshot({ path: path.join(shotsDir, filename), fullPage: true });
+  console.log(`  screenshot: .verify/${filename}`);
+}
+
+async function clickLocationAction(page, name, action) {
+  const index = await page.$$eval(
+    '#locations-body tr',
+    (rows, searchName) => rows.findIndex((row) => row.textContent.includes(searchName)),
+    name,
+  );
+  if (index < 0) throw new Error(`Could not find a row for ${name}.`);
+  await page.click(`#locations-body tr:nth-child(${index + 1}) [data-action="${action}"]`);
+}
+
+async function login(page, baseUrl) {
+  await page.goto(`${baseUrl}/login.html`, { waitUntil: 'networkidle0' });
+  if (new URL(page.url()).pathname !== '/login.html') return;
+  await page.type('#login-email', 'e2e-admin@example.com');
+  await page.type('#login-password', 'TestPass123!');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 12000 }).catch(() => undefined),
+    page.click('#login-submit'),
+  ]);
+  await page.waitForFunction(() => location.pathname !== '/login.html', { timeout: 10000 });
+}
+
+async function runBaselineDiagnostic(browser, baseUrl) {
+  console.log('\nPre-fix worktree diagnostic');
+  const publicResult = await openPage(browser, 390, 844);
+  const page = publicResult.page;
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle0' });
+  const locationId = await chooseLocation(page);
+  await page.select('#checkin-user-type', 'staff');
+  await page.type('#checkin-name', 'Baseline Browser Test');
+  await page.select('#checkin-direction', 'in');
+  await page.select('#checkin-hour', '9');
+  await page.select('#checkin-minute', '05');
+  await page.select('#checkin-period', 'AM');
+  await page.type('#checkin-notes', 'Pre-fix verification');
+  const responsePromise = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/public/entries' && response.request().method() === 'POST',
+    { timeout: 10000 },
+  );
+  await page.click('#checkin-submit');
+  const entryResponse = await responsePromise;
+  await milliseconds(300);
+  const formResult = await page.evaluate(() => ({
+    dialogExists: Boolean(document.getElementById('checkin-dialog')),
+    inlineSuccess: Boolean(document.getElementById('checkin-success')
+      && !document.getElementById('checkin-success').classList.contains('d-none')),
+    message: document.getElementById('checkin-success')?.textContent || '',
+  }));
+  console.log(`Form submission: HTTP ${entryResponse.status()} from POST /api/public/entries`);
+  console.log(`Form result: ${JSON.stringify(formResult)}`);
+  console.log(`Browser errors: ${JSON.stringify(publicResult.telemetry.events)}`);
+  console.log(`Conclusion: request ${entryResponse.ok() ? 'succeeded' : 'failed'}; the form ${entryResponse.ok() ? 'did not do nothing' : 'did not record an entry'}.`);
+  check(entryResponse.status() === 201 && formResult.inlineSuccess, 'pre-fix form submit reaches the API and shows its legacy inline confirmation');
+  check(formResult.dialogExists, 'pre-fix success popup is present');
+  await page.close();
+
+  const normalAdmin = await openPage(browser, 1440, 900);
+  await login(normalAdmin.page, baseUrl);
+  await normalAdmin.page.goto(`${baseUrl}/locations.html`, { waitUntil: 'networkidle0' });
+  const normalLocationStatus = await normalAdmin.page.evaluate(() => ({
+    text: document.getElementById('locations-body').textContent.trim().replace(/\s+/g, ' '),
+    rows: document.querySelectorAll('#locations-body tr').length,
+  }));
+  console.log(`Normal Locations response: rows=${normalLocationStatus.rows}, text="${normalLocationStatus.text}"`);
+  console.log(`Normal Locations API trace: ${JSON.stringify(normalAdmin.telemetry.requests)}`);
+  check(
+    normalAdmin.telemetry.requests.includes('200 /api/locations') && normalLocationStatus.rows === 18,
+    'pre-fix successful Locations response renders all 18 rows',
+    `rows=${normalLocationStatus.rows}; ${normalLocationStatus.text}`,
+  );
+  await normalAdmin.page.close();
+
+  const adminResult = await openPage(browser, 1440, 900);
+  const adminPage = adminResult.page;
+  await login(adminPage, baseUrl);
+  await faultRequests(adminPage, 'hang-locations', '');
+  await adminPage.goto(`${baseUrl}/locations.html`, { waitUntil: 'domcontentloaded' });
+  await milliseconds(2000);
+  const status = await adminPage.$eval('#locations-body', (body) => ({
+    text: body.textContent.trim().replace(/\s+/g, ' '),
+    rows: body.querySelectorAll('tr').length,
+  }));
+  console.log('GET /api/locations: deliberately left pending; response not received.');
+  console.log(`Locations UI after 2 seconds: ${JSON.stringify(status)}`);
+  console.log(`Browser errors: ${JSON.stringify(adminResult.telemetry.events)}`);
+  console.log(`API trace: ${JSON.stringify(adminResult.telemetry.requests)}`);
+  check(!status.text.includes('Loading'), 'pre-fix hung Locations request exits loading state', status.text);
+  console.log('Conclusion: a never-resolving API request leaves the pre-fix spinner indefinitely because the old loader has no timeout/abort.');
+  await adminPage.close();
+}
+
+async function runMutation(browser, baseUrl) {
+  console.log(`\nMutation test: ${mutation}`);
+  const { page, telemetry } = await openPage(browser, 390, 844, mutation);
+  await page.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded' });
+  await milliseconds(700);
+
+  if (mutation === 'submit-handler' || mutation === 'missing-script') {
+    const buttonDisabled = await page.$eval('#checkin-submit', (button) => button.disabled);
+    if (!buttonDisabled) {
+      await page.click('#checkin-submit');
+      await milliseconds(300);
+    }
+    const state = await page.evaluate(() => ({
+      errors: [
+        'checkin-user-type-error',
+        'checkin-name-error',
+        'checkin-direction-error',
+        'checkin-time-error',
+        'checkin-location-error',
+        'checkin-notes-error',
+      ].filter((id) => document.getElementById(id)?.textContent.trim()).length,
+      locationState: document.getElementById('checkin-location-message')?.textContent.trim() || '',
+    }));
+    const caught = state.errors !== 6 || telemetry.events.length > 0;
+    console.log(`Expected E2E assertion (six visible validation errors): ${state.errors}/6`);
+    console.log(`Browser/network evidence: ${JSON.stringify(telemetry.events)}`);
+    console.log(caught ? 'test:e2e: FAIL — mutation was detected.' : 'test:e2e: UNEXPECTED PASS — mutation escaped detection.');
+    check(false, 'the normal e2e suite rejects a broken submit script', state.locationState);
+    if (!caught) failures.push('Mutation was not detected.');
+  } else if (mutation === 'locations-500') {
+    await page.waitForFunction(
+      () => document.getElementById('checkin-location-message')?.textContent.includes('Could not load locations'),
+      { timeout: 5000 },
+    ).catch(() => undefined);
+    const state = await page.evaluate(() => ({
+      disabled: document.getElementById('checkin-location').disabled,
+      message: document.getElementById('checkin-location-message')?.textContent.trim() || '',
+    }));
+    console.log(`GET /api/public/locations: ${JSON.stringify(telemetry.events)}`);
+    console.log(`Public form: ${JSON.stringify(state)}`);
+    console.log('test:e2e: FAIL — injected HTTP 500 is observed and prevents the locations-ready assertion.');
+    check(false, 'the normal e2e suite rejects a 500 locations feed', state.message);
+  } else {
+    throw new Error(`Unknown E2E_MUTATION value: ${mutation}`);
+  }
+  await page.close();
+}
+
+async function runCurrentSuite(browser, baseUrl, server, mongoUri) {
+  console.log('\nPublic form');
+  const publicResult = await openPage(browser, 390, 844);
+  const page = publicResult.page;
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => {
+    const select = document.getElementById('checkin-location');
+    return select && !select.disabled && select.options.length === 19;
+  }, { timeout: 10000 });
+
+  const fieldErrorIds = [
+    'checkin-user-type-error',
+    'checkin-name-error',
+    'checkin-direction-error',
+    'checkin-time-error',
+    'checkin-location-error',
+    'checkin-notes-error',
+  ];
+  await screenshot(page, 'form-empty.png');
+  await page.click('#checkin-submit');
+  await page.waitForFunction(
+    (ids) => ids.every((id) => document.getElementById(id)?.textContent.trim()),
+    { timeout: 5000 },
+    fieldErrorIds,
+  );
+  const validation = await page.evaluate((ids) => ({
+    messages: ids.map((id) => document.getElementById(id).textContent.trim()),
+    focus: document.activeElement?.id || '',
+  }), fieldErrorIds);
+  check(validation.messages.length === 6 && validation.messages.every(Boolean), 'empty submit shows all six field errors');
+  check(validation.focus === 'checkin-user-type', 'empty submit focuses the first invalid field', validation.focus);
+  await screenshot(page, 'form-six-errors.png');
+
+  console.log('\nFuture-time validation');
+  await page.select('#checkin-user-type', 'staff');
+  await page.type('#checkin-name', 'Future Time Test');
+  await page.select('#checkin-direction', 'in');
+  const nowParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const nowValues = Object.fromEntries(nowParts.map(({ type, value }) => [type, value]));
+  const nowTotal = Number(nowValues.hour) * 60 + Number(nowValues.minute);
+  const futureTotal = nowTotal + 15;
+  if (futureTotal > 23 * 60 + 59) {
+    throw new Error('Cannot produce a same-day future time in the final 15 minutes before midnight.');
+  }
+  const futureHour24 = Math.floor(futureTotal / 60);
+  const futureHour = String(futureHour24 % 12 || 12);
+  const futureMinute = String(futureTotal % 60).padStart(2, '0');
+  await page.select('#checkin-hour', futureHour);
+  await page.select('#checkin-minute', futureMinute);
+  await page.select('#checkin-period', futureHour24 < 12 ? 'AM' : 'PM');
+  await chooseLocation(page);
+  await page.type('#checkin-notes', 'Keep these values after error');
+  await page.click('#checkin-submit');
+  await waitForDialog(page);
+  const futureText = await page.$eval('#checkin-dialog', (dialog) => dialog.textContent.trim());
+  const futureValuesRetained = await page.$eval('#checkin-name', (input) => input.value === 'Future Time Test');
+  check(futureText.includes('later than now'), 'future time shows the error popup', futureText);
+  check(futureValuesRetained, 'future-time error keeps the submitted values');
+  await screenshot(page, 'future-time-error-popup.png');
+  await page.click('#checkin-dialog-button');
+  await page.waitForFunction(() => document.getElementById('checkin-dialog').classList.contains('d-none'));
+
+  console.log('\nValid submission and database assertion');
+  await page.evaluate(() => {
+    document.getElementById('checkin-user-type').value = '';
+    document.getElementById('checkin-name').value = '';
+    document.getElementById('checkin-direction').value = '';
+    document.getElementById('checkin-hour').value = '';
+    document.getElementById('checkin-minute').value = '';
+    document.getElementById('checkin-period').value = '';
+    document.getElementById('checkin-location').value = '';
+    document.getElementById('checkin-notes').value = '';
+  });
+  await page.select('#checkin-user-type', 'staff');
+  await page.type('#checkin-name', 'E2E Ada Lovelace');
+  await page.select('#checkin-direction', 'in');
+  await page.click('#checkin-now');
+  const chosen = await page.$eval('#checkin-time-choice', (element) => element.textContent.replace('Time: ', ''));
+  const selectedLocationId = await chooseLocation(page);
+  const selectedLocationName = await page.$eval(
+    '#checkin-location',
+    (select) => select.options[select.selectedIndex].textContent.trim(),
+  );
+  await page.type('#checkin-notes', 'E2E database verification');
+  await screenshot(page, 'form-filled.png');
+  const entryResponsePromise = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/public/entries' && response.request().method() === 'POST',
+    { timeout: 10000 },
+  );
+  await page.click('#checkin-submit');
+  const entryResponse = await entryResponsePromise;
+  const responsePayload = await entryResponse.json();
+  await waitForDialog(page);
+  const successText = await page.$eval('#checkin-dialog', (dialog) => dialog.textContent.trim().replace(/\s+/g, ' '));
+  const responseEntry = responsePayload?.data?.entry;
+  check(entryResponse.status() === 201, 'valid entry receives HTTP 201', String(entryResponse.status()));
+  check(successText.includes('E2E Ada Lovelace'), 'success popup displays the name');
+  check(successText.includes('Staff Member'), 'success popup displays the user type');
+  check(successText.includes(chosen), 'success popup displays the chosen time', chosen);
+  check(successText.includes(selectedLocationName), 'success popup displays the selected location');
+  check(Boolean(responseEntry?.date), 'success response includes the server-decided date', String(responseEntry?.date));
+  const [entryYear, entryMonth, entryDay] = responseEntry.date.split('-').map(Number);
+  const displayDate = new Date(entryYear, entryMonth - 1, entryDay)
+    .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    .replace(',', '');
+  check(successText.includes(displayDate), 'success popup displays the date', displayDate);
+  await screenshot(page, 'success-popup.png');
+
+  const retainedBeforeClose = await page.$eval('#checkin-name', (input) => input.value);
+  await milliseconds(300);
+  const retainedAfterDelay = await page.$eval('#checkin-name', (input) => input.value);
+  check(
+    retainedBeforeClose === 'E2E Ada Lovelace' && retainedAfterDelay === 'E2E Ada Lovelace',
+    'success form remains populated until the popup closes',
+  );
+
+  const mongoose = (await import('mongoose')).default;
+  await mongoose.connect(mongoUri);
+  const { EntryModel } = await import('../src/models/Entry.ts');
+  const savedEntry = await EntryModel.findOne({ name: 'E2E Ada Lovelace' }).lean();
+  const expectedTime = chosen.replace(/ (AM|PM)$/, '').split(':').map(Number);
+  const expectedHour = String((expectedTime[0] % 12) + (chosen.endsWith('PM') ? 12 : 0)).padStart(2, '0');
+  const expectedEnteredTime = `${expectedHour}:${String(expectedTime[1]).padStart(2, '0')}`;
+  check(Boolean(savedEntry), 'valid entry exists in MongoDB');
+  if (savedEntry) {
+    check(savedEntry.date === londonDate(), 'saved entry has the APP_TIMEZONE date', `${savedEntry.date} vs ${londonDate()}`);
+    check(savedEntry.enteredTime === expectedEnteredTime, 'saved entry has the selected clock time', savedEntry.enteredTime);
+    check(savedEntry.direction === 'in', 'saved entry has the selected direction', savedEntry.direction);
+    check(String(savedEntry.locationId) === selectedLocationId, 'saved entry has the selected location id');
+    check(savedEntry.userType === 'staff', 'saved entry has the selected user type');
+  }
+  await mongoose.disconnect();
+
+  await page.click('#checkin-dialog-button');
+  await page.waitForFunction(() => document.getElementById('checkin-dialog').classList.contains('d-none'));
+  const clearedAfterClose = await page.$eval('#checkin-name', (input) => input.value === '');
+  check(clearedAfterClose, 'success form resets after the popup closes');
+
+  console.log('\nDuplicate detection');
+  const duplicateInput = await fillCurrentEntry(page, {
+    name: 'E2E Duplicate Person',
+    direction: 'out',
+    notes: 'Duplicate test',
+  });
+  await page.click('#checkin-submit');
+  await waitForDialog(page);
+  await page.click('#checkin-dialog-button');
+  await page.waitForFunction(() => document.getElementById('checkin-dialog').classList.contains('d-none'));
+  await page.select('#checkin-user-type', 'staff');
+  await page.type('#checkin-name', 'E2E Duplicate Person');
+  await page.select('#checkin-direction', 'out');
+  await page.click('#checkin-now');
+  await page.select('#checkin-location', duplicateInput.locationId);
+  await page.type('#checkin-notes', 'Duplicate test');
+  await page.click('#checkin-submit');
+  await waitForDialog(page);
+  const duplicateText = await page.$eval('#checkin-dialog', (dialog) => dialog.textContent.trim());
+  check(duplicateText.toLowerCase().includes('already recorded'), 'duplicate submission shows duplicate message', duplicateText);
+  await screenshot(page, 'duplicate-message.png');
+  await page.click('#checkin-dialog-button');
+  await page.waitForFunction(() => document.getElementById('checkin-dialog').classList.contains('d-none'));
+  await page.close();
+
+  console.log('\nAdmin login and Locations');
+  const adminResult = await openPage(browser, 1440, 900);
+  const adminPage = adminResult.page;
+  await login(adminPage, baseUrl);
+  console.log(`  login landed at ${adminPage.url()}`);
+  await adminPage.goto(`${baseUrl}/locations.html`, { waitUntil: 'networkidle0' });
+  const locationsReady = await adminPage.waitForFunction(() => {
+    const rows = document.querySelectorAll('#locations-body tr');
+    return rows.length >= 18 && !document.getElementById('locations-body').textContent.includes('Loading');
+  }, { timeout: 10000 }).then(() => true).catch(() => false);
+  if (!locationsReady) {
+    const state = await adminPage.evaluate(() => ({
+      url: location.href,
+      body: document.body.innerText.slice(0, 500),
+      locations: document.getElementById('locations-body')?.innerText || '',
+    }));
+    console.log(`  Locations diagnostic: ${JSON.stringify(state)}`);
+    console.log(`  Browser/network evidence: ${JSON.stringify(adminResult.telemetry.events)}`);
+    console.log(`  API requests: ${JSON.stringify(adminResult.telemetry.requests)}`);
+    console.log(`  Session cookie names: ${JSON.stringify((await adminPage.cookies()).map(({ name }) => name))}`);
+    throw new Error('Authenticated Locations page did not render the seeded rows.');
+  }
+
+  const initialLocations = await adminPage.$$eval('#locations-body tr', (rows) => rows.map((row) => row.textContent.trim()));
+  check(initialLocations.length === 18, 'Locations page shows all 18 seeded rows', String(initialLocations.length));
+  check(!initialLocations.some((text) => text.includes('Loading')), 'Locations spinner ends');
+  await screenshot(adminPage, 'locations-page-18-rows.png');
+
+  const hangingPage = await openPage(browser, 1440, 900);
+  await login(hangingPage.page, baseUrl);
+  await faultRequests(hangingPage.page, 'hang-locations', '');
+  await hangingPage.page.goto(`${baseUrl}/locations.html`, { waitUntil: 'domcontentloaded' });
+  await hangingPage.page.waitForFunction(
+    () => document.getElementById('locations-body')?.textContent.includes('The locations could not be loaded.'),
+    { timeout: 20000 },
+  );
+  const timedOutLocations = await hangingPage.page.$eval('#locations-body', (body) => body.textContent.trim().replace(/\s+/g, ' '));
+  check(!timedOutLocations.includes('Loading') && timedOutLocations.includes('try again'), 'hung Locations API stops spinning and shows retry after timeout', timedOutLocations);
+  console.log(`  Hanging API browser trace: ${JSON.stringify(hangingPage.telemetry.events)}`);
+  await hangingPage.page.close();
+
+  await adminPage.click('#sort-az');
+  const sortedNames = await adminPage.$$eval('#locations-body tr', (rows) =>
+    rows.map((row) => row.querySelector('strong')?.textContent.trim() || row.cells[0]?.textContent.trim() || ''),
+  );
+  const sortedAscending = await adminPage.evaluate(() => {
+    const names = [...document.querySelectorAll('#locations-body tr td:first-child')]
+      .map((cell) => cell.textContent.trim());
+    return names.every((name, index) => !index || names[index - 1].localeCompare(name) <= 0);
+  });
+  check(sortedNames.length === 18 && sortedAscending, 'Sort A-Z sorts names ascending', sortedNames.join(' | '));
+
+  await adminPage.type('#location-search', 'HA1');
+  const postcodeMatches = await adminPage.$$eval('#locations-body tr', (rows) => rows.map((row) => row.querySelector('.location-postcode')?.textContent.trim() || ''));
+  check(postcodeMatches.length > 0 && postcodeMatches.every((postcode) => postcode.includes('HA1')), 'search HA1 filters the table by postcode');
+  await adminPage.$eval('#location-search', (input) => {
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await adminPage.waitForFunction(() => document.querySelectorAll('#locations-body tr').length === 18, { timeout: 5000 });
+
+  await adminPage.click('#add-location');
+  await adminPage.waitForFunction(() => document.getElementById('location-modal').classList.contains('show'));
+  await milliseconds(400);
+  await adminPage.type('#location-name', 'E2E Temporary Site');
+  await adminPage.type('#location-postcode', 'HA1 2ZZ');
+  await adminPage.click('#location-save');
+  await adminPage.waitForFunction(() => document.querySelector('#locations-body').textContent.includes('E2E Temporary Site'), { timeout: 10000 });
+  await adminPage.waitForFunction(() => !document.getElementById('location-modal').classList.contains('show'), { timeout: 5000 });
+  check(true, 'saving a new location closes the editor dialog');
+  check(true, 'administrator can add a location');
+  await milliseconds(400);
+
+  await clickLocationAction(adminPage, 'E2E Temporary Site', 'edit');
+  await adminPage.waitForFunction(() => document.getElementById('location-modal').classList.contains('show'));
+  await milliseconds(400);
+  await adminPage.locator('#location-name').fill('E2E Edited Site');
+  await adminPage.click('#location-save');
+  const editSaved = await adminPage.waitForFunction(
+    () => document.querySelector('#locations-body').textContent.includes('E2E Edited Site'),
+    { timeout: 10000 },
+  ).then(() => true).catch(() => false);
+  if (!editSaved) {
+    const state = await adminPage.evaluate(() => ({
+      modalTitle: document.getElementById('location-modal-title')?.textContent,
+      modalName: document.getElementById('location-name')?.value,
+      rows: [...document.querySelectorAll('#locations-body tr')].map((row) => row.textContent.trim()),
+      alerts: [...document.querySelectorAll('.toast, .invalid-feedback')].map((item) => item.textContent.trim()),
+    }));
+    console.log(`  Edit diagnostic: ${JSON.stringify(state)}`);
+    console.log(`  Browser/network evidence: ${JSON.stringify(adminResult.telemetry.events)}`);
+    console.log(`  API requests: ${JSON.stringify(adminResult.telemetry.requests)}`);
+    throw new Error('Editing a location did not update the table.');
+  }
+  await adminPage.waitForFunction(() => !document.getElementById('location-modal').classList.contains('show'), { timeout: 5000 });
+  check(true, 'administrator can edit a location');
+  await milliseconds(400);
+
+  await clickLocationAction(adminPage, 'E2E Edited Site', 'edit');
+  await adminPage.waitForFunction(() => document.getElementById('location-modal').classList.contains('show'));
+  await milliseconds(400);
+  await adminPage.click('#location-active');
+  await adminPage.click('#location-save');
+  await adminPage.waitForFunction(() => {
+    const row = [...document.querySelectorAll('#locations-body tr')]
+      .find((item) => item.textContent.includes('E2E Edited Site'));
+    return row && row.textContent.includes('Inactive');
+  }, { timeout: 10000 });
+  await adminPage.waitForFunction(() => !document.getElementById('location-modal').classList.contains('show'), { timeout: 5000 });
+  check(true, 'administrator can deactivate a location');
+
+  const publicAfterDeactivate = await openPage(browser, 390, 844);
+  await publicAfterDeactivate.page.goto(`${baseUrl}/`, { waitUntil: 'networkidle0' });
+  const deactivatedIsAbsent = await publicAfterDeactivate.page.$eval(
+    '#checkin-location',
+    (select) => ![...select.options].some((option) => option.textContent.includes('E2E Edited Site')),
+  );
+  check(deactivatedIsAbsent, 'deactivated location is absent from the public dropdown');
+  await publicAfterDeactivate.page.close();
+
+  console.log('\nAdmin pages: console and network checks');
+  const adminPaths = [
+    '/dashboard.html',
+    '/entries.html',
+    '/locations.html',
+    '/admins.html',
+    '/admin-form.html',
+    '/my-account.html',
+  ];
+  const adminPageEvents = [];
+  for (const route of adminPaths) {
+    const result = await openPage(browser, 1440, 900);
+    await result.page.goto(`${baseUrl}${route}`, { waitUntil: 'networkidle0' });
+    await milliseconds(250);
+    const landedPath = new URL(result.page.url()).pathname;
+    check(landedPath === route, `${route} loads while authenticated`, landedPath);
+    if (result.telemetry.events.length) {
+      adminPageEvents.push(`${route}: ${result.telemetry.events.join(' | ')}`);
+    }
+    await result.page.close();
+  }
+  check(adminPageEvents.length === 0, 'all admin pages have zero console errors and failed requests', adminPageEvents.join(' || '));
+
+  console.log('\nAPI unavailable');
+  const offlineResult = await openPage(browser, 390, 844);
+  const offlinePage = offlineResult.page;
+  await offlinePage.goto(`${baseUrl}/`, { waitUntil: 'networkidle0' });
+  await fillCurrentEntry(offlinePage, { name: 'E2E Offline Test', notes: 'Server shutdown test' });
+  await stopChild(server);
+  await offlinePage.click('#checkin-submit');
+  await waitForDialog(offlinePage);
+  const offlineMessage = await offlinePage.$eval('#checkin-dialog', (dialog) => dialog.textContent.trim());
+  check(offlineMessage.toLowerCase().includes('could not reach the server'), 'stopped API shows the could-not-reach-server popup', offlineMessage);
+  check(await offlinePage.$eval('#checkin-name', (input) => input.value === 'E2E Offline Test'), 'network error keeps the entered values');
+  await offlinePage.close();
+}
+
 async function main() {
   await mkdir(shotsDir, { recursive: true });
+  console.log(`Application worktree: ${appRoot}`);
+  console.log('MongoDB for e2e: mongodb-memory-server (ephemeral; no local mongod or configured database is used).');
 
-  const dir = await mkdtemp(path.join(tmpdir(), 'care-e2e-'));
-  const dbName = 'care-attendance-e2e-' + Date.now();
-  const mongoUri = `mongodb://127.0.0.1:27017/${dbName}`;
-  const port = 3215;
-
+  const memoryServer = await MongoMemoryServer.create();
+  const databaseName = `care-attendance-e2e-${Date.now()}`;
+  const mongoUri = memoryServer.getUri(databaseName);
+  const port = await freePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
   const env = {
     ...process.env,
     NODE_ENV: 'development',
     PORT: String(port),
     MONGODB_URI: mongoUri,
-    SESSION_SECRET: 'test-session-secret-e2e-' + Date.now(),
+    SESSION_SECRET: `e2e-only-${Date.now()}-not-a-production-secret`,
     SESSION_COOKIE_NAME: 'care.e2e.sid',
     TRUST_PROXY: '1',
-    APP_URL: `http://127.0.0.1:${port}`,
-    APP_BASE_URL: `http://127.0.0.1:${port}`,
-    APP_TIMEZONE: 'Europe/London',
+    APP_URL: baseUrl,
+    APP_BASE_URL: baseUrl,
+    APP_TIMEZONE: timezone,
     MAIL_PROVIDER: 'none',
     SEED_ADMIN_EMAIL: 'e2e-admin@example.com',
     SEED_ADMIN_PASSWORD: 'TestPass123!',
   };
-
-  console.log('Starting test server...');
-  const server = spawn(process.execPath, ['server.ts'], { cwd: root, env, stdio: 'pipe' });
-  server.stdout.on('data', d => process.stdout.write('[srv] ' + d));
-  server.stderr.on('data', d => process.stderr.write('[srv-err] ' + d));
-
-  const up = await waitForServer(port);
-  if (!up) {
-    console.error('Server failed to start');
-    server.kill();
-    process.exit(1);
-  }
-  console.log('Server up');
-
-  // seed admin
-  const seedAdmin = spawn(process.execPath, ['seed/seed.ts'], { cwd: root, env, stdio: 'inherit' });
-  await new Promise(r => seedAdmin.on('close', r));
-  // seed locations
-  const seedLoc = spawn(process.execPath, ['seed/seed-locations.ts'], { cwd: root, env, stdio: 'inherit' });
-  await new Promise(r => seedLoc.on('close', r));
-
-  // connect puppeteer
-  const chrome = process.env.CHROME_BIN || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+  let server;
   let browser;
+
   try {
+    console.log(`Starting test app on ${baseUrl}`);
+    server = spawn(process.execPath, ['server.ts'], { cwd: appRoot, env, stdio: 'pipe' });
+    server.stdout.on('data', (data) => process.stdout.write(`[srv] ${data}`));
+    server.stderr.on('data', (data) => process.stderr.write(`[srv-err] ${data}`));
+    if (!(await waitForServer(`${baseUrl}/api/health`, server))) {
+      throw new Error('Test server did not become ready.');
+    }
+
+    await runChild(['seed/seed.ts'], env, appRoot);
+    await runChild(['seed/seed-locations.ts'], env, appRoot);
+
+    const chrome = process.env.CHROME_BIN || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
     browser = await puppeteer.launch({
       executablePath: chrome,
       headless: true,
-      args: ['--no-sandbox', '--disable-gpu', '--window-size=1440,900'],
+      args: ['--no-sandbox', '--disable-gpu', '--window-size=1440,1000'],
     });
-  } catch (e) {
-    console.error('Failed to launch chrome:', e.message);
-    server.kill();
-    process.exit(1);
-  }
 
-  const problems = [];
-  const logs = [];
-
-  async function openPage(w, h) {
-    const page = await browser.newPage();
-    await page.setViewport({ width: w, height: h });
-    page.on('console', msg => {
-      if (msg.type() === 'error') logs.push(`console.error: ${msg.text()}`);
-    });
-    page.on('pageerror', err => logs.push(`pageerror: ${err.message}`));
-    page.on('response', res => {
-      if (res.status() >= 400) {
-        const url = res.url();
-        if (res.status() === 401 && url.includes('/api/auth/me')) return;
-        logs.push(`HTTP ${res.status()}: ${url}`);
-      }
-    });
-    return page;
-  }
-
-  try {
-    // (b) empty submit shows six field errors
-    console.log('Test: public form empty validation');
-    let page = await openPage(360, 740);
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle0' });
-    await page.click('#checkin-submit');
-    await page.waitForFunction(() => document.getElementById('checkin-name-error')?.textContent?.length > 0, { timeout: 3000 });
-    const errs = await page.evaluate(() => {
-      const ids = ['checkin-user-type-error','checkin-name-error','checkin-direction-error','checkin-time-error','checkin-location-error','checkin-notes-error'];
-      return ids.map(id => document.getElementById(id)?.textContent?.trim() || '');
-    });
-    if (errs.filter(e => e.length > 0).length !== 6) problems.push('Empty submit did not show 6 field errors');
-    else console.log('  ok: 6 errors shown');
-    await page.screenshot({ path: path.join(shotsDir, 'public form empty.png') });
-    await page.screenshot({ path: path.join(shotsDir, 'with validation errors.png') });
-    await page.close();
-
-    // (c) time later than now shows error popup
-    console.log('Test: time in future');
-    page = await openPage(360, 740);
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle0' });
-    await page.evaluate(() => {
-      document.getElementById('checkin-user-type').value = 'staff';
-      document.getElementById('checkin-name').value = 'Test User';
-      document.getElementById('checkin-direction').value = 'in';
-      document.getElementById('checkin-hour').value = '11';
-      document.getElementById('checkin-minute').value = '59';
-      document.getElementById('checkin-period').value = 'PM';
-      document.getElementById('checkin-notes').value = 'test';
-      // pick first location
-      const loc = document.getElementById('checkin-location');
-      if (loc.options.length > 1) loc.value = loc.options[1].value;
-    });
-    await page.click('#checkin-submit');
-    await page.waitForTimeout(1000);
-    const futureErr = await page.evaluate(() => {
-      const dialog = document.getElementById('checkin-dialog');
-      return dialog && !dialog.classList.contains('d-none') ? dialog.textContent : '';
-    });
-    if (!futureErr.toLowerCase().includes('later than now')) problems.push('Time in future did not show expected error');
-    else console.log('  ok: time in future error shown');
-    await page.screenshot({ path: path.join(shotsDir, 'error popup.png') });
-    await page.close();
-
-    // (a) filled form shows success popup and entry exists in DB
-    console.log('Test: successful submission');
-    page = await openPage(360, 740);
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle0' });
-    await page.evaluate(() => {
-      document.getElementById('checkin-user-type').value = 'staff';
-      document.getElementById('checkin-name').value = 'Ada Lovelace';
-      document.getElementById('checkin-direction').value = 'in';
-      document.getElementById('checkin-hour').value = '9';
-      document.getElementById('checkin-minute').value = '00';
-      document.getElementById('checkin-period').value = 'AM';
-      document.getElementById('checkin-notes').value = 'Start of shift';
-      const loc = document.getElementById('checkin-location');
-      if (loc.options.length > 1) loc.value = loc.options[1].value;
-    });
-    await page.screenshot({ path: path.join(shotsDir, 'filled.png') });
-    await page.click('#checkin-submit');
-    await page.waitForFunction(() => {
-      const d = document.getElementById('checkin-dialog');
-      return d && !d.classList.contains('d-none');
-    }, { timeout: 5000 });
-    const successDialog = await page.evaluate(() => {
-      const d = document.getElementById('checkin-dialog');
-      return d ? d.textContent : '';
-    });
-    if (!successDialog.toLowerCase().includes('check in recorded')) problems.push('Success dialog not shown');
-    else console.log('  ok: success dialog shown');
-    await page.screenshot({ path: path.join(shotsDir, 'success popup.png') });
-    // close dialog
-    await page.click('#checkin-dialog-button');
-    await page.waitForTimeout(500);
-    await page.close();
-
-    // Check DB
-    const mongoose = (await import('mongoose')).default;
-    await mongoose.connect(mongoUri);
-    const { EntryModel } = await import('./src/models/Entry.ts');
-    const entry = await EntryModel.findOne({ name: 'Ada Lovelace' }).lean();
-    if (!entry) problems.push('Entry not found in DB');
-    else {
-      console.log('  ok: entry in DB', { date: entry.date, time: entry.enteredTime, direction: entry.direction, userType: entry.userType });
-    }
-    await mongoose.disconnect();
-
-    // (d) duplicate
-    console.log('Test: duplicate submission');
-    page = await openPage(360, 740);
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle0' });
-    await page.evaluate(() => {
-      document.getElementById('checkin-user-type').value = 'staff';
-      document.getElementById('checkin-name').value = 'Dup User';
-      document.getElementById('checkin-direction').value = 'in';
-      document.getElementById('checkin-hour').value = '8';
-      document.getElementById('checkin-minute').value = '00';
-      document.getElementById('checkin-period').value = 'AM';
-      document.getElementById('checkin-notes').value = 'test';
-      const loc = document.getElementById('checkin-location');
-      if (loc.options.length > 1) loc.value = loc.options[1].value;
-    });
-    await page.click('#checkin-submit');
-    await page.waitForFunction(() => document.getElementById('checkin-dialog') && !document.getElementById('checkin-dialog').classList.contains('d-none'), { timeout: 5000 });
-    await page.click('#checkin-dialog-button');
-    await page.waitForTimeout(500);
-    // submit again
-    await page.evaluate(() => {
-      document.getElementById('checkin-hour').value = '8';
-      document.getElementById('checkin-minute').value = '01';
-      document.getElementById('checkin-period').value = 'AM';
-    });
-    await page.click('#checkin-submit');
-    await page.waitForFunction(() => document.getElementById('checkin-dialog') && !document.getElementById('checkin-dialog').classList.contains('d-none'), { timeout: 5000 });
-    const dup = await page.evaluate(() => document.getElementById('checkin-dialog').textContent);
-    if (!dup.toLowerCase().includes('already')) problems.push('Duplicate not detected');
-    else console.log('  ok: duplicate detected');
-    await page.close();
-
-    // (f) admin login and locations page
-    console.log('Test: admin locations');
-    page = await openPage(1440, 900);
-    await page.goto(`http://127.0.0.1:${port}/login.html`, { waitUntil: 'networkidle0' });
-    await page.type('#login-email', 'e2e-admin@example.com');
-    await page.type('#login-password', 'TestPass123!');
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 10000 }).catch(()=>{}),
-      page.click('#login-submit'),
-    ]);
-    await page.goto(`http://127.0.0.1:${port}/locations.html`, { waitUntil: 'networkidle0' });
-    await page.waitForTimeout(2000);
-    const locPage = await page.evaluate(() => {
-      const body = document.getElementById('locations-body');
-      const rows = body ? body.querySelectorAll('tr').length : 0;
-      const hasSpinner = body ? body.textContent.includes('Loading') : false;
-      return { rows, hasSpinner, text: body ? body.textContent.substring(0, 200) : '' };
-    });
-    if (locPage.hasSpinner) problems.push('Locations page stuck loading');
-    if (locPage.rows < 18) problems.push(`Locations page has ${locPage.rows} rows, expected >=18`);
-    else console.log(`  ok: locations page has ${locPage.rows} rows`);
-    await page.screenshot({ path: path.join(shotsDir, 'Locations page with 18 rows.png') });
-    await page.close();
-
-    // (g) console errors on admin pages
-    console.log('Test: console errors on admin pages');
-    page = await openPage(1440, 900);
-    await page.goto(`http://127.0.0.1:${port}/login.html`, { waitUntil: 'networkidle0' });
-    await page.type('#login-email', 'e2e-admin@example.com');
-    await page.type('#login-password', 'TestPass123!');
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 10000 }).catch(()=>{}),
-      page.click('#login-submit'),
-    ]);
-    const pages = ['/dashboard.html', '/entries.html', '/locations.html', '/admins.html'];
-    for (const p of pages) {
-      await page.goto(`http://127.0.0.1:${port}${p}`, { waitUntil: 'networkidle0' });
-      await page.waitForTimeout(1500);
-    }
-    if (logs.filter(l => l.includes('console.error') && !l.includes('Failed to load resource')).length > 0) {
-      problems.push('Console errors on admin pages: ' + logs.join(' | '));
+    if (baseline) {
+      await runBaselineDiagnostic(browser, baseUrl);
+    } else if (mutation) {
+      await runMutation(browser, baseUrl);
     } else {
-      console.log('  ok: no console errors on admin pages');
+      await runCurrentSuite(browser, baseUrl, server, mongoUri);
     }
-    await page.close();
-
-    console.log('\nScreenshots saved in .verify/:');
-    console.log('  - public form empty.png');
-    console.log('  - with validation errors.png');
-    console.log('  - filled.png');
-    console.log('  - success popup.png');
-    console.log('  - error popup.png');
-    console.log('  - Locations page with 18 rows.png');
-
   } finally {
-    await browser.close();
-    server.kill();
+    if (browser) await browser.close();
+    await stopChild(server);
+    await memoryServer.stop();
   }
 
-  if (problems.length) {
-    console.error('\nFAILURES:');
-    for (const p of problems) console.error('  - ' + p);
-    process.exit(1);
+  if (failures.length) {
+    console.error('\nE2E failures:');
+    for (const failure of failures) console.error(`  - ${failure}`);
+    process.exitCode = 1;
+    return;
   }
-  console.log('\nAll e2e checks passed');
+  console.log(baseline ? '\nPre-fix diagnostic complete.' : mutation ? '\nMutation detection complete.' : '\nAll e2e checks passed.');
 }
 
-main().catch(e => {
-  console.error(e);
-  process.exit(1);
+main().catch((error) => {
+  console.error('E2E run failed:', error);
+  process.exitCode = 1;
 });

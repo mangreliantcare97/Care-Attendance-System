@@ -155,38 +155,6 @@
   opacity: 0.62;
 }
 
-.checkin-alert,
-.checkin-success {
-  margin-bottom: 1rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: 8px;
-  border: 1px solid transparent;
-}
-
-.checkin-alert {
-  color: #842029;
-  background: #f8d7da;
-  border-color: #f5c2c7;
-}
-
-.checkin-success {
-  color: #0f5132;
-  background: #d1e7dd;
-  border-color: #badbcc;
-}
-
-[data-theme='dark'] .checkin-alert {
-  color: #f1aeb5;
-  background: #3b1d21;
-  border-color: #842029;
-}
-
-[data-theme='dark'] .checkin-success {
-  color: #a3cfbb;
-  background: #132b21;
-  border-color: #0f5132;
-}
-
 /* ---- required markers, field errors and the time picker ---- */
 
 .checkin-required-note {

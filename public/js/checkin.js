@@ -24,8 +24,6 @@
   var notesCount = document.getElementById('checkin-notes-count');
   var company = document.getElementById('checkin-company');
   var submitButton = document.getElementById('checkin-submit');
-  var alertBox = document.getElementById('checkin-alert');
-  var successBox = document.getElementById('checkin-success');
   var dialog = document.getElementById('checkin-dialog');
   var dialogBackdrop = document.getElementById('checkin-dialog-backdrop');
   var dialogCard = dialog ? dialog.querySelector('.checkin-dialog-card') : null;
@@ -37,15 +35,14 @@
   var requestedLocation = new URLSearchParams(window.location.search).get('location');
   var locations = [];
   var firstInvalid = null;
-  var resetTimer = null;
   var dialogTimer = null;
+  var dialogOnClose = null;
   var lastFocusedElement = null;
   /** The server's timezone, delivered with the location list (APP_TIMEZONE). */
   var appTimezone = '';
 
   var EMPTY_LOCATION_MESSAGE = 'No active locations are available. Please ask an administrator.';
   var FAILED_LOCATION_MESSAGE = 'Could not load locations.';
-  var RESET_AFTER_MS = 10000;
 
   // ---- time helpers -------------------------------------------------------
 
@@ -140,38 +137,6 @@
 
   // ---- messages -----------------------------------------------------------
 
-  function showAlert(message) {
-    if (successBox) {
-      successBox.classList.add('d-none');
-      successBox.textContent = '';
-    }
-    if (alertBox) {
-      alertBox.textContent = message;
-      alertBox.classList.remove('d-none');
-    }
-  }
-
-  function hideAlert() {
-    if (alertBox) {
-      alertBox.classList.add('d-none');
-      alertBox.textContent = '';
-    }
-  }
-
-  function showSuccess(message) {
-    if (successBox) {
-      successBox.textContent = message;
-      successBox.classList.remove('d-none');
-    }
-  }
-
-  function hideSuccess() {
-    if (successBox) {
-      successBox.classList.add('d-none');
-      successBox.textContent = '';
-    }
-  }
-
   // ---- field errors -------------------------------------------------------
 
   function describedByFor(field, errorId) {
@@ -263,8 +228,6 @@
       locationSelect.disabled = true;
       submitButton.disabled = true;
       if (locationFull) locationFull.textContent = '';
-      hideAlert();
-      hideSuccess();
       showLocationState(EMPTY_LOCATION_MESSAGE, false);
       return;
     }
@@ -408,6 +371,9 @@
       } catch (e) {}
     }
     lastFocusedElement = null;
+    var onClose = dialogOnClose;
+    dialogOnClose = null;
+    if (onClose) onClose();
   }
 
   function openDialog(options) {
@@ -429,6 +395,7 @@
       dialogBody.appendChild(p2);
     }
     dialog.classList.remove('d-none');
+    dialogOnClose = typeof options.onClose === 'function' ? options.onClose : null;
     window.setTimeout(function () {
       if (dialogCard && typeof dialogCard.focus === 'function') {
         dialogCard.focus();
@@ -438,23 +405,13 @@
     if (options.autoClose) {
       dialogTimer = window.setTimeout(closeDialog, options.autoCloseMs || 10000);
     }
-    dialogButton.onclick = function () {
-      closeDialog();
-      if (typeof options.onClose === 'function') options.onClose();
-    };
+    dialogButton.onclick = closeDialog;
   }
 
   // ---- submit -------------------------------------------------------------
 
   async function handleSubmit(event) {
     event.preventDefault();
-    hideSuccess();
-    hideAlert();
-
-    if (resetTimer) {
-      window.clearTimeout(resetTimer);
-      resetTimer = null;
-    }
 
     if (!validate()) {
       focusFirstError();
@@ -584,42 +541,22 @@
       var entryTime = entry.time ? formatClockString(entry.time) : chosenTime() ? formatClockString(chosenTime()) : '';
       var entryDate = entry.date ? formatDisplayDate(entry.date) : formatDisplayDateFromParts();
 
-      // Maintain backward compatibility with existing tests
-      try {
-        if (successBox) {
-          showSuccess(
-            'Thank you, ' +
-              (entry.name || (nameInput ? nameInput.value.trim() : '')) +
-              '. Your ' +
-              ((entry.direction || direction.value) === 'out' ? 'check out' : 'check in') +
-              ' at ' +
-              entryTime +
-              ' has been recorded.',
-          );
-        }
-      } catch (e) {}
-
-      scheduleReset();
       if (dialog) {
-        try {
-          openDialog({
-            type: 'success',
-            title: successTitle,
-            lines: [
-              'Name: ' + (entry.name || (nameInput ? nameInput.value.trim() : '')),
-              'User type: ' + getUserTypeLabel(userType ? userType.value : ''),
-              (entry.direction || direction.value) === 'out' ? 'Direction: Check out' : 'Direction: Check in',
-              'Time: ' + entryTime,
-              'Date: ' + entryDate,
-              locationName ? 'Location: ' + locationName : '',
-            ].filter(Boolean),
-            autoClose: true,
-            autoCloseMs: 10000,
-            onClose: function () {
-              resetForm();
-            },
-          });
-        } catch (e) {}
+        openDialog({
+          type: 'success',
+          title: successTitle,
+          lines: [
+            'Name: ' + (entry.name || (nameInput ? nameInput.value.trim() : '')),
+            'User type: ' + getUserTypeLabel(userType ? userType.value : ''),
+            (entry.direction || direction.value) === 'out' ? 'Direction: Check out' : 'Direction: Check in',
+            'Time: ' + entryTime,
+            'Date: ' + entryDate,
+            locationName ? 'Location: ' + locationName : '',
+          ].filter(Boolean),
+          autoClose: true,
+          autoCloseMs: 10000,
+          onClose: resetForm,
+        });
       }
       if (submitButton) {
         submitButton.textContent = 'Submit';
@@ -663,15 +600,7 @@
 
   // ---- reset for the next person ------------------------------------------
 
-  function scheduleReset() {
-    if (resetTimer) window.clearTimeout(resetTimer);
-    resetTimer = window.setTimeout(resetForm, dialog ? 100 : RESET_AFTER_MS);
-  }
-
   function resetForm() {
-    resetTimer = null;
-    hideSuccess();
-    hideAlert();
     clearAllErrors();
 
     if (userType) userType.value = '';

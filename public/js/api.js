@@ -54,6 +54,7 @@
         headers: buildHeaders(options),
         body: body,
         credentials: 'same-origin',
+        signal: options.signal,
       });
     } catch (error) {
       var networkError = new Error('The server could not be reached. Please check your connection.');

@@ -5,7 +5,7 @@
  * drive the real checkin.js and checkin.html to cover the other half: the six
  * required fields, local validation, the URL preselection, the two location
  * messages, the cookie-free fetch calls, the confirmation text and the reset
- * for the next person.
+ * dialog text and the reset after the success dialog closes.
  *
  * The project compiles without the DOM lib, so the elements are described by
  * the handful of members these tests actually touch.
@@ -76,10 +76,6 @@ interface Harness {
 
 function tick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function harness(options: HarnessOptions = {}): Promise<Harness> {
@@ -372,7 +368,7 @@ describe('public check-in form', () => {
     assert.equal(elem(doc, 'checkin-time-error').textContent, '');
   });
 
-  it('submits without cookies, confirms in words and resets for the next person', async () => {
+  it('shows the success dialog and resets only after it closes', async () => {
     const { doc, calls } = await harness({ search: `?location=${FIRST.id}` });
 
     fillValidForm(doc);
@@ -402,24 +398,32 @@ describe('public check-in form', () => {
       company: '',
     });
 
-    const success = elem(doc, 'checkin-success');
-    assert.equal(
-      success.textContent,
-      'Thank you, Ada Lovelace. Your check in at 09:05 AM has been recorded.',
-    );
-    assert.equal(success.classList.contains('d-none'), false);
-    // The confirmation is text, never markup.
-    assert.equal(success.innerHTML.includes('<'), false);
+    const dialog = elem(doc, 'checkin-dialog');
+    assert.equal(dialog.classList.contains('d-none'), false);
+    const dialogText = elem(doc, 'checkin-dialog-body').textContent ?? '';
+    assert.match(dialogText, /Name: Ada Lovelace/);
+    assert.match(dialogText, /User type: Staff Member/);
+    assert.match(dialogText, /Direction: Check in/);
+    assert.match(dialogText, /Time: 09:05 AM/);
+    assert.match(dialogText, /Date: 26 Oct 2026/);
+    assert.ok(dialogText.includes(`Location: ${FIRST.name}`));
+    assert.equal(doc.getElementById('checkin-success'), null);
 
-    // The form clears itself so the next person starts fresh.
-    await wait(5300);
+    // Keep the submitted values visible until the person dismisses the dialog.
+    assert.equal(elem(doc, 'checkin-name').value, 'Ada Lovelace');
+    assert.equal(elem(doc, 'checkin-user-type').value, 'staff');
+    assert.equal(elem(doc, 'checkin-direction').value, 'in');
+    assert.equal(elem(doc, 'checkin-hour').value, '9');
+    assert.equal(elem(doc, 'checkin-notes').value, 'Start of shift');
+
+    elem(doc, 'checkin-dialog-button').click();
     assert.equal(elem(doc, 'checkin-name').value, '');
     assert.equal(elem(doc, 'checkin-user-type').value, '');
     assert.equal(elem(doc, 'checkin-direction').value, '');
     assert.equal(elem(doc, 'checkin-hour').value, '');
     assert.equal(elem(doc, 'checkin-notes').value, '');
     assert.equal(elem(doc, 'checkin-notes-count').textContent, '0 / 500');
-    assert.equal(success.classList.contains('d-none'), true);
+    assert.equal(dialog.classList.contains('d-none'), true);
     // The location from the URL is preselected again.
     assert.equal(elem(doc, 'checkin-location').value, FIRST.id);
   });
@@ -433,11 +437,12 @@ describe('public check-in form', () => {
     submit(doc);
     await tick();
 
-    const success = elem(doc, 'checkin-success');
-    assert.match(success.textContent ?? '', /Thank you, <img src=x onerror="alert\(1\)">/);
-    assert.equal(success.querySelectorAll('img').length, 0);
-    assert.equal(success.querySelectorAll('script').length, 0);
-    assert.equal(success.classList.contains('d-none'), false);
+    const dialog = elem(doc, 'checkin-dialog');
+    const dialogBody = elem(doc, 'checkin-dialog-body');
+    assert.match(dialogBody.textContent ?? '', /Name: <img src=x onerror="alert\(1\)">/);
+    assert.equal(dialogBody.querySelectorAll('img').length, 0);
+    assert.equal(dialogBody.querySelectorAll('script').length, 0);
+    assert.equal(dialog.classList.contains('d-none'), false);
   });
 
   it('maps a server-side location error onto the location field', async () => {
@@ -451,6 +456,7 @@ describe('public check-in form', () => {
 
     assert.match(elem(doc, 'checkin-location-error').textContent ?? '', /Choose an active location/);
     assert.equal(elem(doc, 'checkin-location').getAttribute('aria-invalid'), 'true');
-    assert.equal(elem(doc, 'checkin-alert').classList.contains('d-none'), true);
+    assert.equal(elem(doc, 'checkin-dialog').classList.contains('d-none'), false);
+    assert.match(elem(doc, 'checkin-dialog-body').textContent ?? '', /Choose an active location/);
   });
 });

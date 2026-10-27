@@ -55,7 +55,6 @@
       });
       if (timeoutId) window.clearTimeout(timeoutId);
       state.locations = (response.data && response.data.locations) ? response.data.locations : [];
-      render();
     } catch (error) {
       if (timeoutId) window.clearTimeout(timeoutId);
       var msg = error && error.message ? error.message : 'The locations could not be loaded.';
@@ -63,9 +62,11 @@
         msg = 'The locations could not be loaded.';
       }
       renderError(msg);
+      return;
     } finally {
       loading = false;
     }
+    render();
   }
 
   function matchesSearch(location) {
