@@ -81,6 +81,16 @@ export function createApp(options: AppOptions = {}): Express {
   app.set('trust proxy', env.trustProxy);
   app.disable('x-powered-by');
 
+  app.use((req, res, next) => {
+    if (env.nodeEnv !== 'production') {
+      const path = req.path.toLowerCase();
+      if (path.endsWith('.html') || path.endsWith('.js') || path.endsWith('.css')) {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      }
+    }
+    next();
+  });
+
   app.use(
     helmet({
       contentSecurityPolicy,

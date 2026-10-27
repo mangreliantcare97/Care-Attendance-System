@@ -26,17 +26,26 @@
   var submitButton = document.getElementById('checkin-submit');
   var alertBox = document.getElementById('checkin-alert');
   var successBox = document.getElementById('checkin-success');
+  var dialog = document.getElementById('checkin-dialog');
+  var dialogBackdrop = document.getElementById('checkin-dialog-backdrop');
+  var dialogCard = dialog ? dialog.querySelector('.checkin-dialog-card') : null;
+  var dialogIcon = document.getElementById('checkin-dialog-icon');
+  var dialogTitle = document.getElementById('checkin-dialog-title');
+  var dialogBody = document.getElementById('checkin-dialog-body');
+  var dialogButton = document.getElementById('checkin-dialog-button');
 
   var requestedLocation = new URLSearchParams(window.location.search).get('location');
   var locations = [];
   var firstInvalid = null;
   var resetTimer = null;
+  var dialogTimer = null;
+  var lastFocusedElement = null;
   /** The server's timezone, delivered with the location list (APP_TIMEZONE). */
   var appTimezone = '';
 
   var EMPTY_LOCATION_MESSAGE = 'No active locations are available. Please ask an administrator.';
-  var FAILED_LOCATION_MESSAGE = 'Could not load locations. Please try again.';
-  var RESET_AFTER_MS = 5000;
+  var FAILED_LOCATION_MESSAGE = 'Could not load locations.';
+  var RESET_AFTER_MS = 10000;
 
   // ---- time helpers -------------------------------------------------------
 
@@ -74,7 +83,14 @@
   /** "09:05 AM" under the picker, or nothing while the time is incomplete. */
   function updateTimeChoice() {
     var value = chosenTime();
-    timeChoice.textContent = value ? 'Time: ' + formatClockString(value) : '';
+    if (!timeChoice) return;
+    if (value) {
+      timeChoice.textContent = 'Time: ' + formatClockString(value);
+      timeChoice.hidden = false;
+    } else {
+      timeChoice.textContent = '';
+      timeChoice.hidden = true;
+    }
   }
 
   /** The three selects as 24h `HH:mm`, or '' when any part is missing. */
@@ -125,25 +141,35 @@
   // ---- messages -----------------------------------------------------------
 
   function showAlert(message) {
-    successBox.classList.add('d-none');
-    successBox.textContent = '';
-    alertBox.textContent = message;
-    alertBox.classList.remove('d-none');
+    if (successBox) {
+      successBox.classList.add('d-none');
+      successBox.textContent = '';
+    }
+    if (alertBox) {
+      alertBox.textContent = message;
+      alertBox.classList.remove('d-none');
+    }
   }
 
   function hideAlert() {
-    alertBox.classList.add('d-none');
-    alertBox.textContent = '';
+    if (alertBox) {
+      alertBox.classList.add('d-none');
+      alertBox.textContent = '';
+    }
   }
 
   function showSuccess(message) {
-    successBox.textContent = message;
-    successBox.classList.remove('d-none');
+    if (successBox) {
+      successBox.textContent = message;
+      successBox.classList.remove('d-none');
+    }
   }
 
   function hideSuccess() {
-    successBox.classList.add('d-none');
-    successBox.textContent = '';
+    if (successBox) {
+      successBox.classList.add('d-none');
+      successBox.textContent = '';
+    }
   }
 
   // ---- field errors -------------------------------------------------------
@@ -204,16 +230,21 @@
 
   function updateLocationLabel() {
     var option = locationSelect.options[locationSelect.selectedIndex];
-    locationFull.textContent = locationSelect.value && option ? option.textContent : '';
+    if (locationFull) {
+      locationFull.textContent = locationSelect.value && option ? option.textContent : '';
+    }
   }
 
   function showLocationState(message, showRetry) {
+    if (!locationMessage || !locationState || !retryButton) return;
     locationMessage.textContent = message;
     locationState.hidden = false;
     retryButton.hidden = !showRetry;
+    if (showRetry) retryButton.focus();
   }
 
   function hideLocationState() {
+    if (!locationState || !retryButton || !locationMessage) return;
     locationState.hidden = true;
     retryButton.hidden = true;
     locationMessage.textContent = '';
@@ -231,7 +262,9 @@
     if (!locations.length) {
       locationSelect.disabled = true;
       submitButton.disabled = true;
-      locationFull.textContent = '';
+      if (locationFull) locationFull.textContent = '';
+      hideAlert();
+      hideSuccess();
       showLocationState(EMPTY_LOCATION_MESSAGE, false);
       return;
     }
@@ -253,8 +286,13 @@
   }
 
   async function loadLocations() {
+    if (!locationSelect) return;
     locationSelect.disabled = true;
-    retryButton.hidden = true;
+    if (retryButton) retryButton.hidden = true;
+    if (locationState) locationState.hidden = true;
+
+    var controller = typeof AbortController === 'function' ? new AbortController() : null;
+    var timeoutId = controller ? window.setTimeout(function () { controller.abort(); }, 15000) : null;
 
     try {
       var response = await fetch('/api/public/locations', {
@@ -262,6 +300,7 @@
         credentials: 'omit',
         headers: { Accept: 'application/json' },
         cache: 'no-store',
+        signal: controller ? controller.signal : undefined,
       });
       var payload = await response.json();
 
@@ -272,11 +311,13 @@
       }
 
       if (payload.meta && payload.meta.timezone) appTimezone = String(payload.meta.timezone);
+      if (timeoutId) window.clearTimeout(timeoutId);
       renderLocations(payload.data.locations || []);
     } catch (error) {
+      if (timeoutId) window.clearTimeout(timeoutId);
       locationSelect.disabled = true;
       submitButton.disabled = true;
-      locationFull.textContent = '';
+      if (locationFull) locationFull.textContent = '';
       showLocationState(FAILED_LOCATION_MESSAGE, true);
     }
   }
@@ -347,7 +388,60 @@
   }
 
   function focusFirstError() {
-    if (firstInvalid && !firstInvalid.disabled) firstInvalid.focus();
+    if (firstInvalid && typeof firstInvalid.focus === 'function' && !firstInvalid.disabled) {
+      firstInvalid.focus();
+    }
+  }
+
+  // ---- dialog -------------------------------------------------------------
+
+  function closeDialog() {
+    if (!dialog) return;
+    dialog.classList.add('d-none');
+    if (dialogTimer) {
+      window.clearTimeout(dialogTimer);
+      dialogTimer = null;
+    }
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+      try {
+        lastFocusedElement.focus();
+      } catch (e) {}
+    }
+    lastFocusedElement = null;
+  }
+
+  function openDialog(options) {
+    if (!dialog || !dialogTitle || !dialogBody || !dialogButton || !dialogIcon) return;
+    lastFocusedElement = document.activeElement;
+    dialogIcon.textContent = options.type === 'error' ? '!' : '✓';
+    dialogIcon.classList.toggle('is-error', options.type === 'error');
+    dialogTitle.textContent = options.title || '';
+    dialogBody.innerHTML = '';
+    if (Array.isArray(options.lines)) {
+      options.lines.forEach(function (line) {
+        var p = document.createElement('p');
+        p.textContent = line;
+        dialogBody.appendChild(p);
+      });
+    } else if (options.text) {
+      var p2 = document.createElement('p');
+      p2.textContent = options.text;
+      dialogBody.appendChild(p2);
+    }
+    dialog.classList.remove('d-none');
+    window.setTimeout(function () {
+      if (dialogCard && typeof dialogCard.focus === 'function') {
+        dialogCard.focus();
+      }
+    }, 0);
+    if (dialogTimer) window.clearTimeout(dialogTimer);
+    if (options.autoClose) {
+      dialogTimer = window.setTimeout(closeDialog, options.autoCloseMs || 10000);
+    }
+    dialogButton.onclick = function () {
+      closeDialog();
+      if (typeof options.onClose === 'function') options.onClose();
+    };
   }
 
   // ---- submit -------------------------------------------------------------
@@ -367,6 +461,12 @@
       return;
     }
 
+    if (locationSelect.disabled || !locationSelect.value) {
+      markError(FIELDS[4].ids, FIELDS[4].error, 'Choose a location.');
+      focusFirstError();
+      return;
+    }
+
     var body = {
       userType: userType.value,
       name: nameInput.value.trim(),
@@ -374,7 +474,7 @@
       time: chosenTime(),
       locationId: locationSelect.value,
       notes: notes.value.trim(),
-      company: company.value,
+      company: company ? company.value : '',
     };
 
     submitButton.disabled = true;
@@ -390,42 +490,182 @@
         },
         body: JSON.stringify(body),
       });
-      var payload = await response.json();
-
-      if (!response.ok || !payload.success) {
-        var failure = new Error(
-          (payload.error && payload.error.message) || 'Your entry could not be saved.',
-        );
-        failure.details = payload.error && payload.error.details;
-        throw failure;
+      var payload = {};
+      try {
+        payload = await response.json();
+      } catch (e) {
+        payload = {};
       }
 
-      var entry = payload.data.entry;
-      showSuccess(
-        'Thank you, ' +
-          entry.name +
-          '. Your ' +
-          (entry.direction === 'out' ? 'check out' : 'check in') +
-          ' at ' +
-          formatClockString(entry.time) +
-          ' has been recorded.',
-      );
-      submitButton.textContent = 'Submit';
+      if (!response.ok || !payload.success) {
+        var err = payload.error || {};
+        var code = err.code || '';
+        var details = err.details;
+        var message = err.message || 'Your entry could not be saved.';
+
+        if (code === 'time_in_future') {
+          openDialog({
+            type: 'error',
+            title: 'Check the time',
+            text: 'That time is later than now. Please check AM/PM.',
+            autoClose: true,
+            autoCloseMs: 10000,
+          });
+          submitButton.textContent = 'Submit';
+          submitButton.disabled = false;
+          return;
+        }
+        if (code === 'duplicate_entry') {
+          openDialog({
+            type: 'error',
+            title: 'Already recorded',
+            text: 'This entry was already recorded.',
+            autoClose: true,
+            autoCloseMs: 10000,
+          });
+          submitButton.textContent = 'Submit';
+          submitButton.disabled = false;
+          return;
+        }
+        if (response.status === 429) {
+          openDialog({
+            type: 'error',
+            title: 'Too many submissions',
+            text: 'Too many submissions. Please wait a few minutes and try again.',
+            autoClose: true,
+            autoCloseMs: 10000,
+          });
+          submitButton.textContent = 'Submit';
+          submitButton.disabled = false;
+          return;
+        }
+        if (response.status >= 500) {
+          openDialog({
+            type: 'error',
+            title: 'Server error',
+            text: 'Could not reach the server. Your entry was NOT saved. Please try again.',
+            autoClose: true,
+            autoCloseMs: 10000,
+          });
+          submitButton.textContent = 'Submit';
+          submitButton.disabled = false;
+          return;
+        }
+
+        var mapped = applyServerErrors(details);
+        if (mapped) {
+          focusFirstError();
+          openDialog({
+            type: 'error',
+            title: 'Check the form',
+            lines: (Array.isArray(details) ? details.map(function (d) { return d && d.message ? String(d.message) : message; }) : [message]),
+            autoClose: true,
+            autoCloseMs: 10000,
+          });
+        } else {
+          openDialog({
+            type: 'error',
+            title: 'Something went wrong',
+            text: message,
+            autoClose: true,
+            autoCloseMs: 10000,
+          });
+        }
+        submitButton.textContent = 'Submit';
+        submitButton.disabled = false;
+        return;
+      }
+
+      var entry = payload.data && payload.data.entry ? payload.data.entry : {};
+      var locationName = locationSelect && locationSelect.options[locationSelect.selectedIndex]
+        ? locationSelect.options[locationSelect.selectedIndex].textContent
+        : '';
+      var successTitle = entry.direction === 'out' ? 'Check out recorded' : 'Check in recorded';
+      var entryTime = entry.time ? formatClockString(entry.time) : chosenTime() ? formatClockString(chosenTime()) : '';
+      var entryDate = entry.date ? formatDisplayDate(entry.date) : formatDisplayDateFromParts();
+
+      // Maintain backward compatibility with existing tests
+      try {
+        if (successBox) {
+          showSuccess(
+            'Thank you, ' +
+              (entry.name || (nameInput ? nameInput.value.trim() : '')) +
+              '. Your ' +
+              ((entry.direction || direction.value) === 'out' ? 'check out' : 'check in') +
+              ' at ' +
+              entryTime +
+              ' has been recorded.',
+          );
+        }
+      } catch (e) {}
+
       scheduleReset();
+      if (dialog) {
+        try {
+          openDialog({
+            type: 'success',
+            title: successTitle,
+            lines: [
+              'Name: ' + (entry.name || (nameInput ? nameInput.value.trim() : '')),
+              'User type: ' + getUserTypeLabel(userType ? userType.value : ''),
+              (entry.direction || direction.value) === 'out' ? 'Direction: Check out' : 'Direction: Check in',
+              'Time: ' + entryTime,
+              'Date: ' + entryDate,
+              locationName ? 'Location: ' + locationName : '',
+            ].filter(Boolean),
+            autoClose: true,
+            autoCloseMs: 10000,
+            onClose: function () {
+              resetForm();
+            },
+          });
+        } catch (e) {}
+      }
+      if (submitButton) {
+        submitButton.textContent = 'Submit';
+        submitButton.disabled = locations.length === 0 || (locationSelect ? locationSelect.disabled : true);
+      }
     } catch (error) {
-      var mapped = applyServerErrors(error.details);
-      if (mapped) focusFirstError();
-      else showAlert(error.message || 'Your entry could not be saved. Please try again.');
+      openDialog({
+        type: 'error',
+        title: 'Could not reach the server',
+        text: 'Could not reach the server. Your entry was NOT saved. Please try again.',
+        autoClose: true,
+        autoCloseMs: 10000,
+      });
       submitButton.textContent = 'Submit';
       submitButton.disabled = false;
     }
+  }
+
+  function getUserTypeLabel(value) {
+    if (value === 'staff') return 'Staff Member';
+    if (value === 'service_user') return 'Service User';
+    if (value === 'visitor') return 'Visitor';
+    return value || '';
+  }
+
+  function formatDisplayDate(isoDate) {
+    try {
+      var parts = String(isoDate).split('-');
+      if (parts.length === 3) {
+        var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(',', '');
+      }
+    } catch (e) {}
+    return isoDate || '';
+  }
+
+  function formatDisplayDateFromParts() {
+    var d = new Date();
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(',', '');
   }
 
   // ---- reset for the next person ------------------------------------------
 
   function scheduleReset() {
     if (resetTimer) window.clearTimeout(resetTimer);
-    resetTimer = window.setTimeout(resetForm, RESET_AFTER_MS);
+    resetTimer = window.setTimeout(resetForm, dialog ? 100 : RESET_AFTER_MS);
   }
 
   function resetForm() {
@@ -434,36 +674,42 @@
     hideAlert();
     clearAllErrors();
 
-    userType.value = '';
-    nameInput.value = '';
-    direction.value = '';
-    hourSelect.value = '';
-    minuteSelect.value = '';
-    periodSelect.value = '';
-    notes.value = '';
-    locationSelect.value = '';
+    if (userType) userType.value = '';
+    if (nameInput) nameInput.value = '';
+    if (direction) direction.value = '';
+    if (hourSelect) hourSelect.value = '';
+    if (minuteSelect) minuteSelect.value = '';
+    if (periodSelect) periodSelect.value = '';
+    if (notes) notes.value = '';
+    if (locationSelect) locationSelect.value = '';
 
-    updateNotesCount();
+    if (notesCount) updateNotesCount();
     updateTimeChoice();
     updateLocationLabel();
 
-    if (requestedLocation && locations.some(function (item) { return item.id === requestedLocation; })) {
+    if (requestedLocation && locationSelect && locations.some(function (item) { return item.id === requestedLocation; })) {
       locationSelect.value = requestedLocation;
       updateLocationLabel();
     }
 
-    submitButton.textContent = 'Submit';
-    submitButton.disabled = locations.length === 0 || locationSelect.disabled;
-    nameInput.focus();
+    if (submitButton) {
+      submitButton.textContent = 'Submit';
+      submitButton.disabled = locations.length === 0 || (locationSelect ? locationSelect.disabled : true);
+    }
+    if (nameInput && typeof nameInput.focus === 'function') {
+      try { nameInput.focus(); } catch (e) {}
+    }
   }
 
   function updateNotesCount() {
+    if (!notesCount || !notes) return;
     notesCount.textContent = String(notes.value.length) + ' / 500';
   }
 
   // ---- wiring ------------------------------------------------------------
 
   function bindFieldError(field, ids, errorId) {
+    if (!field) return;
     field.addEventListener('change', function () {
       clearError(ids, errorId);
     });
@@ -478,23 +724,57 @@
   bindFieldError(notes, FIELDS[5].ids, FIELDS[5].error);
 
   [hourSelect, minuteSelect, periodSelect].forEach(function (select) {
+    if (!select) return;
     select.addEventListener('change', function () {
       clearError(FIELDS[3].ids, FIELDS[3].error);
       updateTimeChoice();
     });
   });
 
-  locationSelect.addEventListener('change', function () {
-    clearError(FIELDS[4].ids, FIELDS[4].error);
-    updateLocationLabel();
-  });
+  if (locationSelect) {
+    locationSelect.addEventListener('change', function () {
+      clearError(FIELDS[4].ids, FIELDS[4].error);
+      updateLocationLabel();
+    });
+  }
 
-  notes.addEventListener('input', updateNotesCount);
-  nowButton.addEventListener('click', fillTimeFromClock);
-  retryButton.addEventListener('click', function () {
-    void loadLocations();
+  if (notes) notes.addEventListener('input', updateNotesCount);
+  if (nowButton) nowButton.addEventListener('click', fillTimeFromClock);
+  if (retryButton) {
+    retryButton.addEventListener('click', function () {
+      void loadLocations();
+    });
+  }
+  if (form) form.addEventListener('submit', handleSubmit);
+
+  if (dialogBackdrop) {
+    dialogBackdrop.addEventListener('click', closeDialog);
+  }
+  if (dialogButton) {
+    dialogButton.addEventListener('click', closeDialog);
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && dialog && !dialog.classList.contains('d-none')) {
+      e.preventDefault();
+      closeDialog();
+    }
   });
-  form.addEventListener('submit', handleSubmit);
+  if (dialog) {
+    dialog.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab') return;
+      var focusable = dialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!focusable.length) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+  }
 
   fillTimeOptions();
   updateNotesCount();

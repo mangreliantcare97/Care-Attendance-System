@@ -27,7 +27,9 @@ steps.
 npm install
 cp .env.example .env          # set a new SESSION_SECRET and MONGODB_URI
 npm run seed                  # creates the first admin from the environment
+npm run seed:locations        # loads the 18 standard locations
 npm start                     # http://localhost:3000
+npm run doctor                # check database, admins, locations and entries
 ```
 
 `SESSION_SECRET` is required in every environment. Generate a new value for
@@ -58,6 +60,13 @@ to run when they are missing.
 The public link is intentionally stable and safe to print. Links are built from
 `APP_BASE_URL`, never from the current browser origin or the request `Host`
 header, so a proxy or preview host cannot poison a printed QR code.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Public form (/): pressing Submit does nothing / no message | Check browser console/network for errors. Ensure locations are loaded (`npm run seed:locations`). If "No active locations are available" appears, activate locations or run the seeder. If it says "Could not load locations", use Retry or check MongoDB. |
+| Admin Locations page stuck on "Loading locations..." | Check network/console. The page now times out after 15 seconds and shows an error with Retry. Verify you're logged in as admin and MongoDB is up. Run `npm run doctor` to inspect counts. |
 
 ### Shared-device warning
 
@@ -161,6 +170,8 @@ postcode and entry counts stay behind the authenticated admin API.
 | `npm start` | Start the server |
 | `npm run dev` | Start the server with file watching |
 | `npm test` | Run the test suite (in-memory MongoDB) |
+| `npm run test:e2e` | Start the app against a temp DB, seed admin + 18 locations, run browser checks |
+| `npm run doctor` | Show DB name, MongoDB reachability, admins, locations (active/total), entries and next steps |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed` | Create/update the administrator from the environment |
 | `npm run seed:locations` | Insert the 18 locations from `seed/locations.json` (idempotent) |

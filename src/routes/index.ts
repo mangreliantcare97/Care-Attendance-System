@@ -36,10 +36,25 @@ export function createApiRouter(options: ApiRouterOptions = {}): Router {
   const router = Router();
 
   /** Liveness probe — used by the host to check the service. */
-  router.get('/health', (_req, res) => {
+  router.get('/health', async (_req, res) => {
+    const mongoose = (await import('mongoose')).default;
+    const dbState = mongoose.connection.readyState;
+    const dbConnected = dbState === 1;
+    let dbName: string | undefined;
+    try {
+      dbName = mongoose.connection.name || mongoose.connection.db?.databaseName;
+    } catch {}
     res.status(200).json({
       success: true,
-      data: { status: 'ok', uptime: Math.round(process.uptime()) },
+      data: {
+        status: dbConnected ? 'ok' : 'degraded',
+        uptime: Math.round(process.uptime()),
+        db: {
+          connected: dbConnected,
+          readyState: dbState,
+          name: dbName,
+        },
+      },
     });
   });
 

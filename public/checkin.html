@@ -8,7 +8,7 @@
     <meta name="robots" content="noindex, nofollow">
     <script src="/js/theme.js"></script>
     <title>Check in | Care Attendance</title>
-    <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
+    <link rel="icon" type="image/svg+xml" href="/assets/img/care-attendance-mark.svg">
 
     <link rel="stylesheet" href="/css/source-sans-pro.css">
     <link rel="stylesheet" href="/css/theme.css">
@@ -17,10 +17,10 @@
 <body class="checkin-page">
     <main class="checkin-shell">
         <header class="checkin-brand">
-            <img src="/assets/img/hr_logo.png" alt="" width="51" height="39">
+            <div class="checkin-brand-mark" aria-hidden="true">CA</div>
             <div>
                 <h1>Care Attendance</h1>
-                <p>Staff check-in</p>
+                <p>Check in or out</p>
             </div>
         </header>
 
@@ -99,7 +99,7 @@
                         </div>
                         <button type="button" class="checkin-now" id="checkin-now">Now</button>
                     </div>
-                    <p class="checkin-time-choice" id="checkin-time-choice" aria-live="polite"></p>
+                    <p class="checkin-time-choice" id="checkin-time-choice" aria-live="polite" hidden></p>
                     <p class="checkin-error" id="checkin-time-error" role="alert"></p>
                 </fieldset>
 
@@ -149,6 +149,16 @@
             </p>
         </section>
     </main>
+
+    <div id="checkin-dialog" class="checkin-dialog d-none" role="dialog" aria-modal="true" aria-labelledby="checkin-dialog-title" tabindex="-1">
+        <div class="checkin-dialog-backdrop" id="checkin-dialog-backdrop"></div>
+        <div class="checkin-dialog-card" role="document" tabindex="0">
+            <div class="checkin-dialog-icon" id="checkin-dialog-icon" aria-hidden="true">✓</div>
+            <h2 class="checkin-dialog-title" id="checkin-dialog-title"></h2>
+            <div class="checkin-dialog-body" id="checkin-dialog-body"></div>
+            <button type="button" class="checkin-dialog-button" id="checkin-dialog-button">Done</button>
+        </div>
+    </div>
 
     <script src="/js/checkin.js"></script>
 </body>

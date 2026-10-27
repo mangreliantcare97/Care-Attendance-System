@@ -14,8 +14,10 @@
     "seed": "node seed/seed.ts",
     "seed:locations": "node seed/seed-locations.ts",
     "reset-admin-password": "node seed/reset-admin-password.ts",
-    "test": "node --test --test-force-exit --test-concurrency=1 tests/",
-    "test:watch": "node --test --test-force-exit --watch --test-concurrency=1 tests/"
+    "test": "node scripts/test-html-assets.mjs && node --test --test-force-exit --test-concurrency=1 tests/",
+    "test:watch": "node scripts/test-html-assets.mjs && node --test --test-force-exit --watch --test-concurrency=1 tests/",
+    "test:e2e": "node scripts/test-e2e.mjs",
+    "doctor": "node scripts/doctor.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -25,30 +25,44 @@
   var state = { locations: [], search: '', sort: { key: 'name', dir: 1 } };
 
   function renderLoading() {
+    if (!body) return;
     window.HrmDom.renderListState(body, 5, { type: 'loading', message: 'Loading locations…' });
-    summary.textContent = '';
+    if (summary) summary.textContent = '';
   }
 
   function renderError(message) {
+    if (!body) return;
     window.HrmDom.renderListState(body, 5, {
       type: 'error',
       message: message || 'The locations could not be loaded.',
       help: 'Check your connection and try again.',
       onRetry: load,
     });
-    summary.textContent = '';
+    if (summary) summary.textContent = '';
   }
 
   async function load() {
     loading = true;
     renderLoading();
 
+    var controller = typeof AbortController === 'function' ? new AbortController() : null;
+    var timeoutId = controller ? window.setTimeout(function () { controller.abort(); }, 15000) : null;
+
     try {
-      var response = await window.HrmApi.get('/api/locations');
-      state.locations = response.data.locations || [];
+      var response = await window.HrmApi.request('/api/locations', {
+        method: 'GET',
+        signal: controller ? controller.signal : undefined,
+      });
+      if (timeoutId) window.clearTimeout(timeoutId);
+      state.locations = (response.data && response.data.locations) ? response.data.locations : [];
       render();
     } catch (error) {
-      renderError(error && error.message);
+      if (timeoutId) window.clearTimeout(timeoutId);
+      var msg = error && error.message ? error.message : 'The locations could not be loaded.';
+      if (error && error.code === 'network_error') {
+        msg = 'The locations could not be loaded.';
+      }
+      renderError(msg);
     } finally {
       loading = false;
     }
@@ -126,14 +140,14 @@
 
   function render() {
     if (loading) return;
+    if (!body) return;
 
     if (!state.locations.length) {
       window.HrmDom.renderListState(body, 5, {
         type: 'empty',
-        message: 'No locations yet.',
-        help: 'Add the first location so the public form can be used.',
+        message: 'No locations yet. Add one, or run npm run seed:locations to load the standard list.',
       });
-      summary.textContent = '';
+      if (summary) summary.textContent = '';
       updateSortIcons();
       return;
     }
@@ -145,7 +159,7 @@
         type: 'empty',
         message: 'No locations match your search.',
       });
-      summary.textContent = '(0) Records Found';
+      if (summary) summary.textContent = '(0) Records Found';
       updateSortIcons();
       return;
     }
@@ -161,7 +175,7 @@
     });
 
     window.HrmDom.renderRows(body, rows, 5, 'No locations to show.');
-    summary.textContent = '(' + list.length + ') Records Found';
+    if (summary) summary.textContent = '(' + list.length + ') Records Found';
     updateSortIcons();
   }
 

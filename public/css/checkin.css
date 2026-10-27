@@ -23,10 +23,18 @@
   color: var(--hrm-text);
 }
 
-.checkin-brand img {
+.checkin-brand-mark {
   width: 51px;
   height: 39px;
-  object-fit: contain;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--hrm-primary);
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 0.95rem;
 }
 
 .checkin-brand h1 {
@@ -276,6 +284,83 @@
   min-height: 1.3rem;
   margin: 0.5rem 0 0;
   font-weight: 600;
+}
+
+.checkin-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkin-dialog.d-none {
+  display: none !important;
+}
+
+.checkin-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.checkin-dialog-card {
+  position: relative;
+  width: min(100% - 1.5rem, 26rem);
+  background: var(--hrm-surface);
+  color: var(--hrm-text);
+  border-radius: 14px;
+  border: 1px solid var(--hrm-border);
+  box-shadow: var(--hrm-shadow);
+  padding: 1.6rem 1.4rem 1.4rem;
+  text-align: center;
+  outline: none;
+}
+
+.checkin-dialog-icon {
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 0.8rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 126, 52, 0.16);
+  color: var(--hrm-success);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.checkin-dialog-icon.is-error {
+  background: rgba(176, 42, 55, 0.16);
+  color: var(--hrm-danger);
+}
+
+.checkin-dialog-title {
+  margin: 0 0 0.6rem;
+  font-size: 1.4rem;
+}
+
+.checkin-dialog-body {
+  margin: 0 0 1rem;
+  color: var(--hrm-text-muted);
+}
+
+.checkin-dialog-body p {
+  margin: 0.25rem 0;
+}
+
+.checkin-dialog-button {
+  width: 100%;
+  min-height: 3rem;
+  border-radius: 10px;
+  border: 0;
+  background: var(--hrm-primary);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .checkin-counter {
