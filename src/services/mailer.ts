@@ -67,6 +67,13 @@ export interface CloudflareMailerOptions {
   fetchImpl?: typeof fetch;
 }
 
+export interface BrevoMailerOptions {
+  apiKey: string;
+  from: string;
+  /** Overridable so the tests can mock the HTTP call. */
+  fetchImpl?: typeof fetch;
+}
+
 /**
  * Cloudflare Email Service (REST API).
  *
@@ -131,6 +138,62 @@ export function createCloudflareMailer(options: CloudflareMailerOptions): Mailer
   };
 }
 
+/** Brevo transactional email REST API. */
+export function createBrevoMailer(options: BrevoMailerOptions): Mailer {
+  const doFetch = options.fetchImpl ?? fetch;
+  const from = parseAddress(options.from);
+
+  return {
+    async send(message) {
+      if (!options.apiKey || !from.address || !isEmailLike(from.address)) {
+        throw new Error(
+          'The brevo mail provider is not configured (BREVO_API_KEY and a valid MAIL_FROM address are required).',
+        );
+      }
+
+      const to = sanitizeHeader(message.to);
+      if (!isEmailLike(to)) {
+        throw new Error(`Refusing to send a mail to "${to}" — not a valid address.`);
+      }
+
+      const sender: { name?: string; email: string } = { email: from.address };
+      if (from.name) sender.name = sanitizeHeader(from.name);
+
+      const payload: Record<string, unknown> = {
+        sender,
+        to: [{ email: to }],
+        subject: sanitizeHeader(message.subject),
+        textContent: message.text,
+        htmlContent: message.html,
+      };
+
+      if (message.replyTo) {
+        const replyAddress = parseAddress(message.replyTo);
+        if (isEmailLike(replyAddress.address)) {
+          payload.replyTo = replyAddress.name
+            ? { email: replyAddress.address, name: sanitizeHeader(replyAddress.name) }
+            : { email: replyAddress.address };
+        }
+      }
+
+      const response = await doFetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': options.apiKey,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`Brevo refused the mail (HTTP ${response.status}): ${body.slice(0, 500)}`);
+      }
+    },
+  };
+}
+
 /** Build the mailer that the `MAIL_PROVIDER` variable selects. */
 export function createMailer(): Mailer {
   switch (env.mail.provider) {
@@ -140,6 +203,11 @@ export function createMailer(): Mailer {
       return createCloudflareMailer({
         accountId: env.mail.cloudflareAccountId,
         apiToken: env.mail.cloudflareApiToken,
+        from: env.mail.from,
+      });
+    case 'brevo':
+      return createBrevoMailer({
+        apiKey: env.mail.brevoApiKey,
         from: env.mail.from,
       });
     default:

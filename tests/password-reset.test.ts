@@ -402,4 +402,59 @@ describe('the mailer', () => {
       /not configured/i,
     );
   });
+
+  it('calls the Brevo transactional email API with the expected payload and API key', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fakeFetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ messageId: 'message-123' }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as unknown as typeof fetch;
+
+    const mailer = mailerModule.createBrevoMailer({
+      apiKey: 'brevo-test-key',
+      from: 'Care Attendance <noreply@example.com>',
+      fetchImpl: fakeFetch,
+    });
+
+    await mailer.send({
+      to: 'admin@example.com',
+      subject: 'Reset your password\r\nBcc: evil@example.com',
+      text: 'the link',
+      html: '<p>the link</p>',
+      replyTo: 'Support <support@example.com>',
+    });
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, 'https://api.brevo.com/v3/smtp/email');
+    assert.equal(calls[0].init.method, 'POST');
+
+    const headers = calls[0].init.headers as Record<string, string>;
+    assert.equal(headers['api-key'], 'brevo-test-key');
+    assert.equal(headers.Accept, 'application/json');
+    assert.equal(headers['Content-Type'], 'application/json');
+
+    const body = JSON.parse(String(calls[0].init.body));
+    assert.deepEqual(body.sender, { name: 'Care Attendance', email: 'noreply@example.com' });
+    assert.deepEqual(body.to, [{ email: 'admin@example.com' }]);
+    assert.equal(body.subject, 'Reset your password Bcc: evil@example.com');
+    assert.equal(body.textContent, 'the link');
+    assert.equal(body.htmlContent, '<p>the link</p>');
+    assert.deepEqual(body.replyTo, { name: 'Support', email: 'support@example.com' });
+  });
+
+  it('fails when the Brevo provider is not configured', async () => {
+    const mailer = mailerModule.createBrevoMailer({
+      apiKey: '',
+      from: '',
+      fetchImpl: (async () => new Response('{}')) as unknown as typeof fetch,
+    });
+
+    await assert.rejects(
+      () => mailer.send({ to: 'admin@example.com', subject: 'x', text: 'y', html: '<p>y</p>' }),
+      /not configured/i,
+    );
+  });
 });

@@ -184,14 +184,14 @@ test('the admins page has the required list controls and no stale password UI', 
   assert.equal(doc.querySelectorAll('[onclick], [onchange], [onsubmit]').length, 0);
 });
 
-test('the admin form keeps the exact Cloudflare helper and password controls', () => {
+test('the admin form keeps the email verification helper and password controls', () => {
   const doc = parsePage(adminFormPage, 'http://localhost/admin-form.html');
 
   assert.equal(doc.body.getAttribute('data-page'), 'admins');
   assert.equal(normalisedText(doc.getElementById('admin-form-title')), 'Add Admin');
   assert.equal(
     normalisedText(doc.getElementById('email-help')),
-    'This address must be verified in Cloudflare (Email Routing > Destination addresses) before it can receive password reset emails.',
+    'Use an address you can access to verify with the configured email provider.',
   );
   assert.equal(
     normalisedText(doc.getElementById('password-help')),

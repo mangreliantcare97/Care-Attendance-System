@@ -38,14 +38,14 @@ const isProduction = nodeEnv === 'production';
 const isTest = nodeEnv === 'test';
 
 /** The mail providers we know about. */
-export type MailProvider = 'none' | 'console' | 'cloudflare';
+export type MailProvider = 'none' | 'console' | 'cloudflare' | 'brevo';
 
 function mailProvider(raw: string): MailProvider {
   const value = raw.trim().toLowerCase();
-  if (value === '' || value === 'none' || value === 'console' || value === 'cloudflare') {
+  if (value === '' || value === 'none' || value === 'console' || value === 'cloudflare' || value === 'brevo') {
     return value === '' ? 'none' : (value as MailProvider);
   }
-  throw new Error(`MAIL_PROVIDER must be one of: none, console, cloudflare — got "${raw}"`);
+  throw new Error(`MAIL_PROVIDER must be one of: none, console, cloudflare, brevo — got "${raw}"`);
 }
 
 export const env = {
@@ -98,6 +98,7 @@ export const env = {
     from: str('MAIL_FROM', ''),
     cloudflareAccountId: str('CLOUDFLARE_ACCOUNT_ID', ''),
     cloudflareApiToken: str('CLOUDFLARE_EMAIL_API_TOKEN', ''),
+    brevoApiKey: str('BREVO_API_KEY', ''),
   },
 
   passwordReset: {

@@ -200,10 +200,11 @@ Everything is read from the environment (see `.env.example`):
 | `PUBLIC_RATE_LIMIT_WINDOW_MINUTES` | `15` | Window for both public endpoints |
 | `PUBLIC_RATE_LIMIT_MAX` | `100` | Public requests per window and IP (offices share one address) |
 | `TURNSTILE_SECRET` | — | Optional Cloudflare Turnstile on the public form; empty = the check is off |
-| `MAIL_PROVIDER` | `none` | `none`, `console` or `cloudflare` |
+| `MAIL_PROVIDER` | `none` | `none`, `console`, `cloudflare` or `brevo` |
 | `MAIL_FROM` | — | The sender, e.g. `Care Attendance <noreply@example.com>` |
 | `CLOUDFLARE_ACCOUNT_ID` | — | Cloudflare account id (email sending) |
 | `CLOUDFLARE_EMAIL_API_TOKEN` | — | Cloudflare API token with email sending permission |
+| `BREVO_API_KEY` | — | Brevo API key; only needed with `MAIL_PROVIDER=brevo` |
 | `APP_BASE_URL` | `APP_URL` | The public address used for reset links and printed check-in links |
 | `PASSWORD_RESET_TTL_MINUTES` | `30` | How long a reset link is valid |
 | `PASSWORD_RESET_RATE_LIMIT_MAX` | `5` | Reset requests per window, per IP and per address |
@@ -229,53 +230,61 @@ There is no `render.yaml` in this repository, so the service name is configured
 in the Render dashboard. Free services sleep after inactivity; Atlas M0 has no
 backups.
 
-## Password reset (Cloudflare Email Service)
+## Password reset email providers
 
-The reset mail is sent through the [Cloudflare Email Service](https://developers.cloudflare.com/email-service/).
-SMTP is never used.
+The app supports Cloudflare Email Service and Brevo transactional email through
+their REST APIs; it does not use SMTP. Choose one provider and configure its
+credentials as server environment variables. `MAIL_FROM` must be a sender
+registered with that provider.
 
-### Setup
+### Brevo (includes a free plan)
 
-1. **Add your domain** to Cloudflare and point the nameservers at it.
-2. **Verify the sending domain:** in the dashboard open
-   *Compute → Email Service → Email Sending*, choose *Onboard Domain* and follow
-   the wizard. Cloudflare creates the DKIM and SPF records for you.
-3. **Create an API token:** *My Profile → API Tokens → Create Token* with the
-   permission **Email Sending → Edit** (nothing else). Copy the token — it is
-   only shown once.
-4. **Verify the destination addresses of your administrators:** open
-   *Email → Email Routing → Destination addresses* and confirm every
-   administrator address. A reset mail to an unverified address is rejected.
-5. **Set the environment variables** (on Render: *Environment*):
+Brevo's Free plan currently includes transactional email with a daily sending
+limit. Check [Brevo's current plan details](https://help.brevo.com/hc/en-us/articles/208589409-About-Brevo-s-pricing-plans).
+
+1. Create a Brevo account and add a sender under **Settings → Senders, Domains, IPs → Senders**.
+2. Verify the sender address using the confirmation code Brevo sends to it.
+   A free mailbox address can be used if you can receive its verification
+   message, but authenticating your own domain is recommended for delivery and
+   sender reputation.
+3. Create a Brevo API key in your account settings. Keep it private.
+4. Add these values to the app host's environment settings:
+
+   ```
+   MAIL_PROVIDER=brevo
+   MAIL_FROM="Care Attendance <verified-sender@example.com>"
+   BREVO_API_KEY=<your Brevo API key>
+   APP_BASE_URL=https://your-public-app-url
+   ```
+
+Brevo API docs: [Send a transactional email](https://developers.brevo.com/docs/send-a-transactional-email).
+
+### Cloudflare Email Service
+
+1. Add your domain to Cloudflare and point the nameservers at it.
+2. In **Compute → Email Service → Email Sending**, onboard and verify the
+   sending domain.
+3. Create an API token with **Email Sending → Edit** permission.
+4. Verify admin recipient addresses as required by Cloudflare Email Routing.
+5. Add these values to the app host's environment settings:
 
    ```
    MAIL_PROVIDER=cloudflare
    MAIL_FROM="Care Attendance <noreply@yourdomain.com>"
    CLOUDFLARE_ACCOUNT_ID=<your account id>
-   CLOUDFLARE_EMAIL_API_TOKEN=<the token>
-   APP_BASE_URL=https://care-attendance.onrender.com
+   CLOUDFLARE_EMAIL_API_TOKEN=<your API token>
+   APP_BASE_URL=https://your-public-app-url
    ```
 
-   `APP_BASE_URL` is the only source for the reset link — the request headers
-   are never used, so a forged `Host` header cannot send an administrator to a
-   hostile site.
+### Test and troubleshoot
 
-### Testing one real send
+Use the login page's **Forgot password?** flow with an admin inbox you can
+access. For local development, `MAIL_PROVIDER=console` prints the message,
+including the reset link, to the server log. In production, mail delivery
+failures are logged by the server; provider dashboards show delivery status.
 
-```bash
-# locally: print the mail instead of sending it
-MAIL_PROVIDER=console npm start
-```
-
-```bash
-# for real: start the app and use the login page → "Forgot password?"
-MAIL_PROVIDER=cloudflare npm start
-```
-
-With `MAIL_PROVIDER=console` the whole mail — including the reset link — is
-printed to the server log. With `cloudflare` the mail is delivered to the
-administrator; the API response is the same either way, so the Cloudflare
-dashboard log is the place to look when a mail does not arrive.
+`APP_BASE_URL` is the only source for reset links—the request headers are never
+used, so a forged `Host` header cannot send an administrator to a hostile site.
 
 ### If an administrator is locked out
 
