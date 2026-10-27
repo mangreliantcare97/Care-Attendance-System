@@ -9,8 +9,8 @@ This branch (`care-attendance-system`) is being converted from the earlier HRM
 application. Phase 1 removed the HRM modules (employees, attendance, leave,
 overtime, reports, calendar and departments) and the reference copy of the old
 Laravel tree. Phase 2 step A rebuilt the locations CRUD, the public form and
-the public API; the Entries page and the dashboard metrics arrive in the next
-steps.
+the public API. Phase 2 steps B and C deliver the Entries administration page
+and dashboard metrics.
 
 ---
 
@@ -84,12 +84,12 @@ cookie is `httpOnly`, `SameSite=Lax`, and `Secure` when
 |---|---|
 | `/` (`checkin.html`) | **Real.** The six-field public form, cookie-free, `noindex`, with inline validation, the `Now` button in `APP_TIMEZONE`, the two location messages and the reset for the next person. |
 | `/locations.html` | **Real.** Search, sorting, “Sort A-Z”, the add/edit modal, entry counts, deactivate-instead-of-delete and “Copy check-in link”. |
-| `/dashboard.html` | **Partial.** The public check-in link card and the “no active locations” warning are live; the metric cards and charts arrive with the dashboard step. The “Coming in Phase 2” card is the placeholder for them. |
-| `/entries.html` | **Placeholder.** Still the Phase 1 shell until the entries step builds the filterable table. |
+| `/dashboard.html` | **Real.** Timezone-aware counts for today, active locations, a seven-day entries chart, a user-type chart and recent entries, alongside the public link and no-active-locations warning. |
+| `/entries.html` | **Real.** Server-filtered, sortable and paginated entries with edit, audited soft-delete and filtered CSV export. |
 
-Everything protected sits behind the administrator login like every other
-protected page and calls no endpoint except the shared session check in
-`public/js/layout.js` until its step lands.
+Every protected page sits behind the administrator login. Module data is
+loaded from authenticated APIs after the shared session check in
+`public/js/layout.js`.
 
 ### The public form
 
@@ -361,7 +361,12 @@ tests/                 node:test suites (in-memory MongoDB)
 | `POST` | `/api/admins/me/password` | Change your own password |
 | `GET` | `/api/public/locations` | Active locations for the public form (`id` and `name` only, in sort order; `meta.timezone` carries `APP_TIMEZONE` for the `Now` button) |
 | `POST` | `/api/public/entries` | Record one public check-in or check-out (no session, no cookies) |
-| `GET` | `/api/entries` | Newest entries for the admin panel |
+| `GET` | `/api/entries` | Filtered, sorted and paginated entries for the admin panel |
+| `GET` | `/api/entries/:id` | One non-deleted entry |
+| `PATCH` | `/api/entries/:id` | Correct an entry; records the acting administrator |
+| `DELETE` | `/api/entries/:id` | Soft-delete an entry and retain its audit history |
+| `GET` | `/api/entries/export.csv` | CSV export using the entry list filters |
+| `GET` | `/api/dashboard` | Timezone-aware dashboard metrics, chart series and recent entries |
 | `GET` | `/api/locations` | Locations with postcode, sort order and entry counts |
 | `POST` | `/api/locations` | Create a location (unique on name + postcode) |
 | `PATCH` | `/api/locations/:id` | Rename, retype the postcode, reorder or deactivate a location |
@@ -373,6 +378,15 @@ Responses always use the same envelope:
 { "success": true,  "data": {}, "meta": {} }
 { "success": false, "error": { "code": "", "message": "" } }
 ```
+
+The Entries list accepts `search`, `userType`, `direction`, `locationId`,
+`dateFrom`, `dateTo`, `sort`, `order`, `page` and `perPage`. Sort fields are
+whitelisted; dates use `YYYY-MM-DD`; per-page size is capped at 100. CSV export
+uses the same filters and sort, exports every matching row (not only the
+current page), and escapes spreadsheet formula prefixes. Deletion is a
+soft-delete; deleted records are excluded from lists, exports, location counts
+and dashboard metrics. Corrections retain the original server receipt time and
+record the administrator in `updatedBy`.
 
 ### Administrator management
 
@@ -424,6 +438,8 @@ endpoints.
   its abuse protections, the routing/redirect rules, the dashboard link and
   warning cards, and the test suite (in-memory MongoDB) plus a headless Chrome
   pass over the public page.
-* **Next** — Phase 2 step B: the Entries admin page (filters, sort, edit,
-  delete, CSV), then step C: the dashboard metrics and charts.
+* **Phase 2, step B** — complete: the filterable, sortable, paginated Entries
+  page, audited corrections and soft-delete, and formula-safe filtered CSV.
+* **Phase 2, step C** — complete: timezone-aware dashboard cards, seven-day
+  and user-type charts, recent entries and the active-location warning.
 * The earlier HRM reports in `docs/` were removed with the code they described;

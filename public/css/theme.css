@@ -147,15 +147,7 @@ h6 {
 .main-sidebar .brand-mark {
   width: 38px;
   height: 29px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: var(--hrm-primary);
-  color: #ffffff;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  font-size: 0.8rem;
+  object-fit: contain;
   margin-left: 0.25rem;
 }
 
@@ -657,6 +649,15 @@ label,
   color: var(--hrm-text-muted);
   font-weight: 700;
   font-size: 0.8rem;
+}
+
+.dashboard-chart-container {
+  position: relative;
+  min-height: 260px;
+}
+
+.entry-per-page-select {
+  width: auto;
 }
 
 /* ==========================================================================
@@ -2938,7 +2939,8 @@ body.page-admins .admin-table thead th.admin-actions-column {
 }
 
 body.page-admins .admin-sort,
-body.page-locations .admin-sort {
+body.page-locations .admin-sort,
+body.page-entries .admin-sort {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -2954,12 +2956,14 @@ body.page-locations .admin-sort {
 }
 
 body.page-admins .admin-sort:hover,
-body.page-locations .admin-sort:hover {
+body.page-locations .admin-sort:hover,
+body.page-entries .admin-sort:hover {
   color: var(--admin-green-ink);
 }
 
 body.page-admins .admin-sort i,
-body.page-locations .admin-sort i {
+body.page-locations .admin-sort i,
+body.page-entries .admin-sort i {
   font-size: 0.78rem;
 }
 

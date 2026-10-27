@@ -3,6 +3,7 @@ import { createAuthRouter, type AuthRouterOptions } from './auth.ts';
 import { adminsRouter } from './admins.ts';
 import { entriesRouter } from './entries.ts';
 import { locationsRouter } from './locations.ts';
+import { dashboardRouter } from './dashboard.ts';
 import { publicRouter } from './public.ts';
 import { requireCsrf } from '../middleware/csrf.ts';
 import { requireAuth } from '../middleware/requireAuth.ts';
@@ -98,6 +99,7 @@ export function createApiRouter(options: ApiRouterOptions = {}): Router {
   router.use('/admins', adminsRouter);
   router.use('/entries', entriesRouter);
   router.use('/locations', locationsRouter);
+  router.use('/dashboard', dashboardRouter);
 
   return router;
 }

@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#ffffff" data-theme-color>
     <script src="/js/theme.js"></script>
     <title>Dashboard | Care Attendance</title>
-    <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
+    <link rel="icon" type="image/png" href="/assets/img/rcl-navlogo.png">
 
     <link rel="stylesheet" href="/css/source-sans-pro.css">
     <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
@@ -26,6 +26,7 @@
                         <div class="row mb-2">
                             <div class="col-12">
                                 <h1 class="m-0">Dashboard</h1>
+                                <small class="text-muted" id="dashboard-report-date"></small>
                             </div>
                         </div>
                     </div>
@@ -64,11 +65,79 @@
                         </div>
                     </div>
 
-                    <div class="row mt-3">
+                    <div class="row" id="dashboard-error-row" hidden>
                         <div class="col-12">
-                            <div class="card card-glass">
-                                <div class="card-body">
-                                    <p class="mb-0">Coming in Phase 2</p>
+                            <div class="alert alert-danger" role="alert">
+                                <span id="dashboard-error-message">The dashboard summary could not be loaded.</span>
+                                <button type="button" class="btn btn-sm btn-outline-danger ml-2" id="retry-dashboard">Retry</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="dashboard-content" hidden>
+                        <div class="row">
+                            <div class="col-lg-3 col-6">
+                                <div class="small-box bg-info">
+                                    <div class="inner"><h3 id="metric-entries-today">—</h3><p>Entries today</p></div>
+                                    <div class="icon"><i class="fas fa-clipboard-list" aria-hidden="true"></i></div>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-6">
+                                <div class="small-box bg-success">
+                                    <div class="inner"><h3 id="metric-checkins-today">—</h3><p>Check-ins today</p></div>
+                                    <div class="icon"><i class="fas fa-sign-in-alt" aria-hidden="true"></i></div>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-6">
+                                <div class="small-box bg-warning">
+                                    <div class="inner"><h3 id="metric-checkouts-today">—</h3><p>Check-outs today</p></div>
+                                    <div class="icon"><i class="fas fa-sign-out-alt" aria-hidden="true"></i></div>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-6">
+                                <div class="small-box bg-primary">
+                                    <div class="inner"><h3 id="metric-active-locations">—</h3><p>Active locations</p></div>
+                                    <div class="icon"><i class="fas fa-map-marker-alt" aria-hidden="true"></i></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-lg-8">
+                                <div class="card card-glass">
+                                    <div class="card-header"><h2 class="card-title h5 mb-0">Entries over the last 7 days</h2></div>
+                                    <div class="card-body dashboard-chart-container">
+                                        <canvas id="entries-trend-chart" role="img" aria-label="Daily entry totals over the last seven days"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="card card-glass">
+                                    <div class="card-header"><h2 class="card-title h5 mb-0">Today by user type</h2></div>
+                                    <div class="card-body dashboard-chart-container">
+                                        <canvas id="entries-user-type-chart" role="img" aria-label="Today's entries by user type"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="card card-glass">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h2 class="card-title h5 mb-0">Recent entries</h2>
+                                        <a href="/entries.html" class="btn btn-sm btn-outline-primary">View all entries</a>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-striped mb-0">
+                                                <thead><tr><th scope="col">Date</th><th scope="col">Time</th><th scope="col">Name</th><th scope="col">Direction</th><th scope="col">Location</th></tr></thead>
+                                                <tbody id="dashboard-recent-entries">
+                                                    <tr><td colspan="5" class="text-center py-4">Loading recent entries…</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -89,6 +158,8 @@
     <script src="/js/fullscreen.js"></script>
     <script src="/js/layout.js"></script>
     <script src="/js/clipboard.js"></script>
+    <script src="/vendor/Chart.min.js"></script>
+    <script src="/js/dom.js"></script>
     <script src="/js/dashboard.js"></script>
 </body>
 </html>

@@ -522,6 +522,8 @@ async function runCurrentSuite(browser, baseUrl, server, mongoUri) {
 
   const initialLocations = await adminPage.$$eval('#locations-body tr', (rows) => rows.map((row) => row.textContent.trim()));
   check(initialLocations.length === 18, 'Locations page shows all 18 seeded rows', String(initialLocations.length));
+  const locationCellCount = await adminPage.$eval('#locations-body tr', (row) => row.cells.length);
+  check(locationCellCount === 5, 'Locations rows render into the five table columns', String(locationCellCount));
   check(!initialLocations.some((text) => text.includes('Loading')), 'Locations spinner ends');
   await screenshot(adminPage, 'locations-page-18-rows.png');
 
@@ -616,6 +618,131 @@ async function runCurrentSuite(browser, baseUrl, server, mongoUri) {
   );
   check(deactivatedIsAbsent, 'deactivated location is absent from the public dropdown');
   await publicAfterDeactivate.page.close();
+
+  console.log('\nEntries admin workflows');
+  await adminPage.goto(`${baseUrl}/entries.html`, { waitUntil: 'networkidle0' });
+  const entriesReady = await adminPage.waitForFunction(
+    () => document.querySelectorAll('#entries-body tr[data-entry-id]').length >= 1,
+    { timeout: 10000 },
+  ).then(() => true).catch(() => false);
+  if (!entriesReady) {
+    const state = await adminPage.evaluate(() => ({
+      url: location.href,
+      body: document.body.innerText.slice(0, 900),
+      rows: document.getElementById('entries-body')?.innerText || '',
+    }));
+    console.log(`  Entries diagnostic: ${JSON.stringify(state)}`);
+    console.log(`  Browser/network evidence: ${JSON.stringify(adminResult.telemetry.events)}`);
+    console.log(`  API requests: ${JSON.stringify(adminResult.telemetry.requests)}`);
+    throw new Error('Authenticated Entries page did not render its records.');
+  }
+  const entriesLoaded = await adminPage.$$eval('#entries-body tr[data-entry-id]', (rows) =>
+    rows.map((row) => row.textContent.trim()),
+  );
+  check(entriesLoaded.length >= 2, 'Entries page shows the submitted records', String(entriesLoaded.length));
+
+  await adminPage.locator('#entry-search').fill('E2E Ada Lovelace');
+  await adminPage.click('#apply-entry-filters');
+  await adminPage.waitForFunction(
+    () => document.querySelectorAll('#entries-body tr[data-entry-id]').length === 1,
+    { timeout: 10000 },
+  );
+  const filteredEntryName = await adminPage.$eval(
+    '#entries-body tr[data-entry-id] td[data-label="Name"]',
+    (cell) => cell.textContent.trim(),
+  );
+  check(filteredEntryName.includes('E2E Ada Lovelace'), 'Entries name filter returns the matching record');
+  await screenshot(adminPage, 'entries-filtered.png');
+
+  await adminPage.click('#export-entries');
+  await adminPage.waitForFunction(
+    () => [...document.querySelectorAll('.toast-message')].some((item) => item.textContent.includes('Entries exported')),
+    { timeout: 5000 },
+  );
+  const csvResult = await adminPage.evaluate(async () => {
+    const response = await fetch('/api/entries/export.csv?search=E2E+Ada+Lovelace', {
+      headers: { Accept: 'text/csv' },
+    });
+    return {
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      text: await response.text(),
+    };
+  });
+  check(
+    csvResult.status === 200 && csvResult.text.includes('E2E Ada Lovelace'),
+    'CSV export downloads the matching filtered entries',
+    `HTTP ${csvResult.status}; ${csvResult.contentType}; matching row=${csvResult.text.includes('E2E Ada Lovelace')}`,
+  );
+
+  await adminPage.click('#entries-body tr[data-entry-id] [data-action="edit"]');
+  await adminPage.waitForFunction(() => document.getElementById('entry-modal').classList.contains('show'));
+  await milliseconds(400);
+  await adminPage.locator('#edit-entry-name').fill('E2E Ada Lovelace Corrected');
+  await adminPage.click('#save-entry');
+  await adminPage.waitForFunction(
+    () => document.querySelector('#entries-body').textContent.includes('E2E Ada Lovelace Corrected'),
+    { timeout: 10000 },
+  );
+  await adminPage.waitForFunction(
+    () => !document.getElementById('entry-modal').classList.contains('show'),
+    { timeout: 5000 },
+  );
+  await milliseconds(400);
+  check(true, 'administrator can edit a submitted entry');
+
+  await adminPage.click('#entries-body tr[data-entry-id] [data-action="delete"]');
+  const confirmShown = await adminPage.waitForFunction(
+    () => document.getElementById('hrm-confirm-modal')?.classList.contains('show'),
+    { timeout: 5000 },
+  ).then(() => true).catch(() => false);
+  if (!confirmShown) {
+    const state = await adminPage.evaluate(() => ({
+      rows: document.getElementById('entries-body')?.innerHTML,
+      modal: document.getElementById('hrm-confirm-modal')?.outerHTML,
+      events: document.getElementById('entries-body')?.textContent,
+    }));
+    console.log(`  Delete confirm diagnostic: ${JSON.stringify(state).slice(0, 1200)}`);
+    console.log(`  Browser/network evidence: ${JSON.stringify(adminResult.telemetry.events)}`);
+    throw new Error('Deleting an entry did not open the confirmation dialog.');
+  }
+  await adminPage.click('#hrm-confirm-ok');
+  const entryDeleted = await adminPage.waitForFunction(
+    () => !document.querySelector('#entries-body').textContent.includes('E2E Ada Lovelace Corrected'),
+    { timeout: 10000 },
+  ).then(() => true).catch(() => false);
+  if (!entryDeleted) {
+    const state = await adminPage.evaluate(() => ({
+      rows: document.getElementById('entries-body')?.textContent,
+      confirm: document.getElementById('hrm-confirm-modal')?.textContent,
+      toasts: [...document.querySelectorAll('.toast-message')].map((item) => item.textContent),
+    }));
+    console.log(`  Delete diagnostic: ${JSON.stringify(state)}`);
+    console.log(`  API requests: ${JSON.stringify(adminResult.telemetry.requests)}`);
+    throw new Error('Deleting the entry did not remove it from the filtered list.');
+  }
+  check(entryDeleted, 'administrator can soft-delete an entry from the list');
+
+  await adminPage.goto(`${baseUrl}/dashboard.html`, { waitUntil: 'networkidle0' });
+  await adminPage.waitForFunction(() => {
+    const content = document.getElementById('dashboard-content');
+    return content && !content.hidden && document.getElementById('metric-entries-today').textContent !== '—';
+  }, { timeout: 10000 });
+  const dashboardState = await adminPage.evaluate(() => ({
+    entriesToday: document.getElementById('metric-entries-today').textContent,
+    checkIns: document.getElementById('metric-checkins-today').textContent,
+    checkOuts: document.getElementById('metric-checkouts-today').textContent,
+    activeLocations: document.getElementById('metric-active-locations').textContent,
+    recentRows: document.querySelectorAll('#dashboard-recent-entries tr').length,
+    recentCells: document.querySelector('#dashboard-recent-entries tr')?.cells.length || 0,
+    trendChart: Boolean(document.getElementById('entries-trend-chart').getContext('2d')),
+    userTypeChart: Boolean(document.getElementById('entries-user-type-chart').getContext('2d')),
+  }));
+  check(Number(dashboardState.entriesToday) > 0, 'dashboard shows today’s entry metrics', JSON.stringify(dashboardState));
+  check(Number(dashboardState.activeLocations) === 18, 'dashboard shows the active location metric');
+  check(dashboardState.recentCells === 5, 'dashboard recent entries render in five columns');
+  check(dashboardState.trendChart && dashboardState.userTypeChart, 'dashboard renders both charts');
+  await screenshot(adminPage, 'dashboard-metrics-and-charts.png');
 
   console.log('\nAdmin pages: console and network checks');
   const adminPaths = [

@@ -167,11 +167,11 @@
 
     var rows = list.map(function (location) {
       return [
-        html`<strong>${location.name}</strong>`,
-        html`<span class="location-postcode">${location.postcode}</span>`,
-        activeBadge(location),
-        html`${location.entryCount}`,
-        actionButtons(location),
+        html`<td data-label="Name"><strong>${location.name}</strong></td>`,
+        html`<td data-label="Postcode"><span class="location-postcode">${location.postcode}</span></td>`,
+        html`<td data-label="Active">${activeBadge(location)}</td>`,
+        html`<td data-label="Entries">${location.entryCount}</td>`,
+        html`<td data-label="Actions">${actionButtons(location)}</td>`,
       ];
     });
 
