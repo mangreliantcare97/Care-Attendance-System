@@ -1,8 +1,9 @@
 /**
- * The public check-in API and the minimum admin surface behind it.
+ * The public check-in API — everything an anonymous visitor can do, and the
+ * abuse protections around it.
  *
- * These tests deliberately use a different supertest request for every call
- * (no agent), so any hidden session requirement or Set-Cookie would show up.
+ * Every call uses a fresh supertest request (never an agent), so a hidden
+ * session requirement or a stray `Set-Cookie` fails the test.
  */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,19 +16,61 @@ import {
   startTestApp,
   type TestContext,
 } from './helpers.ts';
+import { env } from '../src/config/env.ts';
 
 let context: TestContext;
 let app: TestContext['app'];
 let activeLocation: { id: string; name: string };
 let inactiveLocation: { id: string; name: string };
 
-function publicEntry(name: string, locationId: string, direction = 'in') {
-  return request(app).post('/api/public/entries').send({ name, locationId, direction });
+/** Each test uses its own name so the duplicate guard never crosses tests. */
+function entryPayload(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    userType: 'staff',
+    name: 'Ada Lovelace',
+    direction: 'in',
+    time: anHourAgo(),
+    locationId: activeLocation?.id,
+    notes: 'Start of shift',
+    ...overrides,
+  };
+}
+
+function post(body: Record<string, unknown>) {
+  return request(app).post('/api/public/entries').send(body);
+}
+
+/** The current clock in APP_TIMEZONE, as `HH:mm`. */
+function londonNow(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: env.appTimezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(now);
+}
+
+/** One hour before now — always in the past, so always accepted. */
+function anHourAgo(): string {
+  return londonNow(new Date(Date.now() - 60 * 60 * 1000));
+}
+
+/** `HH:mm` plus a number of minutes, wrapped into the same day. */
+function plusMinutes(clock: string, minutes: number): string {
+  const [hour, minute] = clock.split(':').map(Number);
+  const total = (hour * 60 + minute + minutes + 1440 * 2) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+async function entryCount(): Promise<number> {
+  const { EntryModel, NOT_DELETED } = await import('../src/models/Entry.ts');
+  return EntryModel.countDocuments(NOT_DELETED);
 }
 
 before(async () => {
   context = await startTestApp();
   app = context.app;
+
   const owner = await createAdmin({
     name: 'Owner',
     email: OWNER_EMAIL,
@@ -35,17 +78,19 @@ before(async () => {
   });
 
   const { LocationModel } = await import('../src/models/Location.ts');
+  await LocationModel.init();
+
   const active = await LocationModel.create({
-    name: 'Main Office',
-    postcode: 'AB1 2CD',
-    isActive: true,
+    name: 'Main Office, 226 Imperial Drive, Harrow, HA2 7HJ',
+    postcode: 'HA2 7HJ',
+    active: true,
     sortOrder: 1,
     createdBy: owner._id,
   });
   const inactive = await LocationModel.create({
-    name: 'Closed Site',
-    postcode: 'AB1 2CE',
-    isActive: false,
+    name: 'Closed Site, 111 Beaconsfield Road, Southall, UB1 1BZ',
+    postcode: 'UB1 1BZ',
+    active: false,
     sortOrder: 2,
     createdBy: owner._id,
   });
@@ -59,12 +104,14 @@ after(async () => {
 });
 
 describe('GET /api/public/locations', () => {
-  it('returns only active locations, only id and name, and no cookies', async () => {
+  it('returns only active locations, only id and name, in sort order, without cookies', async () => {
     const response = await request(app).get('/api/public/locations');
 
     assert.equal(response.status, 200);
     assert.equal(response.headers['set-cookie'], undefined);
     assert.equal(response.body.success, true);
+    assert.deepEqual(Object.keys(response.body.data), ['locations']);
+    assert.equal(response.body.meta.timezone, env.appTimezone);
 
     const locations = response.body.data.locations as Array<Record<string, unknown>>;
     const ids = locations.map((location) => location.id);
@@ -77,68 +124,266 @@ describe('GET /api/public/locations', () => {
       assert.equal(typeof location.name, 'string');
     }
 
-    assert.equal(locations[0]?.name, 'Main Office');
-    assert.equal(JSON.stringify(response.body).includes('postcode'), false);
+    const body = JSON.stringify(response.body);
+    assert.equal(body.includes('postcode'), false);
+    assert.equal(body.includes('sortOrder'), false);
+    assert.equal(body.includes('entryCount'), false);
+    assert.equal(body.includes('Closed Site'), false);
+  });
+
+  it('sorts by sortOrder and then by name', async () => {
+    const { LocationModel } = await import('../src/models/Location.ts');
+    const { body } = await request(app).get('/api/public/locations');
+    const expected = await LocationModel.find({ active: { $ne: false } })
+      .sort({ sortOrder: 1, name: 1 })
+      .lean();
+
+    assert.deepEqual(
+      (body.data.locations as Array<{ id: string }>).map((location) => location.id),
+      expected.map((location) => String(location._id)),
+    );
+  });
+
+  it('treats a document written before the `active` flag existed as active', async () => {
+    const { LocationModel } = await import('../src/models/Location.ts');
+    const { ensureActiveFlags } = await import('../src/services/locations.ts');
+    const { Types } = await import('mongoose');
+
+    // Raw insert: mongoose would fill in the default, so the flag stays absent.
+    const legacy = await LocationModel.collection.insertOne({
+      name: 'Legacy House, 71 Westway, London, W12 0PU',
+      nameKey: 'legacy house, 71 westway, london, w12 0pu',
+      postcode: 'W12 0PU',
+      sortOrder: 3,
+      createdBy: new Types.ObjectId(),
+    });
+
+    // Before the migration runs, a missing flag already counts as active …
+    const beforeMigration = await request(app).get('/api/public/locations');
+    assert.equal(
+      (beforeMigration.body.data.locations as Array<{ id: string }>).some(
+        (location) => location.id === String(legacy.insertedId),
+      ),
+      true,
+    );
+
+    // … and the migration backfills it exactly once.
+    assert.equal(await ensureActiveFlags(), 1);
+    const stored = await LocationModel.collection.findOne({ _id: legacy.insertedId });
+    assert.equal(stored?.active, true);
+    assert.equal(await ensureActiveFlags(), 0);
+
+    const afterMigration = await request(app).get('/api/public/locations');
+    assert.equal(
+      (afterMigration.body.data.locations as Array<{ id: string }>).some(
+        (location) => location.id === String(legacy.insertedId),
+      ),
+      true,
+    );
+
+    await LocationModel.collection.deleteOne({ _id: legacy.insertedId });
   });
 });
 
 describe('POST /api/public/entries', () => {
-  it('records an active-location check-in without a session or cookie', async () => {
-    const { EntryModel } = await import('../src/models/Entry.ts');
-    const before = await EntryModel.countDocuments();
+  it('records a check-in without a session, a cookie or a CSRF token', async () => {
+    const before = await entryCount();
 
-    const response = await publicEntry('  Ada Lovelace  ', activeLocation.id, 'in');
+    const response = await post(entryPayload({ name: '  Ada Lovelace  ' }));
 
     assert.equal(response.status, 201);
     assert.equal(response.headers['set-cookie'], undefined);
     assert.equal(response.body.success, true);
-    assert.equal(response.body.data.entry.name, 'Ada Lovelace');
-    assert.equal(response.body.data.entry.direction, 'in');
-    assert.deepEqual(response.body.data.entry.location, activeLocation);
-    assert.equal(Object.prototype.hasOwnProperty.call(response.body.data.entry.location, 'note'), false);
-    assert.equal(Object.prototype.hasOwnProperty.call(response.body.data.entry.location, 'isActive'), false);
-    assert.ok(response.body.data.entry.occurredAt);
 
-    assert.equal(await EntryModel.countDocuments(), before + 1);
+    // Only the six documented fields come back — nothing else.
+    const entry = response.body.data.entry;
+    assert.deepEqual(Object.keys(entry).sort(), ['date', 'direction', 'id', 'name', 'time']);
+    assert.equal(entry.name, 'Ada Lovelace');
+    assert.equal(entry.direction, 'in');
+    assert.match(entry.time, /^\d{2}:\d{2}$/);
+    assert.match(entry.date, /^\d{4}-\d{2}-\d{2}$/);
+
+    assert.equal(await entryCount(), before + 1);
   });
 
-  it('records a check-out as well', async () => {
-    const response = await publicEntry('Grace Hopper', activeLocation.id, 'out');
+  it('never reveals another entry, a location or a note in the response', async () => {
+    await post(entryPayload({ name: 'Grace Hopper', notes: 'Handover completed', direction: 'out' }));
 
+    const response = await post(entryPayload({ name: 'Katherine Johnson' }));
     assert.equal(response.status, 201);
-    assert.equal(response.body.data.entry.direction, 'out');
+
+    const body = JSON.stringify(response.body);
+    assert.equal(body.includes('Grace Hopper'), false);
+    assert.equal(body.includes('Handover completed'), false);
+    assert.equal(body.includes('notes'), false);
+    assert.equal(body.includes('postcode'), false);
+    assert.equal(body.includes('receivedAt'), false);
   });
 
-  it('rejects an inactive location without creating an entry', async () => {
-    const { EntryModel } = await import('../src/models/Entry.ts');
-    const before = await EntryModel.countDocuments();
+  it('answers every missing field with a 400 and a field-level error', async () => {
+    const fields = ['userType', 'name', 'direction', 'time', 'locationId', 'notes'];
 
-    const response = await publicEntry('Inactive Person', inactiveLocation.id);
+    for (const field of fields) {
+      const payload = entryPayload();
+      delete payload[field];
 
-    assert.equal(response.status, 422);
-    assert.equal(response.body.success, false);
-    assert.equal(response.body.error.code, 'invalid_location');
-    assert.equal(await EntryModel.countDocuments(), before);
+      const response = await post(payload);
+      assert.equal(response.status, 400, field);
+      assert.equal(response.body.success, false, field);
+      assert.equal(response.body.error.code, 'validation_error', field);
+
+      const details = response.body.error.details as Array<{ path: string; message: string }>;
+      assert.ok(Array.isArray(details) && details.length > 0, field);
+      assert.ok(
+        details.some((issue) => issue.path === field),
+        `${field}: ${JSON.stringify(details)}`,
+      );
+      assert.ok(details.every((issue) => typeof issue.message === 'string' && issue.message), field);
+    }
   });
 
-  it('rejects an unknown location, a malformed id and invalid fields', async () => {
-    const unknown = await publicEntry('Person', '000000000000000000000000');
-    assert.equal(unknown.status, 422);
+  it('rejects unknown keys, invalid enums and control characters', async () => {
+    const extra = await post(entryPayload({ admin: true }));
+    assert.equal(extra.status, 400);
+    assert.equal(extra.body.error.code, 'validation_error');
+
+    const userType = await post(entryPayload({ userType: 'robot' }));
+    assert.equal(userType.status, 400);
+    assert.equal(
+      (userType.body.error.details as Array<{ path: string }>).some((issue) => issue.path === 'userType'),
+      true,
+    );
+
+    const direction = await post(entryPayload({ direction: 'sideways' }));
+    assert.equal(direction.status, 400);
+    assert.equal(
+      (direction.body.error.details as Array<{ path: string }>).some((issue) => issue.path === 'direction'),
+      true,
+    );
+
+    const control = await post(entryPayload({ name: 'Ann\u0007a Bell' }));
+    assert.equal(control.status, 400);
+    assert.equal(
+      (control.body.error.details as Array<{ path: string }>).some((issue) => issue.path === 'name'),
+      true,
+    );
+
+    const short = await post(entryPayload({ name: 'A' }));
+    assert.equal(short.status, 400);
+
+    const long = await post(entryPayload({ name: 'x'.repeat(81) }));
+    assert.equal(long.status, 400);
+  });
+
+  it('accepts notes from 1 to 500 characters and refuses the rest', async () => {
+    const before = await entryCount();
+
+    const maximum = await post(entryPayload({ name: 'Notes Maximum', notes: 'x'.repeat(500) }));
+    assert.equal(maximum.status, 201);
+
+    const tooLong = await post(entryPayload({ name: 'Notes Too Long', notes: 'x'.repeat(501) }));
+    assert.equal(tooLong.status, 400);
+    assert.equal(
+      (tooLong.body.error.details as Array<{ path: string }>).some((issue) => issue.path === 'notes'),
+      true,
+    );
+
+    const empty = await post(entryPayload({ name: 'Notes Empty', notes: '   ' }));
+    assert.equal(empty.status, 400);
+
+    assert.equal(await entryCount(), before + 1);
+  });
+
+  it('refuses an unknown, malformed or inactive location without storing anything', async () => {
+    const before = await entryCount();
+
+    const unknown = await post(entryPayload({ name: 'Unknown Location', locationId: '000000000000000000000000' }));
+    assert.equal(unknown.status, 400);
     assert.equal(unknown.body.error.code, 'invalid_location');
+    assert.deepEqual(
+      unknown.body.error.details,
+      [{ path: 'locationId', message: 'Choose an active location.' }],
+    );
 
-    const malformed = await publicEntry('Person', 'not-an-object-id');
-    assert.equal(malformed.status, 422);
+    const inactive = await post(entryPayload({ name: 'Inactive Location', locationId: inactiveLocation.id }));
+    assert.equal(inactive.status, 400);
+    assert.equal(inactive.body.error.code, 'invalid_location');
+
+    const malformed = await post(entryPayload({ name: 'Malformed Location', locationId: 'not-an-id' }));
+    assert.equal(malformed.status, 400);
     assert.equal(malformed.body.error.code, 'validation_error');
 
-    for (const payload of [
-      { name: '', locationId: activeLocation.id, direction: 'in' },
-      { name: '   ', locationId: activeLocation.id, direction: 'in' },
-      { name: 'Person', locationId: activeLocation.id, direction: 'sideways' },
-    ]) {
-      const response = await request(app).post('/api/public/entries').send(payload);
-      assert.equal(response.status, 422, JSON.stringify(payload));
-      assert.equal(response.body.error.code, 'validation_error');
+    assert.equal(await entryCount(), before);
+  });
+
+  it('refuses a time later than now with 400 time_in_future', async () => {
+    const now = londonNow();
+    const [hour, minute] = now.split(':').map(Number);
+
+    // Nothing can be "in the future" in the last minutes before midnight —
+    // those cases are covered by the unit tests of resolveEntryDate.
+    if (hour * 60 + minute <= 1440 - 150) {
+      const response = await post(entryPayload({ name: 'Future Person', time: plusMinutes(now, 120) }));
+
+      assert.equal(response.status, 400);
+      assert.equal(response.body.error.code, 'time_in_future');
+      assert.equal(response.body.error.message, 'That time is later than now. Please check AM/PM.');
+      assert.deepEqual(
+        response.body.error.details,
+        [{ path: 'time', message: 'That time is later than now. Please check AM/PM.' }],
+      );
     }
+
+    // An earlier time today is always fine, even hours ago.
+    const earlier = await post(entryPayload({ name: 'Early Person', time: anHourAgo() }));
+    assert.equal(earlier.status, 201);
+  });
+
+  it('refuses an immediate repeat of the same person, direction and location', async () => {
+    const payload = entryPayload({ name: 'Duplicate Tester' });
+
+    const first = await post(payload);
+    assert.equal(first.status, 201);
+
+    const second = await post(payload);
+    assert.equal(second.status, 409);
+    assert.equal(second.body.error.code, 'duplicate_entry');
+    assert.match(second.body.error.message, /already been recorded/i);
+
+    // The other direction and another person are not duplicates.
+    assert.equal((await post({ ...payload, direction: 'out' })).status, 201);
+    assert.equal((await post({ ...payload, name: 'Duplicate Tester Two' })).status, 201);
+  });
+
+  it('accepts a honeypot submission and stores nothing', async () => {
+    const before = await entryCount();
+
+    const response = await post(entryPayload({ name: 'Bot Person', company: 'Acme Ltd' }));
+
+    assert.equal(response.status, 201);
+    assert.equal(response.body.success, true);
+    assert.match(response.body.data.entry.name, /Bot Person/);
+    assert.equal(await entryCount(), before);
+  });
+
+  it('refuses a browser request that comes from another site', async () => {
+    const before = await entryCount();
+
+    const crossSite = await request(app)
+      .post('/api/public/entries')
+      .set('Origin', 'https://evil.example')
+      .send(entryPayload({ name: 'Cross Site' }));
+
+    assert.equal(crossSite.status, 403);
+    assert.equal(crossSite.body.error.code, 'cross_site_request');
+
+    const ourOrigin = await request(app)
+      .post('/api/public/entries')
+      .set('Origin', 'http://localhost:3000')
+      .send(entryPayload({ name: 'Same Origin' }));
+
+    assert.equal(ourOrigin.status, 201);
+    assert.equal(await entryCount(), before + 1);
   });
 });
 
@@ -158,28 +403,31 @@ describe('admin locations and entries', () => {
     const list = await agent.get('/api/locations');
     assert.equal(list.status, 200);
     const names = list.body.data.locations.map((location: { name: string }) => location.name);
-    assert.ok(names.includes('Main Office'));
-    assert.ok(names.includes('Closed Site'));
+    assert.ok(names.some((name: string) => name.includes('Main Office')));
+    assert.ok(names.some((name: string) => name.includes('Closed Site')));
 
     const created = await agent
       .post('/api/locations')
       .set('X-CSRF-Token', csrf)
-      .send({ name: 'North Clinic', postcode: 'zz11zz', isActive: true, sortOrder: 3 });
+      .send({ name: 'North Clinic, 14 Browning Way, Hounslow', postcode: 'tw5 9be', active: true, sortOrder: 3 });
 
     assert.equal(created.status, 200);
-    assert.equal(created.body.data.location.name, 'North Clinic');
-    assert.equal(created.body.data.location.postcode, 'ZZ1 1ZZ');
-    assert.equal(created.body.data.location.isActive, true);
+    assert.equal(created.body.data.location.name, 'North Clinic, 14 Browning Way, Hounslow');
+    assert.equal(created.body.data.location.postcode, 'TW5 9BE');
+    assert.equal(created.body.data.location.active, true);
     assert.equal(created.body.data.location.entryCount, 0);
     assert.equal(created.body.data.location.sortOrder, 3);
 
     const publicList = await request(app).get('/api/public/locations');
     const publicIds = publicList.body.data.locations.map((location: { id: string }) => location.id);
     assert.ok(publicIds.includes(created.body.data.location.id));
+
+    // The inactive location never reaches the public form.
+    assert.equal(publicIds.includes(inactiveLocation.id), false);
   });
 
   it('lists public entries for the Entries page with the location name', async () => {
-    const created = await publicEntry('Katherine Johnson', activeLocation.id, 'in');
+    const created = await post(entryPayload({ name: 'Dorothy Vaughan' }));
     assert.equal(created.status, 201);
 
     const { agent } = await signIn(app);
@@ -191,9 +439,18 @@ describe('admin locations and entries', () => {
       (item: { id: string }) => item.id === created.body.data.entry.id,
     );
     assert.ok(entry);
-    assert.equal(entry.name, 'Katherine Johnson');
+    assert.equal(entry.name, 'Dorothy Vaughan');
     assert.equal(entry.direction, 'in');
-    assert.deepEqual(entry.location, activeLocation);
+    assert.equal(entry.location.name, activeLocation.name);
     assert.ok(list.body.meta.pagination.total >= 1);
+  });
+
+  it('hides entries from anonymous callers', async () => {
+    for (const path of ['/api/entries', '/api/locations', '/api/admins']) {
+      const response = await request(app).get(path);
+      assert.equal(response.status, 401, path);
+      assert.equal(response.body.error.code, 'unauthenticated', path);
+      assert.equal(response.body.data, undefined, path);
+    }
   });
 });

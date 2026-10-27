@@ -6,6 +6,7 @@ import { locationsRouter } from './locations.ts';
 import { publicRouter } from './public.ts';
 import { requireCsrf } from '../middleware/csrf.ts';
 import { requireAuth } from '../middleware/requireAuth.ts';
+import { publicRateLimiter } from '../middleware/rateLimit.ts';
 
 /** Endpoints that run without a session — they cannot present a CSRF token. */
 const PUBLIC_API_PATHS = new Set([
@@ -26,6 +27,8 @@ function isAnonymousLogout(path: string, hasCsrfToken: boolean): boolean {
 
 export interface ApiRouterOptions extends AuthRouterOptions {
   loginRateLimiter?: RequestHandler;
+  /** Override the public check-in limiter (used by the tests). */
+  publicRateLimiter?: RequestHandler;
 }
 
 /** Build the API router. The limiters can be replaced (tests). */
@@ -68,7 +71,7 @@ export function createApiRouter(options: ApiRouterOptions = {}): Router {
     requireCsrf(req, res, next);
   });
 
-  router.use('/public', publicRouter);
+  router.use('/public', options.publicRateLimiter ?? publicRateLimiter, publicRouter);
   router.use(
     '/auth',
     createAuthRouter({

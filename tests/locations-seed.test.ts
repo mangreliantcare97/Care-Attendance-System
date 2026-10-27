@@ -82,7 +82,7 @@ describe('seed:locations', () => {
     const first = await LocationModel.findOne({ postcode: 'HA2 7HJ' }).lean();
     assert.ok(first);
     assert.equal(first.sortOrder, 0);
-    assert.equal(first.isActive, true);
+    assert.equal(first.active, true);
     assert.equal(String(first.createdBy), adminId);
     assert.equal(first.name, 'Reliant House, 226 Imperial Drive, Harrow, HA2 7HJ');
   });
@@ -93,7 +93,7 @@ describe('seed:locations', () => {
 
     await LocationModel.updateOne(
       { postcode: 'HA2 7HJ' },
-      { $set: { isActive: false, sortOrder: 99 } },
+      { $set: { active: false, sortOrder: 99 } },
     );
 
     const summary = await upsertSeedLocations(loadSeedLocations(), adminId);
@@ -101,13 +101,13 @@ describe('seed:locations', () => {
     assert.equal(summary.existing, 18);
 
     const edited = await LocationModel.findOne({ postcode: 'HA2 7HJ' }).lean();
-    assert.equal(edited?.isActive, false);
+    assert.equal(edited?.active, false);
     assert.equal(edited?.sortOrder, 99);
 
     // Restore it for the endpoint test.
     await LocationModel.updateOne(
       { postcode: 'HA2 7HJ' },
-      { $set: { isActive: true, sortOrder: 0 } },
+      { $set: { active: true, sortOrder: 0 } },
     );
   });
 
@@ -117,7 +117,7 @@ describe('seed:locations', () => {
     await LocationModel.create({
       name: 'Closed Annexe',
       postcode: 'ZZ9 9ZZ',
-      isActive: false,
+      active: false,
       sortOrder: 0,
       createdBy: adminId,
     });
@@ -141,7 +141,7 @@ describe('seed:locations', () => {
       false,
     );
 
-    const expected = await LocationModel.find({ isActive: true })
+    const expected = await LocationModel.find({ active: { $ne: false } })
       .sort({ sortOrder: 1, name: 1 })
       .lean();
     assert.deepEqual(

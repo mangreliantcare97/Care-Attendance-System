@@ -8,7 +8,7 @@ export interface LocationRecord {
   id: string;
   name: string;
   postcode: string;
-  isActive: boolean;
+  active: boolean;
   sortOrder: number;
   entryCount: number;
   createdAt?: Date;
@@ -24,7 +24,7 @@ interface LocationLike {
   _id: unknown;
   name: string;
   postcode: string;
-  isActive?: boolean;
+  active?: boolean;
   sortOrder?: number;
   createdAt?: Date;
   updatedAt?: Date;
@@ -35,7 +35,7 @@ function toRecord(location: LocationLike, entryCount = 0): LocationRecord {
     id: String(location._id),
     name: location.name,
     postcode: location.postcode,
-    isActive: location.isActive ?? true,
+    active: location.active ?? true,
     sortOrder: location.sortOrder ?? 0,
     entryCount,
     createdAt: location.createdAt,
@@ -43,14 +43,29 @@ function toRecord(location: LocationLike, entryCount = 0): LocationRecord {
   };
 }
 
+/**
+ * Treat documents written before the `active` field existed as active.
+ *
+ * The migration is idempotent and only touches the missing flag, so it is
+ * safe to run on every seed.
+ */
+export async function ensureActiveFlags(): Promise<number> {
+  const result = await LocationModel.updateMany(
+    { active: { $exists: false } },
+    { $set: { active: true } },
+  );
+  return result.modifiedCount;
+}
+
 /** All locations for the admin page, with their entry counts. */
 export async function listLocations(): Promise<LocationRecord[]> {
   const counts = await EntryModel.aggregate<{ _id: unknown; count: number }>([
+    { $match: { deletedAt: null } },
     { $group: { _id: '$locationId', count: { $sum: 1 } } },
   ]);
   const countByLocation = new Map(counts.map((entry) => [String(entry._id), entry.count]));
   const locations = await LocationModel.find()
-    .sort({ isActive: -1, sortOrder: 1, name: 1 })
+    .sort({ active: -1, sortOrder: 1, name: 1 })
     .lean();
 
   return locations.map((location) =>
@@ -61,9 +76,12 @@ export async function listLocations(): Promise<LocationRecord[]> {
 /**
  * Active locations for the public form: id and name only, ordered by the
  * administrator's sort order and then by name. No postcode, no counts.
+ *
+ * `$ne: false` keeps a document without the flag active even if the migration
+ * has not run yet.
  */
 export async function listActiveLocations(): Promise<PublicLocationRecord[]> {
-  const locations = await LocationModel.find({ isActive: true })
+  const locations = await LocationModel.find({ active: { $ne: false } })
     .select('name')
     .sort({ sortOrder: 1, name: 1 })
     .lean();
@@ -71,10 +89,22 @@ export async function listActiveLocations(): Promise<PublicLocationRecord[]> {
   return locations.map((location) => ({ id: String(location._id), name: location.name }));
 }
 
+/**
+ * The location of a public submission: it must exist and be active.
+ *
+ * A well-formed but unknown or inactive id is the client's mistake, so it is
+ * answered like every other field problem — a 400 carrying a field-level
+ * error for `locationId` that the form can show inline.
+ */
 export async function getActiveLocation(id: string) {
-  const location = await LocationModel.findOne({ _id: id, isActive: true }).lean();
+  const location = await LocationModel.findOne({ _id: id, active: { $ne: false } }).lean();
   if (!location) {
-    throw new HttpError(422, 'invalid_location', 'Choose an active location.');
+    throw new HttpError(
+      400,
+      'invalid_location',
+      'Choose an active location.',
+      [{ path: 'locationId', message: 'Choose an active location.' }],
+    );
   }
   return location;
 }
@@ -82,7 +112,7 @@ export async function getActiveLocation(id: string) {
 interface LocationInput {
   name: string;
   postcode: string;
-  isActive?: boolean;
+  active?: boolean;
   sortOrder?: number;
 }
 
@@ -118,7 +148,7 @@ export async function createLocation(
   const location = await LocationModel.create({
     name,
     postcode,
-    isActive: input.isActive ?? true,
+    active: input.active ?? true,
     sortOrder: input.sortOrder ?? 0,
     createdBy,
   });
@@ -145,12 +175,12 @@ export async function updateLocation(
 
   location.name = name;
   location.postcode = postcode;
-  if (patch.isActive !== undefined) location.isActive = patch.isActive;
+  if (patch.active !== undefined) location.active = patch.active;
   if (patch.sortOrder !== undefined) location.sortOrder = patch.sortOrder;
   location.updatedBy = updatedBy as never;
 
   await location.save();
-  const entryCount = await EntryModel.countDocuments({ locationId: location._id });
+  const entryCount = await EntryModel.countDocuments({ locationId: location._id, deletedAt: null });
   return toRecord(location.toObject() as LocationLike, entryCount);
 }
 
@@ -161,7 +191,7 @@ export async function deleteLocation(id: string): Promise<{ deleted: boolean }> 
     throw new HttpError(404, 'location_not_found', 'That location no longer exists.');
   }
 
-  const entryCount = await EntryModel.countDocuments({ locationId: location._id });
+  const entryCount = await EntryModel.countDocuments({ locationId: location._id, deletedAt: null });
   if (entryCount > 0) {
     throw new HttpError(
       409,

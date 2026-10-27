@@ -29,6 +29,26 @@ export function createLoginRateLimiter(options: RateLimiterOptions = {}): RateLi
 
 export const loginRateLimiter = createLoginRateLimiter();
 
+/**
+ * Abuse protection for the cookie-free public endpoints.
+ *
+ * The default budget is deliberately generous (an office shares one IP), and
+ * the same limiter covers the locations feed and the entry submission.
+ */
+export function createPublicRateLimiter(options: RateLimiterOptions = {}): RateLimitRequestHandler {
+  return rateLimit({
+    windowMs: options.windowMs ?? env.publicRateLimit.windowMs,
+    limit: options.max ?? env.publicRateLimit.max,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    handler: (_req, res) => {
+      fail(res, 429, 'too_many_requests', 'Too many requests. Please wait a few minutes and try again.');
+    },
+  });
+}
+
+export const publicRateLimiter = createPublicRateLimiter();
+
 /** A generic limiter for the unauthenticated password endpoints. */
 export function createApiRateLimiter(options: RateLimiterOptions = {}): RateLimitRequestHandler {
   return rateLimit({

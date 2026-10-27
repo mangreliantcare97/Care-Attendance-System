@@ -1,32 +1,144 @@
 /**
  * Public check-in form.
  *
- * This page is deliberately cookie-free: both requests are sent with
- * `credentials: 'omit'` and the API only returns the id and name of active
- * locations. An unknown or inactive `?location=` value is simply ignored.
+ * Cookie-free by design: both requests use `credentials: 'omit'`. The page
+ * never shows an existing entry, never autocompletes names from the database
+ * and never prefills the time — the person always chooses it.
  */
 (function () {
   var form = document.getElementById('checkin-form');
+  var userType = document.getElementById('checkin-user-type');
   var nameInput = document.getElementById('checkin-name');
+  var direction = document.getElementById('checkin-direction');
+  var hourSelect = document.getElementById('checkin-hour');
+  var minuteSelect = document.getElementById('checkin-minute');
+  var periodSelect = document.getElementById('checkin-period');
+  var nowButton = document.getElementById('checkin-now');
+  var timeChoice = document.getElementById('checkin-time-choice');
   var locationSelect = document.getElementById('checkin-location');
   var locationFull = document.getElementById('checkin-location-full');
+  var locationState = document.getElementById('checkin-location-state');
+  var locationMessage = document.getElementById('checkin-location-message');
+  var retryButton = document.getElementById('checkin-retry');
+  var notes = document.getElementById('checkin-notes');
+  var notesCount = document.getElementById('checkin-notes-count');
+  var company = document.getElementById('checkin-company');
   var submitButton = document.getElementById('checkin-submit');
   var alertBox = document.getElementById('checkin-alert');
   var successBox = document.getElementById('checkin-success');
-  var requestedLocation = new URLSearchParams(window.location.search).get('location');
 
-  function showError(message) {
+  var requestedLocation = new URLSearchParams(window.location.search).get('location');
+  var locations = [];
+  var firstInvalid = null;
+  var resetTimer = null;
+  /** The server's timezone, delivered with the location list (APP_TIMEZONE). */
+  var appTimezone = '';
+
+  var EMPTY_LOCATION_MESSAGE = 'No active locations are available. Please ask an administrator.';
+  var FAILED_LOCATION_MESSAGE = 'Could not load locations. Please try again.';
+  var RESET_AFTER_MS = 5000;
+
+  // ---- time helpers -------------------------------------------------------
+
+  function pad(value) {
+    return String(value).length < 2 ? '0' + String(value) : String(value);
+  }
+
+  function format12Hour(hour24, minute) {
+    var suffix = hour24 < 12 ? 'AM' : 'PM';
+    var hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    return pad(hour12) + ':' + pad(minute) + ' ' + suffix;
+  }
+
+  function formatClockString(value) {
+    var parts = String(value).split(':');
+    return format12Hour(Number(parts[0]), Number(parts[1]));
+  }
+
+  function fillTimeOptions() {
+    for (var hour = 1; hour <= 12; hour += 1) {
+      var hourOption = document.createElement('option');
+      hourOption.value = String(hour);
+      hourOption.textContent = pad(hour);
+      hourSelect.appendChild(hourOption);
+    }
+
+    for (var minute = 0; minute < 60; minute += 1) {
+      var minuteOption = document.createElement('option');
+      minuteOption.value = pad(minute);
+      minuteOption.textContent = pad(minute);
+      minuteSelect.appendChild(minuteOption);
+    }
+  }
+
+  /** "09:05 AM" under the picker, or nothing while the time is incomplete. */
+  function updateTimeChoice() {
+    var value = chosenTime();
+    timeChoice.textContent = value ? 'Time: ' + formatClockString(value) : '';
+  }
+
+  /** The three selects as 24h `HH:mm`, or '' when any part is missing. */
+  function chosenTime() {
+    if (!hourSelect.value || !minuteSelect.value || !periodSelect.value) return '';
+    var hour = Number(hourSelect.value) % 12;
+    if (periodSelect.value === 'PM') hour += 12;
+    return pad(hour) + ':' + pad(Number(minuteSelect.value));
+  }
+
+  /**
+   * The current wall clock in APP_TIMEZONE.
+   *
+   * The device on a shared kiosk may sit in another timezone (or have its
+   * clock wrong), and the server decides the date from APP_TIMEZONE — so "Now"
+   * reads the same clock the server does. Falls back to the device time when
+   * the timezone was never delivered.
+   */
+  function currentTimeParts() {
+    var options = {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    };
+    if (appTimezone) options.timeZone = appTimezone;
+
+    var parts = new Intl.DateTimeFormat('en-GB', options).formatToParts(new Date());
+    var hour = '';
+    var minute = '';
+    parts.forEach(function (part) {
+      if (part.type === 'hour') hour = part.value;
+      if (part.type === 'minute') minute = part.value;
+    });
+    return { hour: Number(hour), minute: Number(minute) };
+  }
+
+  function fillTimeFromClock() {
+    var now = currentTimeParts();
+    var hour24 = now.hour % 24;
+    var hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    hourSelect.value = String(hour12);
+    minuteSelect.value = pad(now.minute);
+    periodSelect.value = hour24 < 12 ? 'AM' : 'PM';
+    updateTimeChoice();
+    clearError(['checkin-hour', 'checkin-minute', 'checkin-period'], 'checkin-time-error');
+  }
+
+  // ---- messages -----------------------------------------------------------
+
+  function showAlert(message) {
     successBox.classList.add('d-none');
     successBox.textContent = '';
     alertBox.textContent = message;
     alertBox.classList.remove('d-none');
   }
 
-  function clearError() {
+  function hideAlert() {
     alertBox.classList.add('d-none');
     alertBox.textContent = '';
-    nameInput.removeAttribute('aria-invalid');
-    locationSelect.removeAttribute('aria-invalid');
+  }
+
+  function showSuccess(message) {
+    successBox.textContent = message;
+    successBox.classList.remove('d-none');
   }
 
   function hideSuccess() {
@@ -34,39 +146,95 @@
     successBox.textContent = '';
   }
 
+  // ---- field errors -------------------------------------------------------
+
+  function describedByFor(field, errorId) {
+    var ids = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
+    if (ids.indexOf(errorId) === -1) ids.push(errorId);
+    return ids.join(' ');
+  }
+
+  function markError(fieldIds, errorId, message) {
+    var errorBox = document.getElementById(errorId);
+    if (errorBox) errorBox.textContent = message;
+
+    fieldIds.forEach(function (id, index) {
+      var field = document.getElementById(id);
+      if (!field) return;
+      field.setAttribute('aria-invalid', 'true');
+      if (errorBox) field.setAttribute('aria-describedby', describedByFor(field, errorId));
+      if (index === 0 && !firstInvalid) firstInvalid = field;
+    });
+  }
+
+  function clearError(fieldIds, errorId) {
+    var errorBox = document.getElementById(errorId);
+    if (errorBox) errorBox.textContent = '';
+
+    fieldIds.forEach(function (id) {
+      var field = document.getElementById(id);
+      if (!field) return;
+      field.removeAttribute('aria-invalid');
+      var ids = (field.getAttribute('aria-describedby') || '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .filter(function (value) { return value !== errorId; });
+      if (ids.length) field.setAttribute('aria-describedby', ids.join(' '));
+      else field.removeAttribute('aria-describedby');
+    });
+  }
+
+  var FIELDS = [
+    { ids: ['checkin-user-type'], error: 'checkin-user-type-error' },
+    { ids: ['checkin-name'], error: 'checkin-name-error' },
+    { ids: ['checkin-direction'], error: 'checkin-direction-error' },
+    { ids: ['checkin-hour', 'checkin-minute', 'checkin-period'], error: 'checkin-time-error' },
+    { ids: ['checkin-location'], error: 'checkin-location-error' },
+    { ids: ['checkin-notes'], error: 'checkin-notes-error' },
+  ];
+
+  function clearAllErrors() {
+    firstInvalid = null;
+    FIELDS.forEach(function (field) {
+      clearError(field.ids, field.error);
+    });
+  }
+
+  // ---- locations ---------------------------------------------------------
+
   function updateLocationLabel() {
     var option = locationSelect.options[locationSelect.selectedIndex];
     locationFull.textContent = locationSelect.value && option ? option.textContent : '';
   }
 
-  function selectedDirection() {
-    var checked = form.querySelector('input[name="direction"]:checked');
-    return checked ? checked.value : 'in';
+  function showLocationState(message, showRetry) {
+    locationMessage.textContent = message;
+    locationState.hidden = false;
+    retryButton.hidden = !showRetry;
   }
 
-  function updateSubmitLabel() {
-    submitButton.textContent = selectedDirection() === 'out' ? 'Check out' : 'Check in';
+  function hideLocationState() {
+    locationState.hidden = true;
+    retryButton.hidden = true;
+    locationMessage.textContent = '';
   }
 
-  function renderLocations(locations) {
+  function renderLocations(list) {
+    locations = list || [];
     locationSelect.textContent = '';
-
-    if (!locations.length) {
-      var none = document.createElement('option');
-      none.value = '';
-      none.textContent = 'No active locations available';
-      locationSelect.appendChild(none);
-      locationSelect.disabled = true;
-      submitButton.disabled = true;
-      locationFull.textContent = '';
-      showError('No active check-in locations are available. Please ask an administrator.');
-      return;
-    }
 
     var placeholder = document.createElement('option');
     placeholder.value = '';
-    placeholder.textContent = 'Choose a location';
+    placeholder.textContent = '-- Select --';
     locationSelect.appendChild(placeholder);
+
+    if (!locations.length) {
+      locationSelect.disabled = true;
+      submitButton.disabled = true;
+      locationFull.textContent = '';
+      showLocationState(EMPTY_LOCATION_MESSAGE, false);
+      return;
+    }
 
     var matched = false;
     locations.forEach(function (location) {
@@ -77,19 +245,17 @@
       if (requestedLocation && location.id === requestedLocation) matched = true;
     });
 
+    hideLocationState();
     locationSelect.disabled = false;
     submitButton.disabled = false;
-
-    if (matched) {
-      locationSelect.value = requestedLocation;
-    } else {
-      locationSelect.value = '';
-    }
-
+    locationSelect.value = matched ? requestedLocation : '';
     updateLocationLabel();
   }
 
   async function loadLocations() {
+    locationSelect.disabled = true;
+    retryButton.hidden = true;
+
     try {
       var response = await fetch('/api/public/locations', {
         method: 'GET',
@@ -101,58 +267,118 @@
 
       if (!response.ok || !payload.success) {
         throw new Error(
-          (payload.error && payload.error.message) || 'The locations could not be loaded.',
+          (payload.error && payload.error.message) || FAILED_LOCATION_MESSAGE,
         );
       }
 
+      if (payload.meta && payload.meta.timezone) appTimezone = String(payload.meta.timezone);
       renderLocations(payload.data.locations || []);
     } catch (error) {
-      locationSelect.textContent = '';
-      var failed = document.createElement('option');
-      failed.value = '';
-      failed.textContent = 'Locations could not be loaded';
-      locationSelect.appendChild(failed);
       locationSelect.disabled = true;
       submitButton.disabled = true;
       locationFull.textContent = '';
-      showError(error.message || 'The locations could not be loaded. Please try again.');
+      showLocationState(FAILED_LOCATION_MESSAGE, true);
     }
   }
 
-  form.addEventListener('change', function (event) {
-    if (event.target === locationSelect) {
-      updateLocationLabel();
-    }
-    if (event.target && event.target.name === 'direction') {
-      updateSubmitLabel();
-    }
-  });
+  // ---- validation ---------------------------------------------------------
 
-  form.addEventListener('submit', async function (event) {
-    event.preventDefault();
-    clearError();
-    hideSuccess();
+  var FIELD_BY_PATH = {
+    userType: FIELDS[0],
+    name: FIELDS[1],
+    direction: FIELDS[2],
+    time: FIELDS[3],
+    locationId: FIELDS[4],
+    notes: FIELDS[5],
+  };
+
+  function validate() {
+    clearAllErrors();
+
+    if (!userType.value) {
+      markError(FIELDS[0].ids, FIELDS[0].error, 'Choose a user type.');
+    }
 
     var name = nameInput.value.trim();
-    var locationId = locationSelect.value;
-
     if (!name) {
-      nameInput.setAttribute('aria-invalid', 'true');
-      nameInput.focus();
-      showError('Enter your name.');
+      markError(FIELDS[1].ids, FIELDS[1].error, 'Enter your name.');
+    } else if (name.length < 2) {
+      markError(FIELDS[1].ids, FIELDS[1].error, 'Enter a name of at least 2 characters.');
+    } else if (name.length > 80) {
+      markError(FIELDS[1].ids, FIELDS[1].error, 'The name must be 80 characters or fewer.');
+    } else if (/[\u0000-\u001F\u007F]/.test(name)) {
+      markError(FIELDS[1].ids, FIELDS[1].error, 'That name contains characters that are not allowed.');
+    }
+
+    if (!direction.value) {
+      markError(FIELDS[2].ids, FIELDS[2].error, 'Choose check in or check out.');
+    }
+
+    if (!chosenTime()) {
+      markError(FIELDS[3].ids, FIELDS[3].error, 'Choose the hour, minute and AM/PM.');
+    }
+
+    if (locationSelect.disabled || !locationSelect.value) {
+      markError(FIELDS[4].ids, FIELDS[4].error, 'Choose a location.');
+    }
+
+    var notesValue = notes.value.trim();
+    if (!notesValue) {
+      markError(FIELDS[5].ids, FIELDS[5].error, 'Enter a note for the record.');
+    } else if (notesValue.length > 500) {
+      markError(FIELDS[5].ids, FIELDS[5].error, 'Notes must be 500 characters or fewer.');
+    }
+
+    return firstInvalid === null;
+  }
+
+  /** Paint the field errors the server reported; true when at least one mapped. */
+  function applyServerErrors(details) {
+    if (!Array.isArray(details) || !details.length) return false;
+
+    var applied = false;
+    details.forEach(function (issue) {
+      var field = FIELD_BY_PATH[issue.path];
+      if (!field) return;
+      markError(field.ids, field.error, String(issue.message || 'This value is not valid.'));
+      applied = true;
+    });
+    return applied;
+  }
+
+  function focusFirstError() {
+    if (firstInvalid && !firstInvalid.disabled) firstInvalid.focus();
+  }
+
+  // ---- submit -------------------------------------------------------------
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    hideSuccess();
+    hideAlert();
+
+    if (resetTimer) {
+      window.clearTimeout(resetTimer);
+      resetTimer = null;
+    }
+
+    if (!validate()) {
+      focusFirstError();
       return;
     }
 
-    if (!locationId) {
-      locationSelect.setAttribute('aria-invalid', 'true');
-      locationSelect.focus();
-      showError('Choose a location.');
-      return;
-    }
+    var body = {
+      userType: userType.value,
+      name: nameInput.value.trim(),
+      direction: direction.value,
+      time: chosenTime(),
+      locationId: locationSelect.value,
+      notes: notes.value.trim(),
+      company: company.value,
+    };
 
-    var direction = selectedDirection();
     submitButton.disabled = true;
-    submitButton.textContent = 'Saving…';
+    submitButton.textContent = 'Sending…';
 
     try {
       var response = await fetch('/api/public/entries', {
@@ -162,40 +388,116 @@
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: name,
-          locationId: locationId,
-          direction: direction,
-        }),
+        body: JSON.stringify(body),
       });
       var payload = await response.json();
 
       if (!response.ok || !payload.success) {
-        throw new Error(
+        var failure = new Error(
           (payload.error && payload.error.message) || 'Your entry could not be saved.',
         );
+        failure.details = payload.error && payload.error.details;
+        throw failure;
       }
 
       var entry = payload.data.entry;
-      successBox.textContent =
+      showSuccess(
         'Thank you, ' +
-        entry.name +
-        '. You checked ' +
-        (entry.direction === 'out' ? 'out' : 'in') +
-        ' at ' +
-        entry.location.name +
-        '.';
-      successBox.classList.remove('d-none');
-      nameInput.value = '';
-      nameInput.focus();
+          entry.name +
+          '. Your ' +
+          (entry.direction === 'out' ? 'check out' : 'check in') +
+          ' at ' +
+          formatClockString(entry.time) +
+          ' has been recorded.',
+      );
+      submitButton.textContent = 'Submit';
+      scheduleReset();
     } catch (error) {
-      showError(error.message || 'Your entry could not be saved. Please try again.');
-    } finally {
+      var mapped = applyServerErrors(error.details);
+      if (mapped) focusFirstError();
+      else showAlert(error.message || 'Your entry could not be saved. Please try again.');
+      submitButton.textContent = 'Submit';
       submitButton.disabled = false;
-      updateSubmitLabel();
     }
+  }
+
+  // ---- reset for the next person ------------------------------------------
+
+  function scheduleReset() {
+    if (resetTimer) window.clearTimeout(resetTimer);
+    resetTimer = window.setTimeout(resetForm, RESET_AFTER_MS);
+  }
+
+  function resetForm() {
+    resetTimer = null;
+    hideSuccess();
+    hideAlert();
+    clearAllErrors();
+
+    userType.value = '';
+    nameInput.value = '';
+    direction.value = '';
+    hourSelect.value = '';
+    minuteSelect.value = '';
+    periodSelect.value = '';
+    notes.value = '';
+    locationSelect.value = '';
+
+    updateNotesCount();
+    updateTimeChoice();
+    updateLocationLabel();
+
+    if (requestedLocation && locations.some(function (item) { return item.id === requestedLocation; })) {
+      locationSelect.value = requestedLocation;
+      updateLocationLabel();
+    }
+
+    submitButton.textContent = 'Submit';
+    submitButton.disabled = locations.length === 0 || locationSelect.disabled;
+    nameInput.focus();
+  }
+
+  function updateNotesCount() {
+    notesCount.textContent = String(notes.value.length) + ' / 500';
+  }
+
+  // ---- wiring ------------------------------------------------------------
+
+  function bindFieldError(field, ids, errorId) {
+    field.addEventListener('change', function () {
+      clearError(ids, errorId);
+    });
+    field.addEventListener('input', function () {
+      clearError(ids, errorId);
+    });
+  }
+
+  bindFieldError(userType, FIELDS[0].ids, FIELDS[0].error);
+  bindFieldError(nameInput, FIELDS[1].ids, FIELDS[1].error);
+  bindFieldError(direction, FIELDS[2].ids, FIELDS[2].error);
+  bindFieldError(notes, FIELDS[5].ids, FIELDS[5].error);
+
+  [hourSelect, minuteSelect, periodSelect].forEach(function (select) {
+    select.addEventListener('change', function () {
+      clearError(FIELDS[3].ids, FIELDS[3].error);
+      updateTimeChoice();
+    });
   });
 
-  updateSubmitLabel();
+  locationSelect.addEventListener('change', function () {
+    clearError(FIELDS[4].ids, FIELDS[4].error);
+    updateLocationLabel();
+  });
+
+  notes.addEventListener('input', updateNotesCount);
+  nowButton.addEventListener('click', fillTimeFromClock);
+  retryButton.addEventListener('click', function () {
+    void loadLocations();
+  });
+  form.addEventListener('submit', handleSubmit);
+
+  fillTimeOptions();
+  updateNotesCount();
+  updateTimeChoice();
   void loadLocations();
 })();

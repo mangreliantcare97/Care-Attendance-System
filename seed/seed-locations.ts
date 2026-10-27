@@ -16,6 +16,7 @@ import { connectDatabase, disconnectDatabase } from '../src/config/db.ts';
 import { env } from '../src/config/env.ts';
 import { AdminModel } from '../src/models/Admin.ts';
 import { LocationModel } from '../src/models/Location.ts';
+import { ensureActiveFlags } from '../src/services/locations.ts';
 import { isValidUkPostcode, normalisePostcode } from '../src/utils/postcode.ts';
 import { normaliseNameKey } from '../src/utils/text.ts';
 
@@ -93,7 +94,7 @@ export async function upsertSeedLocations(
           name,
           nameKey,
           postcode,
-          isActive: true,
+          active: true,
           sortOrder: index,
           createdBy,
         },
@@ -152,8 +153,13 @@ async function main(): Promise<void> {
     console.log(`[seed:locations] administrator: ${admin.email}`);
 
     // Replace the retired single-field name index with the (name, postcode)
-    // rule, so the same label may exist at two postcodes.
+    // rule, so the same label may exist at two postcodes, and count any
+    // location written before the `active` field existed.
     await LocationModel.syncIndexes();
+    const migrated = await ensureActiveFlags();
+    if (migrated > 0) {
+      console.log(`[seed:locations] marked ${migrated} existing location(s) as active.`);
+    }
 
     const summary = await upsertSeedLocations(entries, String(admin._id));
 

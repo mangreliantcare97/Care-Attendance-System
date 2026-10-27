@@ -27,7 +27,7 @@ export const createLocationSchema = z
   .object({
     name: nameSchema,
     postcode: postcodeSchema,
-    isActive: z.boolean().optional(),
+    active: z.boolean().optional(),
     sortOrder: sortOrderSchema.optional(),
   })
   .strict();

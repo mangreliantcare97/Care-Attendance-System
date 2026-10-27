@@ -194,8 +194,14 @@ describe('protected API authentication', () => {
     assert.equal(locations.body.success, true);
 
     const entry = await request(app).post('/api/public/entries').send({});
-    assert.equal(entry.status, 422);
+    assert.equal(entry.status, 400);
     assert.equal(entry.body.error.code, 'validation_error');
+    const details = entry.body.error.details as Array<{ path: string }>;
+    assert.ok(Array.isArray(details) && details.length > 0);
+    assert.equal(
+      details.some((issue) => issue.path === 'name'),
+      true,
+    );
   });
 });
 

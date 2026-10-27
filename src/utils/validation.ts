@@ -17,11 +17,11 @@ function formatIssues(error: z.ZodError): Array<{ path: string; message: string 
  * The parsed result is stored on `req.valid[source]` — the raw request objects
  * are left untouched so that Express' own parsing stays predictable.
  */
-export function validate(schema: ZodType, source: Source = 'body') {
+export function validate(schema: ZodType, source: Source = 'body', status = 422) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req[source]);
     if (!result.success) {
-      fail(res, 422, 'validation_error', 'The submitted data is invalid.', formatIssues(result.error));
+      fail(res, status, 'validation_error', 'The submitted data is invalid.', formatIssues(result.error));
       return;
     }
     req.valid = { ...req.valid, [source]: result.data };

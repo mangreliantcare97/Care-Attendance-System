@@ -1,9 +1,14 @@
 /**
- * Browser-side behaviour of the public check-in form.
+ * Browser-side behaviour of the public check-in form, driven in jsdom.
  *
  * The server tests prove the API only exposes active locations. These tests
- * drive the real checkin.js in jsdom to cover the other half: the URL
- * preselection and the cookie-free fetch calls.
+ * drive the real checkin.js and checkin.html to cover the other half: the six
+ * required fields, local validation, the URL preselection, the two location
+ * messages, the cookie-free fetch calls, the confirmation text and the reset
+ * for the next person.
+ *
+ * The project compiles without the DOM lib, so the elements are described by
+ * the handful of members these tests actually touch.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -12,79 +17,116 @@ import { JSDOM } from 'jsdom';
 
 const pageSource = readFileSync(new URL('../public/checkin.html', import.meta.url), 'utf8');
 const scriptSource = readFileSync(new URL('../public/js/checkin.js', import.meta.url), 'utf8');
+const seedLocations = JSON.parse(
+  readFileSync(new URL('../seed/locations.json', import.meta.url), 'utf8'),
+) as Array<{ name: string; postcode: string }>;
 
-const LOCATIONS = [
-  { id: '64b000000000000000000001', name: 'Main Office' },
-  { id: '64b000000000000000000002', name: 'North Clinic' },
-];
+/** The real seed labels, so the tests run against the longest addresses. */
+const LOCATIONS = seedLocations.map((location, index) => ({
+  id: `64b0000000000000000000${String(index + 1).padStart(2, '0')}`,
+  name: location.name,
+}));
 
-function tick() {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+const FIRST = LOCATIONS[0];
+const SECOND = LOCATIONS[1];
+
+interface OptionLike {
+  textContent: string | null;
+}
+
+interface ElemLike {
+  id: string;
+  value: string;
+  textContent: string | null;
+  innerHTML: string;
+  disabled: boolean;
+  hidden: boolean;
+  required: boolean;
+  options: ArrayLike<OptionLike>;
+  classList: { contains(name: string): boolean };
+  getAttribute(name: string): string | null;
+  setAttribute(name: string, value: string): void;
+  querySelectorAll(selector: string): ArrayLike<unknown>;
+  click(): void;
+  dispatchEvent(event: unknown): boolean;
+  closest(selector: string): unknown;
+}
+
+interface DocLike {
+  body: { textContent: string | null };
+  activeElement: { id: string } | null;
+  defaultView: { Event: new (type: string, init?: Record<string, unknown>) => unknown };
+  getElementById(id: string): ElemLike | null;
+  querySelector(selector: string): unknown;
+  querySelectorAll(selector: string): ArrayLike<unknown>;
+}
+
+interface HarnessOptions {
+  search?: string;
+  /** Deliver this list; `null` means the server returned an empty list. */
+  locations?: Array<{ id: string; name: string }> | null;
+  /** Simulate a network failure on the location feed. */
+  failLocations?: boolean;
 }
 
 interface Harness {
-  dom: JSDOM;
   calls: Array<{ url: string; options: Record<string, unknown> }>;
+  doc: DocLike;
 }
 
-interface SelectLike {
-  value: string;
-  disabled: boolean;
-  options: ArrayLike<{ textContent: string | null }>;
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-interface InputLike {
-  value: string;
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-interface ElementLike {
-  textContent: string | null;
-  classList: { contains: (name: string) => boolean };
-}
-
-interface FormLike {
-  dispatchEvent: (event: unknown) => boolean;
-}
-
-function byId(dom: JSDOM, id: string): ElementLike {
-  return dom.window.document.getElementById(id) as unknown as ElementLike;
-}
-
-function selectById(dom: JSDOM, id: string): SelectLike {
-  return dom.window.document.getElementById(id) as unknown as SelectLike;
-}
-
-async function harness(search: string): Promise<Harness> {
+async function harness(options: HarnessOptions = {}): Promise<Harness> {
   const dom = new JSDOM(pageSource, {
-    url: `http://localhost:3000/${search}`,
+    url: `http://localhost:3000/${options.search ?? ''}`,
     runScripts: 'outside-only',
     pretendToBeVisual: true,
   });
 
   const calls: Harness['calls'] = [];
   const window = dom.window;
+  const doc = window.document as unknown as DocLike;
+  const locationList = options.locations === undefined || options.locations === null
+    ? (options.locations === null ? [] : LOCATIONS)
+    : options.locations;
 
-  const fakeFetch = async (url: string, options: Record<string, unknown> = {}) => {
-    calls.push({ url: String(url), options });
+  const fakeFetch = async (url: string, fetchOptions: Record<string, unknown> = {}) => {
+    calls.push({ url: String(url), options: fetchOptions });
 
     if (String(url) === '/api/public/locations') {
+      if (options.failLocations) throw new Error('network down');
       return {
         ok: true,
         status: 200,
-        json: async () => ({ success: true, data: { locations: LOCATIONS } }),
+        json: async () => ({
+          success: true,
+          data: { locations: locationList },
+          meta: { timezone: 'Europe/London' },
+        }),
       };
     }
 
     if (String(url) === '/api/public/entries') {
-      const body = JSON.parse(String(options.body));
+      const body = JSON.parse(String(fetchOptions.body));
       const location = LOCATIONS.find((item) => item.id === body.locationId);
-      if (!location) {
+      // `notes` is the test's way of asking for the refused-location answer.
+      if (!location || body.notes === 'force-location-error') {
         return {
           ok: false,
-          status: 422,
+          status: 400,
           json: async () => ({
             success: false,
-            error: { code: 'invalid_location', message: 'Choose an active location.' },
+            error: {
+              code: 'invalid_location',
+              message: 'Choose an active location.',
+              details: [{ path: 'locationId', message: 'Choose an active location.' }],
+            },
           }),
         };
       }
@@ -99,59 +141,242 @@ async function harness(search: string): Promise<Harness> {
               id: '64c000000000000000000001',
               name: body.name,
               direction: body.direction,
-              occurredAt: new Date().toISOString(),
-              location,
+              time: body.time,
+              date: '2026-10-26',
             },
           },
         }),
       };
     }
 
-    throw new Error(`Unexpected fetch: ${url}`);
+    throw new Error(`Unexpected fetch: ${String(url)}`);
   };
 
   (window as unknown as { fetch: typeof fakeFetch }).fetch = fakeFetch;
-
   window.eval(scriptSource);
   await tick();
   await tick();
 
-  return { dom, calls };
+  return { calls, doc };
+}
+
+function elem(doc: DocLike, id: string): ElemLike {
+  const found = doc.getElementById(id);
+  assert.ok(found, `#${id} is missing from the page`);
+  return found;
+}
+
+function submit(doc: DocLike): void {
+  const form = elem(doc, 'checkin-form');
+  const Event = doc.defaultView.Event;
+  form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+}
+
+function change(doc: DocLike, id: string): void {
+  const field = elem(doc, id);
+  field.dispatchEvent(new doc.defaultView.Event('change', { bubbles: true }));
+}
+
+function fillValidForm(doc: DocLike, name = 'Ada Lovelace'): void {
+  elem(doc, 'checkin-user-type').value = 'staff';
+  elem(doc, 'checkin-name').value = name;
+  elem(doc, 'checkin-direction').value = 'in';
+  elem(doc, 'checkin-hour').value = '9';
+  elem(doc, 'checkin-minute').value = '05';
+  elem(doc, 'checkin-period').value = 'AM';
+  elem(doc, 'checkin-location').value = FIRST.id;
+  elem(doc, 'checkin-notes').value = 'Start of shift';
 }
 
 describe('public check-in form', () => {
-  it('preselects a valid active location id from ?location=', async () => {
-    const { dom } = await harness(`?location=${LOCATIONS[1].id}`);
-    const select = selectById(dom, 'checkin-location');
+  it('shows all six required fields, bound to their inputs and with no radio buttons', async () => {
+    const { doc } = await harness();
 
-    assert.equal(select.value, LOCATIONS[1].id);
-    assert.equal(select.disabled, false);
-    assert.equal(
-      (dom.window.document.getElementById('checkin-submit') as unknown as { hasAttribute: (name: string) => boolean }).hasAttribute('disabled'),
-      false,
-    );
+    const labelled: Array<[string, string]> = [
+      ['checkin-user-type', 'checkin-user-type'],
+      ['checkin-name', 'checkin-name'],
+      ['checkin-direction', 'checkin-direction'],
+      ['checkin-location', 'checkin-location'],
+      ['checkin-notes', 'checkin-notes'],
+    ];
+
+    for (const [id, target] of labelled) {
+      assert.ok(doc.querySelector(`label[for="${target}"]`), `no label for ${target}`);
+      assert.ok(
+        doc.querySelector(`label[for="${target}"] .checkin-required`),
+        `${target} has no required marker`,
+      );
+      assert.equal(elem(doc, id).required, true, `${id} should be required`);
+    }
+
+    // Time is a fieldset of three selects plus the Now button.
+    for (const id of ['checkin-hour', 'checkin-minute', 'checkin-period']) {
+      assert.equal(elem(doc, id).required, true, `${id} should be required`);
+    }
+    assert.ok(doc.getElementById('checkin-now'));
+
+    // The radio buttons are gone and the direction is a plain select.
+    assert.equal(doc.querySelectorAll('input[type="radio"]').length, 0);
+    assert.equal(elem(doc, 'checkin-direction').options.length, 3);
+
+    // Nothing is preselected and the "* Required" note is present.
+    assert.equal(elem(doc, 'checkin-user-type').value, '');
+    assert.equal(elem(doc, 'checkin-direction').value, '');
+    assert.equal(elem(doc, 'checkin-location').value, '');
+    assert.equal(elem(doc, 'checkin-hour').value, '');
+    assert.equal(elem(doc, 'checkin-minute').value, '');
+    assert.equal(elem(doc, 'checkin-period').value, '');
+    assert.match(doc.body.textContent ?? '', /\*\s*Required/);
+
+    // The honeypot exists, and the privacy and shared-device lines stay.
+    assert.ok(elem(doc, 'checkin-company').closest('.checkin-hp'));
+    assert.match(doc.body.textContent ?? '', /do not store your IP address/i);
+    assert.match(doc.body.textContent ?? '', /Never sign in to the admin panel on it/i);
   });
 
-  it('ignores an unknown or inactive location id and leaves the placeholder selected', async () => {
-    for (const value of ['000000000000000000000000', 'not-a-real-id', '']) {
-      const { dom } = await harness(`?location=${encodeURIComponent(value)}`);
-      const select = selectById(dom, 'checkin-location');
+  it('renders every real address label without stray text', async () => {
+    const { doc } = await harness();
 
-      assert.equal(select.value, '', value);
-      assert.equal(select.disabled, false);
-      assert.equal(select.options[0].textContent, 'Choose a location');
+    const options = Array.from(elem(doc, 'checkin-location').options).map(
+      (option) => option.textContent ?? '',
+    );
+    assert.equal(options[0], '-- Select --');
+    assert.equal(options.length, LOCATIONS.length + 1);
+    for (const location of LOCATIONS) {
+      assert.ok(options.includes(location.name), `missing ${location.name}`);
+    }
+
+    const text = doc.body.textContent ?? '';
+    for (const stray of ['undefined', '[object Object]', 'NaN', 'null']) {
+      assert.equal(text.includes(stray), false, `stray text: ${stray}`);
     }
   });
 
-  it('submits without cookies and shows a safe confirmation', async () => {
-    const { dom, calls } = await harness(`?location=${LOCATIONS[0].id}`);
-    const document = dom.window.document;
-    const form = document.getElementById('checkin-form') as unknown as FormLike;
-    const name = document.getElementById('checkin-name') as unknown as InputLike;
+  it('preselects a valid active location id from ?location=', async () => {
+    const { doc } = await harness({ search: `?location=${SECOND.id}` });
 
-    name.value = '  Ada Lovelace  ';
-    form.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+    assert.equal(elem(doc, 'checkin-location').value, SECOND.id);
+    assert.equal(elem(doc, 'checkin-location').disabled, false);
+    assert.equal(elem(doc, 'checkin-submit').disabled, false);
+    // The full address is shown underneath the select so it can wrap.
+    assert.equal(elem(doc, 'checkin-location-full').textContent, SECOND.name);
+  });
+
+  it('ignores an unknown or malformed location id', async () => {
+    for (const value of ['000000000000000000000000', 'not-a-real-id', '']) {
+      const { doc } = await harness({ search: `?location=${encodeURIComponent(value)}` });
+
+      assert.equal(elem(doc, 'checkin-location').value, '', value);
+      assert.equal(elem(doc, 'checkin-location').disabled, false, value);
+      assert.equal(elem(doc, 'checkin-location').options[0].textContent, '-- Select --', value);
+    }
+  });
+
+  it('shows the empty-list message when no location is active', async () => {
+    const { doc } = await harness({ locations: [] });
+
+    assert.match(
+      elem(doc, 'checkin-location-message').textContent ?? '',
+      /No active locations are available/,
+    );
+    assert.equal(elem(doc, 'checkin-retry').hidden, true);
+    assert.equal(elem(doc, 'checkin-location').disabled, true);
+    assert.equal(elem(doc, 'checkin-submit').disabled, true);
+  });
+
+  it('shows the retry message when the location list cannot be loaded', async () => {
+    const { doc, calls } = await harness({ failLocations: true });
+
+    assert.match(
+      elem(doc, 'checkin-location-message').textContent ?? '',
+      /Could not load locations/,
+    );
+    assert.equal(elem(doc, 'checkin-retry').hidden, false);
+
+    elem(doc, 'checkin-retry').click();
     await tick();
+    assert.ok(calls.filter((call) => call.url === '/api/public/locations').length >= 2);
+  });
+
+  it('validates locally, inline, and moves the focus to the first error', async () => {
+    const { doc, calls } = await harness();
+
+    submit(doc);
+    await tick();
+
+    assert.equal(calls.some((call) => call.url === '/api/public/entries'), false);
+
+    const order: Array<[string, string, RegExp]> = [
+      ['checkin-user-type-error', 'checkin-user-type', /Choose a user type/],
+      ['checkin-name-error', 'checkin-name', /Enter your name/],
+      ['checkin-direction-error', 'checkin-direction', /Choose check in or check out/],
+      ['checkin-time-error', 'checkin-hour', /Choose the hour/],
+      ['checkin-location-error', 'checkin-location', /Choose a location/],
+      ['checkin-notes-error', 'checkin-notes', /Enter a note/],
+    ];
+
+    for (const [errorId, fieldId, pattern] of order) {
+      assert.match(elem(doc, errorId).textContent ?? '', pattern, errorId);
+
+      const field = elem(doc, fieldId);
+      assert.equal(field.getAttribute('aria-invalid'), 'true', fieldId);
+      assert.ok(
+        (field.getAttribute('aria-describedby') ?? '').split(/\s+/).includes(errorId),
+        `${fieldId} should point at ${errorId}`,
+      );
+    }
+
+    // Focus lands on the very first invalid control.
+    assert.equal(doc.activeElement?.id, 'checkin-user-type');
+
+    // Correcting one field clears only that error.
+    elem(doc, 'checkin-user-type').value = 'visitor';
+    change(doc, 'checkin-user-type');
+    assert.equal(elem(doc, 'checkin-user-type-error').textContent, '');
+    assert.match(elem(doc, 'checkin-name-error').textContent ?? '', /Enter your name/);
+  });
+
+  it('fills the picker with the current time in APP_TIMEZONE when Now is pressed', async () => {
+    const { doc } = await harness();
+
+    assert.equal(elem(doc, 'checkin-time-choice').textContent, '');
+
+    elem(doc, 'checkin-now').click();
+
+    const hour = elem(doc, 'checkin-hour').value;
+    const minute = elem(doc, 'checkin-minute').value;
+    const period = elem(doc, 'checkin-period').value;
+    assert.notEqual(hour, '');
+    assert.notEqual(minute, '');
+    assert.ok(period === 'AM' || period === 'PM');
+
+    const expected = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(new Date());
+    const [expectedHour, expectedMinute] = expected.split(':');
+    const hour24 = (Number(hour) % 12) + (period === 'PM' ? 12 : 0);
+
+    const chosen = hour24 * 60 + Number(minute);
+    const wanted = Number(expectedHour) * 60 + Number(expectedMinute);
+    const distance = Math.min(
+      Math.abs(chosen - wanted),
+      1440 - Math.abs(chosen - wanted),
+    );
+    assert.ok(distance <= 1, `chosen ${chosen}, expected ${wanted} (${hour}:${minute} ${period})`);
+
+    const padded = `${String(hour).padStart(2, '0')}:${minute}`;
+    assert.equal(elem(doc, 'checkin-time-choice').textContent, `Time: ${padded} ${period}`);
+    assert.equal(elem(doc, 'checkin-time-error').textContent, '');
+  });
+
+  it('submits without cookies, confirms in words and resets for the next person', async () => {
+    const { doc, calls } = await harness({ search: `?location=${FIRST.id}` });
+
+    fillValidForm(doc);
+    submit(doc);
     await tick();
 
     const locationsCall = calls.find((call) => call.url === '/api/public/locations');
@@ -159,33 +384,73 @@ describe('public check-in form', () => {
     assert.equal(locationsCall.options.credentials, 'omit');
 
     const entryCall = calls.find((call) => call.url === '/api/public/entries');
-    assert.ok(entryCall);
+    assert.ok(entryCall, 'the form did not submit');
     assert.equal(entryCall.options.credentials, 'omit');
-    assert.equal((entryCall.options.headers as Record<string, string>)['Content-Type'], 'application/json');
-    assert.deepEqual(JSON.parse(String(entryCall.options.body)), {
+    assert.equal(
+      (entryCall.options.headers as Record<string, string>)['Content-Type'],
+      'application/json',
+    );
+
+    const sent = JSON.parse(String(entryCall.options.body));
+    assert.deepEqual(sent, {
+      userType: 'staff',
       name: 'Ada Lovelace',
-      locationId: LOCATIONS[0].id,
       direction: 'in',
+      time: '09:05',
+      locationId: FIRST.id,
+      notes: 'Start of shift',
+      company: '',
     });
 
-    const success = byId(dom, 'checkin-success');
-    assert.match(success.textContent ?? '', /Thank you, Ada Lovelace\./);
-    assert.match(success.textContent ?? '', /Main Office/);
+    const success = elem(doc, 'checkin-success');
+    assert.equal(
+      success.textContent,
+      'Thank you, Ada Lovelace. Your check in at 09:05 AM has been recorded.',
+    );
     assert.equal(success.classList.contains('d-none'), false);
-    assert.equal(name.value, '');
+    // The confirmation is text, never markup.
+    assert.equal(success.innerHTML.includes('<'), false);
+
+    // The form clears itself so the next person starts fresh.
+    await wait(5300);
+    assert.equal(elem(doc, 'checkin-name').value, '');
+    assert.equal(elem(doc, 'checkin-user-type').value, '');
+    assert.equal(elem(doc, 'checkin-direction').value, '');
+    assert.equal(elem(doc, 'checkin-hour').value, '');
+    assert.equal(elem(doc, 'checkin-notes').value, '');
+    assert.equal(elem(doc, 'checkin-notes-count').textContent, '0 / 500');
+    assert.equal(success.classList.contains('d-none'), true);
+    // The location from the URL is preselected again.
+    assert.equal(elem(doc, 'checkin-location').value, FIRST.id);
   });
 
-  it('validates locally before sending an entry', async () => {
-    const { dom, calls } = await harness('');
-    const document = dom.window.document;
-    const form = document.getElementById('checkin-form') as unknown as FormLike;
+  it('shows an XSS payload as plain text and never as markup', async () => {
+    const { doc } = await harness({ search: `?location=${FIRST.id}` });
+    const payload = '<img src=x onerror="alert(1)">';
 
-    form.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+    fillValidForm(doc, payload);
+    elem(doc, 'checkin-notes').value = '"><script>alert(1)</script>';
+    submit(doc);
     await tick();
 
-    assert.equal(calls.some((call) => call.url === '/api/public/entries'), false);
-    const alert = byId(dom, 'checkin-alert');
-    assert.match(alert.textContent ?? '', /Enter your name/);
-    assert.equal(alert.classList.contains('d-none'), false);
+    const success = elem(doc, 'checkin-success');
+    assert.match(success.textContent ?? '', /Thank you, <img src=x onerror="alert\(1\)">/);
+    assert.equal(success.querySelectorAll('img').length, 0);
+    assert.equal(success.querySelectorAll('script').length, 0);
+    assert.equal(success.classList.contains('d-none'), false);
+  });
+
+  it('maps a server-side location error onto the location field', async () => {
+    const { doc } = await harness();
+
+    fillValidForm(doc);
+    // The server refuses this one, and the answer lands on the field.
+    elem(doc, 'checkin-notes').value = 'force-location-error';
+    submit(doc);
+    await tick();
+
+    assert.match(elem(doc, 'checkin-location-error').textContent ?? '', /Choose an active location/);
+    assert.equal(elem(doc, 'checkin-location').getAttribute('aria-invalid'), 'true');
+    assert.equal(elem(doc, 'checkin-alert').classList.contains('d-none'), true);
   });
 });

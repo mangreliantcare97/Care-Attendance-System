@@ -27,8 +27,10 @@
         <section class="checkin-card" aria-labelledby="checkin-heading">
             <h2 id="checkin-heading">Check in or out</h2>
             <p class="checkin-intro">
-                Enter your name, choose your location and record your arrival or departure.
-                No account is needed.
+                Record an arrival or departure. No account is needed.
+            </p>
+            <p class="checkin-required-note">
+                <span class="checkin-required" aria-hidden="true">*</span> Required
             </p>
 
             <div id="checkin-alert" class="checkin-alert d-none" role="alert"></div>
@@ -36,35 +38,111 @@
 
             <form id="checkin-form" novalidate>
                 <div class="checkin-field">
-                    <label for="checkin-name">Your name</label>
-                    <input type="text" id="checkin-name" name="name" maxlength="120"
-                           autocomplete="name" autocapitalize="words" required>
+                    <label for="checkin-user-type">User Type
+                        <span class="checkin-required" aria-hidden="true">*</span>
+                    </label>
+                    <select id="checkin-user-type" name="userType" required>
+                        <option value="">-- Select --</option>
+                        <option value="staff">Staff Member</option>
+                        <option value="service_user">Service User</option>
+                        <option value="visitor">Visitor</option>
+                    </select>
+                    <p class="checkin-error" id="checkin-user-type-error" role="alert"></p>
                 </div>
 
                 <div class="checkin-field">
-                    <label for="checkin-location">Location</label>
-                    <select id="checkin-location" name="locationId" required disabled>
-                        <option value="">Loading locations…</option>
-                    </select>
-                    <p class="checkin-location-full" id="checkin-location-full" aria-live="polite"></p>
+                    <label for="checkin-name">Name
+                        <span class="checkin-required" aria-hidden="true">*</span>
+                    </label>
+                    <input type="text" id="checkin-name" name="name" required
+                           minlength="2" maxlength="80"
+                           autocomplete="off" autocapitalize="words" spellcheck="false">
+                    <p class="checkin-error" id="checkin-name-error" role="alert"></p>
                 </div>
 
-                <fieldset class="checkin-direction">
-                    <legend>I am</legend>
-                    <label class="checkin-radio">
-                        <input type="radio" name="direction" value="in" checked>
-                        <span>Checking in</span>
+                <div class="checkin-field">
+                    <label for="checkin-direction">Check in or Check out
+                        <span class="checkin-required" aria-hidden="true">*</span>
                     </label>
-                    <label class="checkin-radio">
-                        <input type="radio" name="direction" value="out">
-                        <span>Checking out</span>
-                    </label>
+                    <select id="checkin-direction" name="direction" required>
+                        <option value="">-- Select --</option>
+                        <option value="in">Check in</option>
+                        <option value="out">Check out</option>
+                    </select>
+                    <p class="checkin-error" id="checkin-direction-error" role="alert"></p>
+                </div>
+
+                <fieldset class="checkin-time">
+                    <legend>Time
+                        <span class="checkin-required" aria-hidden="true">*</span>
+                    </legend>
+                    <div class="checkin-time-row">
+                        <div class="checkin-time-part">
+                            <label for="checkin-hour">Hour</label>
+                            <select id="checkin-hour" name="hour" required>
+                                <option value="">--</option>
+                            </select>
+                        </div>
+                        <div class="checkin-time-part">
+                            <label for="checkin-minute">Minute</label>
+                            <select id="checkin-minute" name="minute" required>
+                                <option value="">--</option>
+                            </select>
+                        </div>
+                        <div class="checkin-time-part">
+                            <label for="checkin-period">AM/PM</label>
+                            <select id="checkin-period" name="period" required>
+                                <option value="">--</option>
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
+                        </div>
+                        <button type="button" class="checkin-now" id="checkin-now">Now</button>
+                    </div>
+                    <p class="checkin-time-choice" id="checkin-time-choice" aria-live="polite"></p>
+                    <p class="checkin-error" id="checkin-time-error" role="alert"></p>
                 </fieldset>
 
+                <div class="checkin-field">
+                    <label for="checkin-location">Location
+                        <span class="checkin-required" aria-hidden="true">*</span>
+                    </label>
+                    <select id="checkin-location" name="locationId" required disabled>
+                        <option value="">-- Select --</option>
+                    </select>
+                    <p class="checkin-location-full" id="checkin-location-full" aria-live="polite"></p>
+                    <div class="checkin-location-state" id="checkin-location-state" hidden>
+                        <p class="checkin-location-message" id="checkin-location-message"></p>
+                        <button type="button" class="checkin-retry" id="checkin-retry" hidden>Retry</button>
+                    </div>
+                    <p class="checkin-error" id="checkin-location-error" role="alert"></p>
+                </div>
+
+                <div class="checkin-field">
+                    <label for="checkin-notes">Notes
+                        <span class="checkin-required" aria-hidden="true">*</span>
+                    </label>
+                    <textarea id="checkin-notes" name="notes" rows="3" required
+                              maxlength="500" aria-describedby="checkin-notes-count"></textarea>
+                    <p class="checkin-counter" id="checkin-notes-count">0 / 500</p>
+                    <p class="checkin-error" id="checkin-notes-error" role="alert"></p>
+                </div>
+
+                <!-- Hidden honeypot: a bot that fills it is accepted and discarded. -->
+                <div class="checkin-hp" aria-hidden="true">
+                    <label for="checkin-company">Company</label>
+                    <input type="text" id="checkin-company" name="company" tabindex="-1" autocomplete="off">
+                </div>
+
                 <button type="submit" class="checkin-submit" id="checkin-submit" disabled>
-                    Check in
+                    Submit
                 </button>
             </form>
+
+            <p class="checkin-privacy">
+                Your name, notes and the time of this record are stored to show who was
+                on site. We do not store your IP address.
+            </p>
 
             <p class="checkin-note">
                 This device is shared. Never sign in to the admin panel on it.

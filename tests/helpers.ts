@@ -29,6 +29,8 @@ export interface TestAppOptions {
   loginLimit?: number;
   passwordLimit?: number;
   perEmailLimit?: number;
+  /** Budget for the cookie-free public check-in endpoints. */
+  publicLimit?: number;
 }
 
 export async function startTestApp(options: TestAppOptions = {}): Promise<TestContext> {
@@ -42,9 +44,12 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestCo
   await connectDatabase(process.env.MONGODB_URI);
 
   const { createApp } = await import('../src/app.ts');
-  const { createLoginRateLimiter, createApiRateLimiter, createPerEmailRateLimiter } = await import(
-    '../src/middleware/rateLimit.ts'
-  );
+  const {
+    createLoginRateLimiter,
+    createApiRateLimiter,
+    createPerEmailRateLimiter,
+    createPublicRateLimiter,
+  } = await import('../src/middleware/rateLimit.ts');
   const { AdminModel } = await import('../src/models/Admin.ts');
 
   // Make sure the indexes exist before the first write.
@@ -54,6 +59,7 @@ export async function startTestApp(options: TestAppOptions = {}): Promise<TestCo
     loginRateLimiter: createLoginRateLimiter({ max: options.loginLimit ?? 1000 }),
     passwordRateLimiter: createApiRateLimiter({ max: options.passwordLimit ?? 1000 }),
     perEmailRateLimiter: createPerEmailRateLimiter({ max: options.perEmailLimit ?? 1000 }),
+    publicRateLimiter: createPublicRateLimiter({ max: options.publicLimit ?? 1000 }),
   });
 
   return {

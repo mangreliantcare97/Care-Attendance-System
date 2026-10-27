@@ -8,8 +8,9 @@ cookie-free and does not require an account.
 This branch (`care-attendance-system`) is being converted from the earlier HRM
 application. Phase 1 removed the HRM modules (employees, attendance, leave,
 overtime, reports, calendar and departments) and the reference copy of the old
-Laravel tree. The Dashboard, Entries and Locations admin pages are Phase 1
-placeholders until Phase 2 builds them.
+Laravel tree. Phase 2 step A rebuilt the locations CRUD, the public form and
+the public API; the Entries page and the dashboard metrics arrive in the next
+steps.
 
 ---
 
@@ -68,21 +69,57 @@ expire after `SESSION_MAX_HOURS` of inactivity (12 hours by default); the
 cookie is `httpOnly`, `SameSite=Lax`, and `Secure` when
 `NODE_ENV=production`.
 
-### Phase 1 placeholders
+### Where each page stands
 
-Three protected pages are deliberately empty shells in Phase 1:
-
-| Page | Phase 1 state |
+| Page | State |
 |---|---|
-| `/dashboard.html` | Heading plus “Coming in Phase 2” |
-| `/entries.html` | Heading plus “Coming in Phase 2” |
-| `/locations.html` | Heading plus “Coming in Phase 2” |
+| `/` (`checkin.html`) | **Real.** The six-field public form, cookie-free, `noindex`, with inline validation, the `Now` button in `APP_TIMEZONE`, the two location messages and the reset for the next person. |
+| `/locations.html` | **Real.** Search, sorting, “Sort A-Z”, the add/edit modal, entry counts, deactivate-instead-of-delete and “Copy check-in link”. |
+| `/dashboard.html` | **Partial.** The public check-in link card and the “no active locations” warning are live; the metric cards and charts arrive with the dashboard step. The “Coming in Phase 2” card is the placeholder for them. |
+| `/entries.html` | **Placeholder.** Still the Phase 1 shell until the entries step builds the filterable table. |
 
-They sit behind the administrator login like every other protected page, show
-no data, and call no endpoint except the shared session check in
-`public/js/layout.js`. The sidebar links to all three; Phase 2 replaces each
-file with the real dashboard, entries table and locations CRUD. The public
-check-in page is not a placeholder.
+Everything protected sits behind the administrator login like every other
+protected page and calls no endpoint except the shared session check in
+`public/js/layout.js` until its step lands.
+
+### The public form
+
+Everything on the form is required and nothing is preselected — the person has
+to choose every value:
+
+1. **User Type** — Staff Member, Service User or Visitor.
+2. **Name** — 2–80 characters, `autocomplete="off"`, no suggestions.
+3. **Check in or Check out** — a select, not radio buttons.
+4. **Time** — Hour / Minute / AM-PM selects plus a **Now** button that fills
+   the current time in `APP_TIMEZONE` (delivered by `meta.timezone` on the
+   locations feed, never the kiosk's own clock). The chosen time is echoed
+   underneath as `Time: 09:05 AM` so a wrong AM/PM is visible. The picker is
+   never prefilled.
+5. **Location** — from `GET /api/public/locations`; `?location=<id>`
+   preselects an active location and ignores anything else. The full address
+   is repeated under the select so long labels wrap on a 360px screen.
+6. **Notes** — 1–500 characters with a live counter.
+
+Validation happens in the browser first (inline messages, focus to the first
+error, `aria-invalid` and `aria-describedby`) and again on the server. On
+success the page says `Thank you, <name>. Your <check in|check out> at
+<hh:mm AM/PM> has been recorded.` and resets itself for the next person; it
+never shows an existing entry.
+
+**The date rule.** The server decides the calendar day in `APP_TIMEZONE`. An
+earlier time today is fine. A time more than five minutes ahead is accepted as
+*yesterday* only when the server clock is before 03:00 and that moment is no
+more than six hours back — which is what makes "11:50 PM" submitted at 00:10
+belong to the previous day. Everything else is refused with
+`400 time_in_future` (“That time is later than now. Please check AM/PM.”).
+
+**Abuse protection.** One generous per-IP budget covers both public endpoints
+(`PUBLIC_RATE_LIMIT_MAX` per 15 minutes), the hidden honeypot field is
+accepted and discarded without a trace, the same person, direction and
+location inside two minutes is refused as a duplicate, the JSON body is
+limited to 8kB, cross-site browser requests are refused when a foreign
+`Origin` header is present, and Cloudflare Turnstile is enforced only when
+`TURNSTILE_SECRET` is set. Names are never logged together with locations.
 
 ### Locations
 
@@ -143,6 +180,9 @@ Everything is read from the environment (see `.env.example`):
 | `SESSION_MAX_HOURS` | `12` | Rolling session lifetime in hours; every request refreshes it |
 | `TRUST_PROXY` | `1` | Number of reverse proxies in front of the app |
 | `LOGIN_RATE_LIMIT_MAX` | `10` | Login attempts per window and IP |
+| `PUBLIC_RATE_LIMIT_WINDOW_MINUTES` | `15` | Window for both public endpoints |
+| `PUBLIC_RATE_LIMIT_MAX` | `100` | Public requests per window and IP (offices share one address) |
+| `TURNSTILE_SECRET` | — | Optional Cloudflare Turnstile on the public form; empty = the check is off |
 | `MAIL_PROVIDER` | `none` | `none`, `console` or `cloudflare` |
 | `MAIL_FROM` | — | The sender, e.g. `Care Attendance <noreply@example.com>` |
 | `CLOUDFLARE_ACCOUNT_ID` | — | Cloudflare account id (email sending) |
@@ -302,10 +342,13 @@ tests/                 node:test suites (in-memory MongoDB)
 | `POST` | `/api/admins/:id/activate` | Activate an administrator (kept for compatibility) |
 | `POST` | `/api/admins/:id/deactivate` | Deactivate an administrator (kept for compatibility) |
 | `POST` | `/api/admins/me/password` | Change your own password |
-| `GET` | `/api/public/locations` | Active locations for the public form (`id` and `name` only, in sort order) |
-| `POST` | `/api/public/entries` | Record one public check-in or check-out |
-| `GET` | `/api/entries` | Newest entries for the admin panel (Phase 2 columns) |
+| `GET` | `/api/public/locations` | Active locations for the public form (`id` and `name` only, in sort order; `meta.timezone` carries `APP_TIMEZONE` for the `Now` button) |
+| `POST` | `/api/public/entries` | Record one public check-in or check-out (no session, no cookies) |
+| `GET` | `/api/entries` | Newest entries for the admin panel |
 | `GET` | `/api/locations` | Locations with postcode, sort order and entry counts |
+| `POST` | `/api/locations` | Create a location (unique on name + postcode) |
+| `PATCH` | `/api/locations/:id` | Rename, retype the postcode, reorder or deactivate a location |
+| `DELETE` | `/api/locations/:id` | Delete a location that has no entries (otherwise deactivate it) |
 
 Responses always use the same envelope:
 
@@ -355,10 +398,15 @@ endpoints.
 
 ## Status
 
-* **Phase 1** — clean-up complete: HRM modules and the reference `legacy/`
+* **Phase 1** — complete and approved: HRM modules and the reference `legacy/`
   tree removed, sidebar reduced to Dashboard, Entries, Locations and Admins &
-  Settings, three placeholder pages in place, README updated.
-* **Next** — Phase 2: the locations CRUD, the entries model and API, the public
-  form, the admin pages, the dashboard and the tests.
-* The earlier HRM reports remain in `docs/` for reference only; the features
-  they describe are no longer part of this application.
+  Settings, sessions/CSRF/helmet/rate limiting/zod/CSV/HrmDom kept, password
+  reset via the Cloudflare mailer kept.
+* **Phase 2, step A** — complete: the real Locations page, the idempotent
+  `seed:locations` run, the six-field public form, the public entries API with
+  its abuse protections, the routing/redirect rules, the dashboard link and
+  warning cards, and the test suite (in-memory MongoDB) plus a headless Chrome
+  pass over the public page.
+* **Next** — Phase 2 step B: the Entries admin page (filters, sort, edit,
+  delete, CSV), then step C: the dashboard metrics and charts.
+* The earlier HRM reports in `docs/` were removed with the code they described;

@@ -30,7 +30,41 @@
                         </div>
                     </div>
 
+                    <div class="row" id="no-locations-warning" hidden>
+                        <div class="col-12">
+                            <div class="card card-glass border-warning">
+                                <div class="card-body d-flex flex-wrap align-items-center justify-content-between">
+                                    <div>
+                                        <h5 class="mb-1"><i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i>No active locations</h5>
+                                        <p class="mb-0">The public check-in form cannot be used until at least one location is active.</p>
+                                    </div>
+                                    <a href="/locations.html" class="btn btn-outline-primary mt-2">Open Locations</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row">
+                        <div class="col-12">
+                            <div class="card card-glass">
+                                <div class="card-header">
+                                    <h3 class="card-title">Public check-in link</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="public-link" readonly aria-label="Public check-in link">
+                                        <div class="input-group-append">
+                                            <button type="button" class="btn btn-outline-primary" id="copy-public-link"><i class="fas fa-copy mr-1" aria-hidden="true"></i>Copy</button>
+                                            <a class="btn btn-primary" id="open-public-link" href="/" target="_blank" rel="noopener"><i class="fas fa-external-link-alt mr-1" aria-hidden="true"></i>Open</a>
+                                        </div>
+                                    </div>
+                                    <p class="mb-0 mt-2 small text-muted" id="public-link-status" role="status" aria-live="polite"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
                         <div class="col-12">
                             <div class="card card-glass">
                                 <div class="card-body">
@@ -54,5 +88,7 @@
     <script src="/js/api.js"></script>
     <script src="/js/fullscreen.js"></script>
     <script src="/js/layout.js"></script>
+    <script src="/js/clipboard.js"></script>
+    <script src="/js/dashboard.js"></script>
 </body>
 </html>

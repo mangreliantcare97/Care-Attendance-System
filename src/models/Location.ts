@@ -11,6 +11,9 @@ import { normalisePostcode } from '../utils/postcode.ts';
  * the unique rule: the same label may exist at two postcodes, and one postcode
  * may hold several labels (33 and 35 Chandos Road both sit at HA1 4QX).
  *
+ * `active` defaults to true; documents written before the field existed are
+ * migrated to `active: true` by `ensureActiveFlags`.
+ *
  * Public check-in only ever sees the id and name of active locations.
  */
 const locationSchema = new Schema(
@@ -18,7 +21,7 @@ const locationSchema = new Schema(
     name: { type: String, required: true, trim: true, minlength: 3, maxlength: 160 },
     nameKey: { type: String, required: true, trim: true },
     postcode: { type: String, required: true, trim: true, set: normalisePostcode },
-    isActive: { type: Boolean, default: true },
+    active: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0, min: 0 },
     createdBy: { type: Schema.Types.ObjectId, ref: 'Admin', required: true },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'Admin', default: null },
@@ -31,7 +34,7 @@ locationSchema.pre('validate', function () {
 });
 
 locationSchema.index({ nameKey: 1, postcode: 1 }, { unique: true });
-locationSchema.index({ isActive: 1, sortOrder: 1, name: 1 });
+locationSchema.index({ active: 1, sortOrder: 1, name: 1 });
 
 applyJsonTransform(locationSchema);
 

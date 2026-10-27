@@ -28,6 +28,8 @@ function setNoIndex(req: Request, res: Response, next: NextFunction): void {
 export interface AppOptions {
   /** Override the login rate limiter (used by the tests). */
   loginRateLimiter?: RequestHandler;
+  /** Override the public check-in rate limiter (used by the tests). */
+  publicRateLimiter?: RequestHandler;
   /** Override the rate limiter of the password endpoints (used by the tests). */
   passwordRateLimiter?: RequestHandler;
   /** Override the per email rate limiter (used by the tests). */
@@ -88,6 +90,10 @@ export function createApp(options: AppOptions = {}): Express {
     }),
   );
 
+  // The public check-in endpoints accept a small body only: the form sends
+  // six short fields, so anything larger is not a real submission. This parser
+  // runs first for those paths; the global one below skips an already-read body.
+  app.use('/api/public', express.json({ limit: '8kb' }));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
@@ -100,6 +106,7 @@ export function createApp(options: AppOptions = {}): Express {
     '/api',
     createApiRouter({
       loginRateLimiter: options.loginRateLimiter ?? loginRateLimiter,
+      publicRateLimiter: options.publicRateLimiter,
       passwordLimiter: options.passwordRateLimiter,
       perEmailLimiter: options.perEmailRateLimiter,
     }),

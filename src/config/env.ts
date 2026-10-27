@@ -76,6 +76,15 @@ export const env = {
     max: int('LOGIN_RATE_LIMIT_MAX', 10),
   },
 
+  /** Public check-in endpoints — one generous budget per IP. */
+  publicRateLimit: {
+    windowMs: int('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', 15) * 60 * 1000,
+    max: int('PUBLIC_RATE_LIMIT_MAX', 100),
+  },
+
+  /** Optional Cloudflare Turnstile; empty means the check is off. */
+  turnstileSecret: str('TURNSTILE_SECRET', ''),
+
   /**
    * The public address of the app. Used to build the links in the mails —
    * never taken from the request headers, so a forged `Host` cannot poison a

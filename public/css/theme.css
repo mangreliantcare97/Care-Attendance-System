@@ -2919,7 +2919,8 @@ body.page-admins .admin-table thead th.admin-actions-column {
   text-align: right;
 }
 
-body.page-admins .admin-sort {
+body.page-admins .admin-sort,
+body.page-locations .admin-sort {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -2934,11 +2935,13 @@ body.page-admins .admin-sort {
   cursor: pointer;
 }
 
-body.page-admins .admin-sort:hover {
+body.page-admins .admin-sort:hover,
+body.page-locations .admin-sort:hover {
   color: var(--admin-green-ink);
 }
 
-body.page-admins .admin-sort i {
+body.page-admins .admin-sort i,
+body.page-locations .admin-sort i {
   font-size: 0.78rem;
 }
 
@@ -3401,6 +3404,7 @@ body.page-admins .admin-help {
 }
 
 body.page-admins .admin-required,
+body.page-locations .admin-required,
 body.page-admins .admin-required-note span {
   color: var(--admin-danger);
 }
