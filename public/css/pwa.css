@@ -1,6 +1,6 @@
 .pwa-controls {
   position: fixed;
-  right: max(1rem, env(safe-area-inset-right, 0px));
+  left: max(1rem, env(safe-area-inset-left, 0px));
   bottom: max(1rem, env(safe-area-inset-bottom, 0px));
   z-index: 1090;
   display: grid;
@@ -9,7 +9,7 @@
 }
 
 .pwa-action-button {
-  justify-self: end;
+  justify-self: start;
   min-width: 7rem;
   min-height: 2.75rem;
   padding: 0.65rem 1rem;

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'care-attendance-pwa-v1';
+const CACHE_NAME = 'care-attendance-pwa-v2';
 const CACHE_PREFIX = 'care-attendance-pwa-';
 const OFFLINE_URL = '/offline.html';
 const STATIC_PREFIXES = ['/assets/fonts/', '/assets/img/', '/css/', '/js/', '/vendor/'];
