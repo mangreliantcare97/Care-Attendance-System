@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0056b3">
+    <title>Connection required | Care Attendance</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #212529;
+            background: #f4f6f9;
+        }
+
+        body {
+            box-sizing: border-box;
+            display: grid;
+            min-height: 100vh;
+            min-height: 100dvh;
+            margin: 0;
+            padding: max(1.5rem, env(safe-area-inset-top, 0px)) 1.25rem
+                max(1.5rem, env(safe-area-inset-bottom, 0px));
+            place-items: center;
+        }
+
+        main {
+            box-sizing: border-box;
+            width: min(100%, 30rem);
+            padding: clamp(1.5rem, 6vw, 2.5rem);
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 10%);
+        }
+
+        h1 {
+            margin-top: 0;
+            color: #0056b3;
+            font-size: 1.6rem;
+        }
+
+        .brand {
+            margin: 0 0 0.4rem;
+            color: #0056b3;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        p {
+            line-height: 1.55;
+        }
+
+        button {
+            min-height: 2.75rem;
+            padding: 0.65rem 1rem;
+            color: #fff;
+            background: #0056b3;
+            border: 0;
+            border-radius: 0.4rem;
+            font: inherit;
+            font-weight: 600;
+        }
+
+        button:focus-visible {
+            outline: 3px solid #0b5ed7;
+            outline-offset: 3px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                color: #e6e8ea;
+                background: #17191d;
+            }
+
+            main {
+                background: #23272c;
+                border-color: #3a4048;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <p class="brand">Care Attendance</p>
+        <h1>You're offline</h1>
+        <p>Care Attendance needs an internet connection to load pages and current attendance information. No check-in or other changes have been submitted.</p>
+        <p>Reconnect to the internet, then try again.</p>
+        <form action="/" method="get">
+            <button type="submit">Try again</button>
+        </form>
+    </main>
+</body>
+</html>

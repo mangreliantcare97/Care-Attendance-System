@@ -63,6 +63,61 @@ describe('public entry points', () => {
   });
 });
 
+describe('PWA resources', () => {
+  it('serves the manifest with the app identity and all referenced icons', async () => {
+    const response = await request(app).get('/manifest.webmanifest');
+
+    assert.equal(response.status, 200);
+    assert.match(response.headers['content-type'], /application\/manifest\+json/);
+    assert.match(response.headers['cache-control'], /no-cache/);
+
+    const manifest = JSON.parse(response.text) as {
+      id: string;
+      start_url: string;
+      scope: string;
+      display: string;
+      icons: Array<{ src: string; sizes: string; type: string }>;
+    };
+    assert.equal(manifest.id, '/');
+    assert.equal(manifest.start_url, '/');
+    assert.equal(manifest.scope, '/');
+    assert.equal(manifest.display, 'standalone');
+
+    for (const icon of manifest.icons) {
+      const image = await request(app).get(icon.src);
+      assert.equal(image.status, 200, icon.src);
+      assert.match(image.headers['content-type'], /image\/png/, icon.src);
+      assert.equal(Buffer.isBuffer(image.body), true, icon.src);
+      assert.equal(`${image.body.readUInt32BE(16)}x${image.body.readUInt32BE(20)}`, icon.sizes, icon.src);
+    }
+
+    for (const [iconPath, size] of [
+      ['/assets/img/pwa/apple-touch-icon.png', '180x180'],
+      ['/assets/img/pwa/favicon-48.png', '48x48'],
+    ]) {
+      const image = await request(app).get(iconPath);
+      assert.equal(image.status, 200, iconPath);
+      assert.equal(`${image.body.readUInt32BE(16)}x${image.body.readUInt32BE(20)}`, size, iconPath);
+    }
+  });
+
+  it('serves a revalidatable root-scoped worker and a generic offline page', async () => {
+    const worker = await request(app).get('/service-worker.js');
+    assert.equal(worker.status, 200);
+    assert.match(worker.headers['content-type'], /javascript/);
+    assert.match(worker.headers['cache-control'], /no-cache/);
+    assert.equal(worker.headers['service-worker-allowed'], '/');
+    assert.match(worker.text, /request\.method !== 'GET'/);
+    assert.match(worker.text, /url\.pathname\.startsWith\('\/api\/'\)/);
+
+    const offline = await request(app).get('/offline.html');
+    assert.equal(offline.status, 200);
+    assert.match(offline.headers['content-type'], /text\/html/);
+    assert.match(offline.text, /You're offline/);
+    assert.match(offline.text, /action="\/"/);
+  });
+});
+
 describe('admin entry point', () => {
   it('sends an anonymous visitor to the login page for the dashboard', async () => {
     const response = await request(app).get('/admin');

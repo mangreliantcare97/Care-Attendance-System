@@ -244,6 +244,58 @@ traffic to Render. Keep `APP_BASE_URL` aligned with the actual public frontend
 URL; it controls public check-in links, origin validation, and password-reset
 links.
 
+## Installable app (PWA)
+
+The site uses a web manifest and one root-scoped service worker; it remains the
+same multi-page Express/HTML application. The Home Screen icon opens `/`, the
+existing public check-in page. Protected admin pages still require the existing
+server session and send signed-out users through the usual login redirect.
+
+The supplied `public/assets/img/Attendance_APP_Icon.png` (1024 × 1024) is the
+source for the standard 192 × 192 and 512 × 512 icons, padded maskable
+variants, the 180 × 180 Apple touch icon, and a 48 × 48 favicon. Derived PNGs
+are in `public/assets/img/pwa/`; the source image is unchanged.
+
+The service worker caches only same-origin static CSS, JavaScript, fonts and
+images after a successful network response. It never caches HTML, API
+responses, session data or writes. Navigation stays network-only; on a network
+failure it displays a generic offline page and does not claim that a check-in
+or administrative change succeeded. The offline page is cached at installation.
+When a new worker is ready, an **Update app** button waits for the user's choice
+before activating it and reloading the current page. Old caches are limited to
+the `care-attendance-pwa-` namespace.
+
+Production installation requires HTTPS (localhost is a secure development
+context). The deployment is rooted at `/`, matching the application's existing
+absolute routes; hosting it below a URL subdirectory is not supported.
+`service-worker.js` and the manifest are served with revalidation headers by
+Express, and `netlify.toml` sets the equivalent Netlify headers.
+
+### Install on Android
+
+1. Open the production site in Chrome.
+2. When Chrome reports the app is installable, tap **Install app** on the page
+   or choose Chrome's **Install app** / **Add to Home screen** menu item.
+3. Confirm the installation. Open **Care Attendance** from the Home Screen.
+
+The in-page button appears only after the browser provides its native install
+prompt. If it is unavailable, use Chrome's menu when that option is offered.
+
+### Add on iPhone or iPad
+
+1. Open the production site in **Safari**.
+2. Tap **Share**, choose **Add to Home Screen**, then tap **Add**. If Safari
+   offers **Open as Web App**, leave it enabled.
+3. Launch **Care Attendance** from the Home Screen. Sign in as usual to use
+   protected admin pages.
+
+Safari does not provide the Android `beforeinstallprompt` event; the page's
+**Install app** button opens these manual instructions instead. In other iOS
+browsers, the instructions direct you to open the site in Safari.
+On iOS, an installed app can be identified while it is running standalone, but
+Safari provides no reliable API for detecting its installation from an ordinary
+browser tab; dismissing the guide suppresses it in that browser for 30 days.
+
 ## Password reset email providers
 
 The app supports Cloudflare Email Service and Brevo transactional email through

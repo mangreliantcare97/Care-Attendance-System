@@ -329,11 +329,86 @@ async function runMutation(browser, baseUrl) {
   await page.close();
 }
 
-async function runCurrentSuite(browser, baseUrl, server, mongoUri) {
+async function runCurrentSuite(browser, baseUrl, server, mongoUri, env, updateServer) {
   console.log('\nPublic form');
   const publicResult = await openPage(browser, 390, 844);
   const page = publicResult.page;
   await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle0' });
+
+  console.log('\nPWA installation, cache and offline navigation');
+  await page.waitForFunction(
+    () => Boolean(navigator.serviceWorker?.controller),
+    { timeout: 10000 },
+  );
+  const pwaResources = await page.evaluate(async () => {
+    const manifestResponse = await fetch('/manifest.webmanifest');
+    const manifest = await manifestResponse.json();
+    const registration = await navigator.serviceWorker.getRegistration('/');
+    return {
+      secureContext: window.isSecureContext,
+      manifestOk: manifestResponse.ok,
+      manifestType: manifestResponse.headers.get('content-type') || '',
+      startUrl: manifest.start_url,
+      scope: manifest.scope,
+      display: manifest.display,
+      activeWorker: Boolean(registration?.active),
+      workerScope: registration?.scope || '',
+    };
+  });
+  check(pwaResources.secureContext, 'PWA worker runs in a secure context');
+  check(
+    pwaResources.manifestOk
+      && pwaResources.manifestType.includes('application/manifest+json')
+      && pwaResources.startUrl === '/'
+      && pwaResources.scope === '/'
+      && pwaResources.display === 'standalone',
+    'browser loads the expected app manifest',
+    JSON.stringify(pwaResources),
+  );
+  check(
+    pwaResources.activeWorker && pwaResources.workerScope === `${baseUrl}/`,
+    'browser registers the root-scoped service worker',
+    JSON.stringify(pwaResources),
+  );
+
+  await page.reload({ waitUntil: 'networkidle0' });
+  const cachedResources = await page.evaluate(async () => {
+    const cache = await caches.open('care-attendance-pwa-v1');
+    const keys = await cache.keys();
+    const paths = keys.map((request) => new URL(request.url).pathname);
+    return {
+      offlineFallback: paths.includes('/offline.html'),
+      appScript: paths.includes('/js/pwa.js'),
+      adminHtml: paths.includes('/dashboard.html'),
+      apiResponse: paths.some((path) => path.startsWith('/api/')),
+    };
+  });
+  check(cachedResources.offlineFallback, 'service worker caches the generic offline page');
+  check(cachedResources.appScript, 'service worker caches a safe static application script');
+  check(
+    !cachedResources.adminHtml && !cachedResources.apiResponse,
+    'service worker does not cache protected HTML or API responses',
+    JSON.stringify(cachedResources),
+  );
+
+  await stopChild(server);
+  updateServer(null);
+  try {
+    await page.goto(`${baseUrl}/dashboard.html`, { waitUntil: 'domcontentloaded' });
+    const offlineFallbackShown = await page.$eval('h1', (heading) => heading.textContent === "You're offline");
+    check(offlineFallbackShown, 'offline navigation shows the connection-required page');
+  } finally {
+    server = spawn(process.execPath, ['server.ts'], { cwd: appRoot, env, stdio: 'pipe' });
+    updateServer(server);
+    server.stdout.on('data', (data) => process.stdout.write(`[srv] ${data}`));
+    server.stderr.on('data', (data) => process.stderr.write(`[srv-err] ${data}`));
+    if (!(await waitForServer(`${baseUrl}/api/health`, server))) {
+      await stopChild(server);
+      throw new Error('Test server did not restart after the offline navigation check.');
+    }
+  }
+  await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle0' });
+
   await page.waitForFunction(() => {
     const select = document.getElementById('checkin-location');
     return select && !select.disabled && select.options.length === 19;
@@ -854,7 +929,9 @@ async function main() {
     } else if (mutation) {
       await runMutation(browser, baseUrl);
     } else {
-      await runCurrentSuite(browser, baseUrl, server, mongoUri);
+      await runCurrentSuite(browser, baseUrl, server, mongoUri, env, (currentServer) => {
+        server = currentServer;
+      });
     }
   } finally {
     if (browser) await browser.close();

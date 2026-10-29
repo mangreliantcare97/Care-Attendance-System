@@ -138,6 +138,26 @@ export function createApp(options: AppOptions = {}): Express {
     );
   });
 
+  app.get('/manifest.webmanifest', (_req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.type('application/manifest+json');
+    res.sendFile(path.join(PUBLIC_DIR, 'manifest.webmanifest'));
+  });
+
+  app.get('/service-worker.js', (_req, res) => {
+    res.set({
+      'Cache-Control': 'no-cache',
+      'Service-Worker-Allowed': '/',
+    });
+    res.type('application/javascript');
+    res.sendFile(path.join(PUBLIC_DIR, 'service-worker.js'));
+  });
+
+  app.get('/offline.html', (_req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(PUBLIC_DIR, 'offline.html'));
+  });
+
   // ---- public entry point ------------------------------------------------
   // The check-in form is the root of the site. It never redirects and never
   // needs a session, so a bookmark or printed QR code keeps working forever.

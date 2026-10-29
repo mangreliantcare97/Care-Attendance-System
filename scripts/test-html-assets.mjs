@@ -50,12 +50,75 @@ for (const file of htmlFiles) {
   const full = path.join(publicDir, file);
   if (!existsSync(full)) continue;
   const html = readFileSync(full, 'utf8');
+  for (const marker of [
+    'href="/manifest.webmanifest"',
+    'name="apple-mobile-web-app-capable"',
+    'name="apple-mobile-web-app-status-bar-style"',
+    'href="/assets/img/pwa/apple-touch-icon.png"',
+    'href="/assets/img/pwa/favicon-48.png"',
+    'viewport-fit=cover',
+    'src="/js/pwa.js"',
+    'href="/css/pwa.css"',
+  ]) {
+    if (!html.includes(marker)) {
+      failures.push(`${file}: missing PWA metadata or resource ${marker}`);
+    }
+  }
   const assets = collectAssets(html);
   for (const asset of assets) {
     const resolved = resolveAsset(asset);
     if (!existsSync(resolved)) {
       failures.push(`${file}: missing ${asset}`);
     }
+  }
+}
+
+const manifestPath = path.join(publicDir, 'manifest.webmanifest');
+if (!existsSync(manifestPath)) {
+  failures.push('missing public/manifest.webmanifest');
+} else {
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  } catch (error) {
+    failures.push(`manifest.webmanifest: invalid JSON (${error.message})`);
+  }
+
+  if (manifest) {
+    if (manifest.name !== 'Care Attendance' || manifest.short_name !== 'Care Attendance') {
+      failures.push('manifest.webmanifest: app name does not match Care Attendance');
+    }
+    if (manifest.id !== '/' || manifest.start_url !== '/' || manifest.scope !== '/' || manifest.display !== 'standalone') {
+      failures.push('manifest.webmanifest: identity, start URL, scope or display mode is incorrect');
+    }
+    for (const icon of manifest.icons || []) {
+      const iconPath = resolveAsset(icon.src);
+      if (!existsSync(iconPath)) {
+        failures.push(`manifest.webmanifest: missing icon ${icon.src}`);
+        continue;
+      }
+      const bytes = readFileSync(iconPath);
+      const dimensions = `${bytes.readUInt32BE(16)}x${bytes.readUInt32BE(20)}`;
+      if (dimensions !== icon.sizes) {
+        failures.push(`manifest.webmanifest: ${icon.src} is ${dimensions}, expected ${icon.sizes}`);
+      }
+    }
+  }
+}
+
+for (const [asset, expected] of [
+  ['/assets/img/pwa/apple-touch-icon.png', '180x180'],
+  ['/assets/img/pwa/favicon-48.png', '48x48'],
+]) {
+  const resolved = resolveAsset(asset);
+  if (!existsSync(resolved)) {
+    failures.push(`missing PWA icon ${asset}`);
+    continue;
+  }
+  const bytes = readFileSync(resolved);
+  const dimensions = `${bytes.readUInt32BE(16)}x${bytes.readUInt32BE(20)}`;
+  if (dimensions !== expected) {
+    failures.push(`${asset} is ${dimensions}, expected ${expected}`);
   }
 }
 
