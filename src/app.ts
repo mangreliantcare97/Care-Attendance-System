@@ -162,6 +162,7 @@ export function createApp(options: AppOptions = {}): Express {
   // The check-in form is the root of the site. It never redirects and never
   // needs a session, so a bookmark or printed QR code keeps working forever.
   const sendCheckin = (_req: Request, res: Response): void => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.sendFile(path.join(PUBLIC_DIR, 'checkin.html'));
   };
   app.get('/', sendCheckin);

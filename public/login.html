@@ -21,34 +21,6 @@
     <link rel="stylesheet" href="/css/pwa.css">
     <script src="/js/pwa.js" defer></script>
 
-    <style>
-        /* The blurred photo behind the login card (kept in the theme so that
-           the print stylesheet and dark mode stay in one place). */
-        body.login-page {
-            background: none;
-        }
-
-        .login-page::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: url('/assets/img/bc4.jpg') no-repeat center center fixed;
-            background-size: cover;
-            filter: blur(8px);
-            z-index: -1;
-        }
-
-        .login-box {
-            position: relative;
-            z-index: 1;
-            background: var(--hrm-surface-raised);
-            border-radius: 8px;
-        }
-
-        [data-theme='dark'] .login-page::before {
-            filter: blur(8px) brightness(0.5);
-        }
-    </style>
 </head>
 <body class="hold-transition login-page">
     <div class="login-box">

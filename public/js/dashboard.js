@@ -77,9 +77,9 @@
         datasets: [{
           label: 'Entries',
           data: counts,
-          borderColor: '#0b6fc2',
-          backgroundColor: 'rgba(11, 111, 194, 0.16)',
-          pointBackgroundColor: '#0b6fc2',
+          borderColor: '#c92231',
+          backgroundColor: 'rgba(201, 34, 49, 0.14)',
+          pointBackgroundColor: '#c92231',
           pointRadius: 3,
           fill: true,
           lineTension: 0.25,
@@ -107,7 +107,7 @@
           labels: ['Staff Member', 'Service User', 'Visitor'],
           datasets: [{
             data: values.map(function (item) { return item.count; }),
-            backgroundColor: ['#0b6fc2', '#28a745', '#f0ad4e'],
+            backgroundColor: ['#c92231', '#505c68', '#c4a16a'],
             borderWidth: 1,
           }],
         },

@@ -224,10 +224,10 @@ describe('public check-in form', () => {
     assert.equal(elem(doc, 'checkin-period').value, '');
     assert.match(doc.body.textContent ?? '', /\*\s*Required/);
 
-    // The honeypot exists, and the privacy and shared-device lines stay.
+    // The honeypot and privacy note remain, but the shared-device notice is removed.
     assert.ok(elem(doc, 'checkin-company').closest('.checkin-hp'));
     assert.match(doc.body.textContent ?? '', /do not store your IP address/i);
-    assert.match(doc.body.textContent ?? '', /Never sign in to the admin panel on it/i);
+    assert.doesNotMatch(doc.body.textContent ?? '', /Never sign in to the admin panel on it/i);
   });
 
   it('renders every real address label without stray text', async () => {

@@ -35,9 +35,11 @@ describe('public entry points', () => {
       assert.equal(response.status, 200);
       assert.match(response.headers['content-type'], /text\/html/);
       assert.equal(response.headers['x-robots-tag'], 'noindex, nofollow');
+      assert.match(response.headers['cache-control'], /no-store/);
       assert.equal(response.headers['set-cookie'], undefined);
       assert.match(response.text, /id="checkin-form"/);
       assert.match(response.text, /Care Attendance/);
+      assert.doesNotMatch(response.text, /This device is shared\. Never sign in to the admin panel on it\./);
 
       // The public page is not a disguised admin screen: no navigation or
       // links back to the protected application.
