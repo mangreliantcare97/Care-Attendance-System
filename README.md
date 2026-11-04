@@ -75,6 +75,14 @@ Everything is read from the environment (see `.env.example`):
 
 The app supports sending password-reset mail through [Brevo's transactional email API](https://developers.brevo.com/docs/send-a-transactional-email) or the Cloudflare Email Service. SMTP is not used.
 
+## Netlify with a Render backend
+
+The root `netlify.toml` proxies all paths through to the Express service on Render.
+Set the Netlify site to deploy the `rename/students` branch. In the Render service's
+environment, set `APP_BASE_URL` to `https://student-attendance-meadhouse.netlify.app`
+so password-reset links use the public Netlify address. Deploy the site on Netlify
+after updating the Render URL in `netlify.toml` if the backend URL changes.
+
 ### Brevo setup
 
 1. Verify the sender address or domain in Brevo and create a transactional email API key.
