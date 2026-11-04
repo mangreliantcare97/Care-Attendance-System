@@ -62,44 +62,40 @@ Everything is read from the environment (see `.env.example`):
 | `ANNUAL_ALLOWANCE_DEFAULT` | `28` | Default holiday allowance per student and calendar year |
 | `LOGIN_RATE_LIMIT_MAX` | `10` | Login attempts per window and IP |
 | `STUDENT_PHOTO_MAX_BYTES` | `262144` | Maximum accepted photo size |
-| `MAIL_PROVIDER` | `none` | `none`, `console` or `cloudflare` |
+| `MAIL_PROVIDER` | `none` | `none`, `console`, `cloudflare` or `brevo` |
 | `MAIL_FROM` | — | The sender, e.g. `Human Resource <noreply@example.com>` |
 | `CLOUDFLARE_ACCOUNT_ID` | — | Cloudflare account id (email sending) |
 | `CLOUDFLARE_EMAIL_API_TOKEN` | — | Cloudflare API token with email sending permission |
+| `BREVO_API_KEY` | — | Brevo transactional email API key |
 | `APP_BASE_URL` | `APP_URL` | The public address — the reset links are built from it |
 | `PASSWORD_RESET_TTL_MINUTES` | `30` | How long a reset link is valid |
 | `PASSWORD_RESET_RATE_LIMIT_MAX` | `5` | Reset requests per window, per IP and per address |
 
-## Password reset (Cloudflare Email Service)
+## Password reset email
 
-The reset mail is sent through the [Cloudflare Email Service](https://developers.cloudflare.com/email-service/).
-SMTP is never used.
+The app supports sending password-reset mail through [Brevo's transactional email API](https://developers.brevo.com/docs/send-a-transactional-email) or the Cloudflare Email Service. SMTP is not used.
 
-### Setup
+### Brevo setup
 
-1. **Add your domain** to Cloudflare and point the nameservers at it.
-2. **Verify the sending domain:** in the dashboard open
-   *Compute → Email Service → Email Sending*, choose *Onboard Domain* and follow
-   the wizard. Cloudflare creates the DKIM and SPF records for you.
-3. **Create an API token:** *My Profile → API Tokens → Create Token* with the
-   permission **Email Sending → Edit** (nothing else). Copy the token — it is
-   only shown once.
-4. **Verify the destination addresses of your administrators:** open
-   *Email → Email Routing → Destination addresses* and confirm every
-   administrator address. A reset mail to an unverified address is rejected.
-5. **Set the environment variables** (on Render: *Environment*):
+1. Verify the sender address or domain in Brevo and create a transactional email API key.
+2. Set these environment variables (for example, in Render's *Environment* settings):
 
    ```
-   MAIL_PROVIDER=cloudflare
+   MAIL_PROVIDER=brevo
    MAIL_FROM="Human Resource <noreply@yourdomain.com>"
-   CLOUDFLARE_ACCOUNT_ID=<your account id>
-   CLOUDFLARE_EMAIL_API_TOKEN=<the token>
+   BREVO_API_KEY=<your Brevo API key>
    APP_BASE_URL=https://your-app.onrender.com
    ```
 
    `APP_BASE_URL` is the only source for the reset link — the request headers
    are never used, so a forged `Host` header cannot send an administrator to a
    hostile site.
+
+### Cloudflare setup
+
+The Cloudflare Email Service is also supported. Configure `MAIL_PROVIDER=cloudflare`,
+`MAIL_FROM`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_EMAIL_API_TOKEN` as described
+in the [Cloudflare Email Service documentation](https://developers.cloudflare.com/email-service/).
 
 ### Testing one real send
 

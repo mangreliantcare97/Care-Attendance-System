@@ -392,6 +392,56 @@ describe('the mailer', () => {
     assert.equal(body.subject.includes('\r'), false);
   });
 
+  it('calls the Brevo transactional email API with the documented payload', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fakeFetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ messageId: 'abc' }), { status: 201 });
+    }) as unknown as typeof fetch;
+    const mailer = mailerModule.createBrevoMailer({
+      apiKey: 'brevo-test-key',
+      from: 'Human Resource <noreply@example.com>',
+      fetchImpl: fakeFetch,
+    });
+
+    await mailer.send({
+      to: 'admin@example.com',
+      subject: 'Reset your password\r\nBcc: evil@example.com',
+      text: 'the link',
+      html: '<p>the link</p>',
+      replyTo: 'support@example.com',
+    });
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, 'https://api.brevo.com/v3/smtp/email');
+    assert.equal(calls[0].init.method, 'POST');
+    const headers = calls[0].init.headers as Record<string, string>;
+    assert.equal(headers['api-key'], 'brevo-test-key');
+    assert.equal(headers['Content-Type'], 'application/json');
+
+    const body = JSON.parse(String(calls[0].init.body));
+    assert.deepEqual(body.sender, { email: 'noreply@example.com', name: 'Human Resource' });
+    assert.deepEqual(body.to, [{ email: 'admin@example.com' }]);
+    assert.deepEqual(body.replyTo, { email: 'support@example.com' });
+    assert.equal(body.subject.includes('\n'), false);
+    assert.equal(body.subject.includes('\r'), false);
+    assert.equal(body.textContent, 'the link');
+    assert.equal(body.htmlContent, '<p>the link</p>');
+  });
+
+  it('fails when the Brevo provider is not configured', async () => {
+    const mailer = mailerModule.createBrevoMailer({
+      apiKey: '',
+      from: '',
+      fetchImpl: (async () => new Response('{}')) as unknown as typeof fetch,
+    });
+
+    await assert.rejects(
+      () => mailer.send({ to: 'admin@example.com', subject: 'x', text: 'y', html: '<p>y</p>' }),
+      /not configured/i,
+    );
+  });
+
   it('fails when the Cloudflare provider is not configured', async () => {
     const mailer = mailerModule.createCloudflareMailer({
       accountId: '',

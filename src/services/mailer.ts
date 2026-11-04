@@ -67,6 +67,60 @@ export interface CloudflareMailerOptions {
   fetchImpl?: typeof fetch;
 }
 
+export interface BrevoMailerOptions {
+  apiKey: string;
+  from: string;
+  /** Overridable so the tests can mock the HTTP call. */
+  fetchImpl?: typeof fetch;
+}
+
+/** Brevo Transactional Email API. */
+export function createBrevoMailer(options: BrevoMailerOptions): Mailer {
+  const doFetch = options.fetchImpl ?? fetch;
+  const from = parseAddress(options.from);
+
+  return {
+    async send(message) {
+      if (!options.apiKey || !from.address) {
+        throw new Error('The Brevo mail provider is not configured (BREVO_API_KEY and MAIL_FROM are required).');
+      }
+
+      const to = sanitizeHeader(message.to);
+      if (!isEmailLike(to)) {
+        throw new Error(`Refusing to send a mail to "${to}" — not a valid address.`);
+      }
+
+      const payload: Record<string, unknown> = {
+        sender: from.name ? { email: from.address, name: from.name } : { email: from.address },
+        to: [{ email: to }],
+        subject: sanitizeHeader(message.subject),
+        textContent: message.text,
+        htmlContent: message.html,
+      };
+
+      const replyTo = message.replyTo ? sanitizeHeader(message.replyTo) : '';
+      if (replyTo && isEmailLike(replyTo)) {
+        payload.replyTo = { email: replyTo };
+      }
+
+      const response = await doFetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': options.apiKey,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`Brevo refused the mail (HTTP ${response.status}): ${body.slice(0, 500)}`);
+      }
+    },
+  };
+}
+
 /**
  * Cloudflare Email Service (REST API).
  *
@@ -140,6 +194,11 @@ export function createMailer(): Mailer {
       return createCloudflareMailer({
         accountId: env.mail.cloudflareAccountId,
         apiToken: env.mail.cloudflareApiToken,
+        from: env.mail.from,
+      });
+    case 'brevo':
+      return createBrevoMailer({
+        apiKey: env.mail.brevoApiKey,
         from: env.mail.from,
       });
     default:
