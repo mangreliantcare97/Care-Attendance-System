@@ -3889,3 +3889,294 @@ body.page-admins .admin-check input:focus-visible + span {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ==========================================================================
+   Shared shell in dark mode
+   --------------------------------------------------------------------------
+   AdminLTE's `.dark-mode` palette (#454d55 canvas, #343a40 cards, #3f6791
+   primary) loads before this file and out-specifies the tokens above, so the
+   navbar stayed white and cards ignored the intended surface colour. These
+   rules repeat the shell selectors under `html[data-theme='dark'] body.dark-mode`
+   so the shared --hrm-* tokens win through specificity and source order.
+   Colours are token references only — no separate palette.
+   ========================================================================== */
+
+@media screen {
+  /* AdminLTE paints html/body with `.dark-mode` + !important; this is the one
+     place a matching !important is required. */
+  html[data-theme='dark'].dark-mode {
+    background-color: var(--hrm-bg) !important;
+  }
+
+  html[data-theme='dark'] body.dark-mode {
+    background-color: var(--hrm-bg) !important;
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .content-wrapper {
+    background-color: var(--hrm-bg);
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .content-wrapper .content-header {
+    color: var(--hrm-text);
+  }
+
+  /* Navbar — the dark glass treatment used by the dashboard header. */
+  html[data-theme='dark'] body.dark-mode .main-header.navbar {
+    background-color: rgba(23, 25, 29, 0.82);
+    border-bottom-color: var(--hrm-border);
+    color: var(--hrm-navbar-text);
+    -webkit-backdrop-filter: blur(20px) saturate(145%);
+    backdrop-filter: blur(20px) saturate(145%);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+  }
+
+  html[data-theme='dark'] body.dark-mode .main-header .navbar-brand,
+  html[data-theme='dark'] body.dark-mode .main-header .navbar-nav .nav-link {
+    color: var(--hrm-navbar-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .main-header .navbar-nav .nav-link:hover,
+  html[data-theme='dark'] body.dark-mode .main-header .navbar-nav .nav-link:focus,
+  html[data-theme='dark'] body.dark-mode .main-header .navbar-nav .nav-link:active,
+  html[data-theme='dark'] body.dark-mode .main-header .navbar-nav .nav-link[aria-expanded='true'] {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+  }
+
+  html[data-theme='dark'] body.dark-mode .main-header .dropdown-menu {
+    background-color: var(--hrm-surface);
+    border-color: var(--hrm-border);
+    color: var(--hrm-text);
+    box-shadow: var(--hrm-shadow);
+  }
+
+  html[data-theme='dark'] body.dark-mode .main-header .dropdown-item {
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .main-header .dropdown-item:hover,
+  html[data-theme='dark'] body.dark-mode .main-header .dropdown-item:focus {
+    background-color: var(--hrm-surface-muted);
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .main-header .dropdown-header {
+    color: var(--hrm-text-muted);
+  }
+
+  html[data-theme='dark'] body.dark-mode .main-header .dropdown-divider {
+    border-color: var(--hrm-border);
+  }
+
+  /* Cards and their headers. */
+  html[data-theme='dark'] body.dark-mode .card {
+    background-color: var(--hrm-surface);
+    border-color: var(--hrm-border);
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .card-glass {
+    background-color: var(--hrm-surface-raised);
+  }
+
+  html[data-theme='dark'] body.dark-mode .card .card {
+    background-color: var(--hrm-surface-muted);
+  }
+
+  html[data-theme='dark'] body.dark-mode .card-header,
+  html[data-theme='dark'] body.dark-mode .card-footer {
+    background-color: var(--hrm-surface-muted);
+    border-color: var(--hrm-border);
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .card-title {
+    color: var(--hrm-text);
+  }
+
+  /* Tables. */
+  html[data-theme='dark'] body.dark-mode .table {
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .table thead th {
+    color: var(--hrm-text-muted);
+    border-bottom-color: var(--hrm-border);
+  }
+
+  html[data-theme='dark'] body.dark-mode .table td,
+  html[data-theme='dark'] body.dark-mode .table th {
+    border-color: var(--hrm-border);
+  }
+
+  html[data-theme='dark'] body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.03);
+  }
+
+  html[data-theme='dark'] body.dark-mode .table-hover tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--hrm-text);
+  }
+
+  /* Forms and their focus/disabled states. */
+  /* AdminLTE uses `.dark-mode .form-control:not(...):not(...)` (four classes),
+     so these keep the extra :not() to win without !important. */
+  html[data-theme='dark'] body.dark-mode .form-control:not(.form-control-navbar),
+  html[data-theme='dark'] body.dark-mode .custom-select,
+  html[data-theme='dark'] body.dark-mode .input-group-text {
+    background-color: var(--hrm-surface);
+    color: var(--hrm-text);
+    border-color: var(--hrm-border);
+  }
+
+  html[data-theme='dark'] body.dark-mode .form-control:not(.form-control-navbar):focus,
+  html[data-theme='dark'] body.dark-mode .custom-select:focus {
+    background-color: var(--hrm-surface);
+    color: var(--hrm-text);
+    border-color: var(--hrm-primary);
+  }
+
+  html[data-theme='dark'] body.dark-mode .form-control::placeholder {
+    color: var(--hrm-text-muted);
+  }
+
+  html[data-theme='dark'] body.dark-mode .form-control:disabled:not(.form-control-navbar),
+  html[data-theme='dark'] body.dark-mode .form-control[readonly]:not(.form-control-navbar),
+  html[data-theme='dark'] body.dark-mode .custom-select:disabled {
+    background-color: var(--hrm-surface-muted);
+    color: var(--hrm-text-muted);
+  }
+
+  /* Buttons keep the shared contrast-safe brand colour. */
+  html[data-theme='dark'] body.dark-mode .btn-primary {
+    background-color: var(--hrm-button-primary);
+    border-color: var(--hrm-button-primary);
+    color: #ffffff;
+  }
+
+  html[data-theme='dark'] body.dark-mode .btn-primary:hover,
+  html[data-theme='dark'] body.dark-mode .btn-primary:focus,
+  html[data-theme='dark'] body.dark-mode .btn-primary:active,
+  html[data-theme='dark'] body.dark-mode .btn-primary:not(:disabled):not(.disabled):active {
+    background-color: var(--hrm-button-primary-hover);
+    border-color: var(--hrm-button-primary-hover);
+    color: #ffffff;
+  }
+
+  html[data-theme='dark'] body.dark-mode .btn-outline-primary {
+    color: var(--hrm-primary);
+    border-color: var(--hrm-primary);
+  }
+
+  html[data-theme='dark'] body.dark-mode .btn-outline-primary:hover,
+  html[data-theme='dark'] body.dark-mode .btn-outline-primary:focus,
+  html[data-theme='dark'] body.dark-mode .btn-outline-primary:active {
+    background-color: var(--hrm-button-primary);
+    border-color: var(--hrm-button-primary);
+    color: #ffffff;
+  }
+
+  /* Footer and muted copy meet AA against the dark canvas. */
+  html[data-theme='dark'] body.dark-mode .main-footer {
+    background-color: var(--hrm-bg);
+    border-top-color: var(--hrm-border);
+    color: var(--hrm-text-muted);
+  }
+
+  html[data-theme='dark'] body.dark-mode .text-muted,
+  html[data-theme='dark'] body.dark-mode .help-block {
+    color: var(--hrm-text-muted) !important;
+  }
+
+  html[data-theme='dark'] body.dark-mode label,
+  html[data-theme='dark'] body.dark-mode .form-group > label {
+    color: var(--hrm-text-muted);
+  }
+
+  html[data-theme='dark'] body.dark-mode .main-sidebar .nav-header {
+    color: var(--hrm-sidebar-text);
+  }
+
+  /* Overlays: dropdowns, reports tabs, pagination and modals. */
+  html[data-theme='dark'] body.dark-mode .dropdown-menu {
+    background-color: var(--hrm-surface);
+    border-color: var(--hrm-border);
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .dropdown-item {
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .dropdown-item:hover,
+  html[data-theme='dark'] body.dark-mode .dropdown-item:focus {
+    background-color: var(--hrm-surface-muted);
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .dropdown-header {
+    color: var(--hrm-text-muted);
+  }
+
+  html[data-theme='dark'] body.dark-mode .dropdown-divider {
+    border-color: var(--hrm-border);
+  }
+
+  html[data-theme='dark'] body.dark-mode .reports-tabs .nav-tabs {
+    border-bottom-color: var(--hrm-border);
+  }
+
+  html[data-theme='dark'] body.dark-mode .reports-tabs .nav-link {
+    color: var(--hrm-text-muted);
+    border-color: transparent;
+  }
+
+  html[data-theme='dark'] body.dark-mode .reports-tabs .nav-link:hover,
+  html[data-theme='dark'] body.dark-mode .reports-tabs .nav-link:focus {
+    color: var(--hrm-text);
+    background-color: var(--hrm-surface-muted);
+    border-color: transparent;
+  }
+
+  html[data-theme='dark'] body.dark-mode .reports-tabs .nav-link.active {
+    background-color: var(--hrm-surface);
+    color: var(--hrm-text);
+    border-color: var(--hrm-border) var(--hrm-border) var(--hrm-surface);
+  }
+
+  html[data-theme='dark'] body.dark-mode .pagination .page-item .page-link {
+    background-color: var(--hrm-surface);
+    border-color: var(--hrm-border);
+    color: var(--hrm-primary);
+  }
+
+  html[data-theme='dark'] body.dark-mode .pagination .page-item.active .page-link {
+    background-color: var(--hrm-button-primary);
+    border-color: var(--hrm-button-primary);
+    color: #ffffff;
+  }
+
+  html[data-theme='dark'] body.dark-mode .pagination .page-item.disabled .page-link {
+    background-color: var(--hrm-surface-muted);
+    border-color: var(--hrm-border);
+    color: var(--hrm-text-muted);
+  }
+
+  html[data-theme='dark'] body.dark-mode .modal-content {
+    background-color: var(--hrm-surface);
+    border-color: var(--hrm-border);
+    color: var(--hrm-text);
+  }
+
+  html[data-theme='dark'] body.dark-mode .modal-header .close {
+    color: var(--hrm-text);
+    opacity: 0.85;
+  }
+
+  html[data-theme='dark'] body.dark-mode .attendance-save-bar {
+    background-color: var(--hrm-surface);
+    border-top-color: var(--hrm-border);
+  }
+}

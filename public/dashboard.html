@@ -3,219 +3,241 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
-    <meta name="theme-color" content="#ffffff" data-theme-color>
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#E8E6F0" data-theme-color>
     <script src="/js/theme.js"></script>
     <title>Dashboard | Human Resource</title>
     <link rel="icon" type="image/x-icon" href="/assets/img/hr_logo.png">
 
     <link rel="stylesheet" href="/css/source-sans-pro.css">
     <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="/vendor/adminlte.min.css">
     <link rel="stylesheet" href="/vendor/toastr/toastr.min.css">
     <link rel="stylesheet" href="/css/theme.css">
-
+    <link rel="stylesheet" href="/css/dashboard-glass.css">
+    <link rel="stylesheet" href="/css/app-glass.css">
 </head>
-<body class="hold-transition sidebar-mini layout-fixed" data-page="dashboard">
-    <div class="wrapper">
-        <div id="navbar-placeholder"></div>
-        <div id="sidebar-placeholder"></div>
+<body class="hrm-glass hrm-dashboard" data-page="dashboard">
+    <div class="dashboard-shell">
+        <div id="glass-nav-placeholder"></div>
 
-        <div class="content-wrapper">
-            <section class="content">
-                <div class="container-fluid">
-                    <div class="content-header">
-                        <div class="row mb-2">
-                            <div class="col-sm-6">
-                                <h1 class="m-0">Dashboard</h1>
-                                <small class="text-muted">Today is <span id="summary-date">…</span></small>
-                            </div>
-                            <div class="col-sm-6 text-right no-print">
-                                <button type="button" class="btn btn-secondary" id="refresh-dashboard">
-                                    <i class="fa fa-sync"></i> Refresh
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+        <main class="dashboard-main">
+            <div id="glass-header-placeholder"></div>
 
-                    <div class="alert alert-info d-none" id="non-working-notice" role="status">
-                        <i class="fa fa-info-circle" aria-hidden="true"></i>
-                        <span id="non-working-text">Today is not a working day.</span>
-                    </div>
+            <div class="page-content">
+            <div id="non-working-notice" class="glass-notice d-none" role="status">
+                <i class="fa fa-info-circle" aria-hidden="true"></i>
+                <span id="non-working-text">Today is not a working day.</span>
+            </div>
 
-                    <!-- Today's cards -->
-                    <div class="row dashboard-card" id="summary-cards">
-                        <div class="col-xl-2 col-md-4 col-6">
-                            <div class="small-box bg-primary">
-                                <div class="inner">
-                                    <h3 data-summary="totalStudents">—</h3>
-                                    <p>Total students</p>
-                                </div>
-                                <div class="icon"><i class="fa fa-users"></i></div>
-                            </div>
-                        </div>
-                        <div class="col-xl-2 col-md-4 col-6">
-                            <div class="small-box bg-success">
-                                <div class="inner">
-                                    <h3 data-summary="present">—</h3>
-                                    <p>Present</p>
-                                </div>
-                                <div class="icon"><i class="fa fa-check"></i></div>
-                            </div>
-                        </div>
-                        <div class="col-xl-2 col-md-4 col-6">
-                            <div class="small-box bg-warning">
-                                <div class="inner">
-                                    <h3 data-summary="late">—</h3>
-                                    <p>Late</p>
-                                </div>
-                                <div class="icon"><i class="fa fa-clock"></i></div>
-                            </div>
-                        </div>
-                        <div class="col-xl-2 col-md-4 col-6">
-                            <div class="small-box bg-danger">
-                                <div class="inner">
-                                    <h3 data-summary="absent">—</h3>
-                                    <p>Absent</p>
-                                </div>
-                                <div class="icon"><i class="fa fa-times"></i></div>
-                            </div>
-                        </div>
-                        <div class="col-xl-2 col-md-4 col-6">
-                            <div class="small-box bg-info">
-                                <div class="inner">
-                                    <h3 data-summary="onLeave">—</h3>
-                                    <p>On leave</p>
-                                </div>
-                                <div class="icon"><i class="fa fa-umbrella-beach"></i></div>
-                            </div>
-                        </div>
-                        <div class="col-xl-2 col-md-4 col-6" id="not-marked-card">
-                            <a class="small-box bg-secondary" href="/attendance.html" id="not-marked-link" aria-label="Open today's attendance sheet">
-                                <div class="inner">
-                                    <h3 data-summary="notMarked">—</h3>
-                                    <p>Not marked yet</p>
-                                </div>
-                                <div class="icon"><i class="fa fa-question" aria-hidden="true"></i></div>
-                            </a>
-                        </div>
+            <section class="content-grid" aria-label="Today's summary">
+                <article class="glass-card glass-card--span-4 hero-card">
+                    <div class="hero-card__head">
+                        <span class="icon-badge icon-badge--blue"><i class="fas fa-clock" aria-hidden="true"></i></span>
+                        <span class="day-chip day-chip--positive" id="day-status">Working day</span>
                     </div>
+                    <p class="hero-card__date" id="summary-date-long">—</p>
+                    <p class="hero-card__time"><time id="dashboard-clock">--:--</time></p>
+                    <div class="hero-card__divider" aria-hidden="true"></div>
+                    <div class="hero-card__metric">
+                        <span class="hero-card__value" data-summary="present">—</span>
+                        <span class="hero-card__label">present today<br><span data-summary="totalStudents">—</span> active students</span>
+                    </div>
+                </article>
 
-                    <!-- Year -->
-                    <div class="row">
-                        <div class="col-12">
-                            <div class="card card-glass">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h3 class="card-title mb-0">Year overview</h3>
-                                    <div class="form-inline no-print">
-                                        <label for="year-select" class="mr-2 mb-0">Year</label>
-                                        <input type="number" class="form-control form-control-sm" id="year-select" min="2000" max="2100" step="1">
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="chart-box">
-                                        <canvas id="year-chart" aria-label="Attendance, absence and leave per month" role="img"></canvas>
-                                    </div>
-                                </div>
+                <article class="glass-card glass-card--span-3 coverage-card">
+                    <header class="glass-card__header">
+                        <div class="glass-card__heading">
+                            <span class="icon-badge icon-badge--blue"><i class="fas fa-percentage" aria-hidden="true"></i></span>
+                            <div>
+                                <h2 class="glass-card__title">Attendance rate</h2>
+                                <p class="glass-card__subtitle">Recorded for today</p>
                             </div>
                         </div>
+                    </header>
+                    <div class="coverage-ring">
+                        <svg class="coverage-ring__svg" viewBox="0 0 120 120" role="img" aria-label="Attendance rate today">
+                            <defs>
+                                <linearGradient id="coverage-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#5C83EC"></stop>
+                                    <stop offset="100%" stop-color="#8B63E8"></stop>
+                                </linearGradient>
+                            </defs>
+                            <circle class="coverage-ring__track" cx="60" cy="60" r="52"></circle>
+                            <circle class="coverage-ring__value" id="coverage-ring-value" cx="60" cy="60" r="52" stroke-dasharray="326.73" stroke-dashoffset="326.73" transform="rotate(-90 60 60)"></circle>
+                        </svg>
+                        <p class="coverage-ring__center">
+                            <span class="coverage-ring__percent" id="coverage-percent">—</span>
+                            <span class="coverage-ring__unit">present</span>
+                        </p>
                     </div>
+                    <p class="coverage-caption" id="coverage-caption">—</p>
+                    <p class="coverage-link-row" id="not-marked-card">
+                        <a class="coverage-link" id="not-marked-link" href="/attendance.html">
+                            <span data-summary="notMarked">—</span> not marked yet
+                            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                        </a>
+                    </p>
+                </article>
 
-                    <!-- Month + departments doughnut -->
-                    <div class="row">
-                        <div class="col-lg-8">
-                            <div class="card card-glass">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h3 class="card-title mb-0">Month overview</h3>
-                                    <div class="form-inline no-print">
-                                        <label for="month-select" class="mr-2 mb-0">Month</label>
-                                        <input type="month" class="form-control form-control-sm" id="month-select">
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="chart-box">
-                                        <canvas id="month-chart" aria-label="Attendance, absence and leave per day" role="img"></canvas>
-                                    </div>
-                                </div>
-                            </div>
+                <div class="stat-grid" role="group" aria-label="Today's attendance breakdown">
+                    <article class="glass-card stat-card">
+                        <div class="stat-card__head">
+                            <span class="icon-badge icon-badge--mint"><i class="fas fa-check" aria-hidden="true"></i></span>
+                            <span class="stat-card__share" data-stat-share="present">—</span>
                         </div>
-                        <div class="col-lg-4">
-                            <div class="card card-glass">
-                                <div class="card-header">
-                                    <h3 class="card-title">Active students by department</h3>
-                                </div>
-                                <div class="card-body">
-                                    <div class="chart-box chart-doughnut">
-                                        <canvas id="departments-chart" aria-label="Active students by department" role="img"></canvas>
-                                    </div>
-                                    <p class="text-muted text-center mb-0 d-none" id="departments-chart-empty">No departments yet.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                        <p class="stat-card__value" data-summary="present">—</p>
+                        <p class="stat-card__label">Present</p>
+                        <span class="stat-card__bar" aria-hidden="true"><i data-stat-bar="present"></i></span>
+                    </article>
 
-                    <!-- Top students + department table -->
-                    <div class="row">
-                        <div class="col-lg-7">
-                            <div class="card card-glass">
-                                <div class="card-header">
-                                    <h3 class="card-title">Top students of the month</h3>
-                                </div>
-                                <div class="card-body p-0">
-                                    <div class="table-responsive">
-                                        <table class="table table-striped dashboard-table mb-0">
-                                            <thead>
-                                                <tr>
-                                                    <th>#</th>
-                                                    <th>Student</th>
-                                                    <th class="text-center">Score</th>
-                                                    <th class="text-center">Present</th>
-                                                    <th class="text-center">Late</th>
-                                                    <th class="text-center">Absent</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="top-students-body">
-                                                <tr><td colspan="6" class="text-center py-4">Loading…</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="card-footer text-muted small">
-                                    Score = present × 3 − late × 1 − absent × 2. Leave and vacation days are not counted.
-                                </div>
-                            </div>
+                    <article class="glass-card stat-card">
+                        <div class="stat-card__head">
+                            <span class="icon-badge icon-badge--yellow"><i class="fas fa-hourglass-half" aria-hidden="true"></i></span>
+                            <span class="stat-card__share" data-stat-share="late">—</span>
                         </div>
-                        <div class="col-lg-5">
-                            <div class="card card-glass">
-                                <div class="card-header">
-                                    <h3 class="card-title">Departments</h3>
-                                </div>
-                                <div class="card-body p-0">
-                                    <div class="table-responsive">
-                                        <table class="table table-striped dashboard-table mb-0">
-                                            <thead>
-                                                <tr>
-                                                    <th>Department</th>
-                                                    <th class="text-center">Active students</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="departments-body">
-                                                <tr><td colspan="2" class="text-center py-4">Loading…</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
+                        <p class="stat-card__value" data-summary="late">—</p>
+                        <p class="stat-card__label">Late</p>
+                        <span class="stat-card__bar" aria-hidden="true"><i data-stat-bar="late"></i></span>
+                    </article>
+
+                    <article class="glass-card stat-card">
+                        <div class="stat-card__head">
+                            <span class="icon-badge icon-badge--coral"><i class="fas fa-times" aria-hidden="true"></i></span>
+                            <span class="stat-card__share" data-stat-share="absent">—</span>
                         </div>
-                    </div>
+                        <p class="stat-card__value" data-summary="absent">—</p>
+                        <p class="stat-card__label">Absent</p>
+                        <span class="stat-card__bar" aria-hidden="true"><i data-stat-bar="absent"></i></span>
+                    </article>
+
+                    <article class="glass-card stat-card">
+                        <div class="stat-card__head">
+                            <span class="icon-badge icon-badge--violet"><i class="fas fa-umbrella-beach" aria-hidden="true"></i></span>
+                            <span class="stat-card__share" data-stat-share="onLeave">—</span>
+                        </div>
+                        <p class="stat-card__value" data-summary="onLeave">—</p>
+                        <p class="stat-card__label">On leave</p>
+                        <span class="stat-card__bar" aria-hidden="true"><i data-stat-bar="onLeave"></i></span>
+                    </article>
                 </div>
             </section>
-        </div>
 
-        <footer class="main-footer">
-            <strong>Human Resource</strong> — Lean HRM
-            <div class="float-right d-none d-sm-inline">Signed in as <span data-admin-name>Administrator</span></div>
-        </footer>
+            <section class="content-grid" aria-label="Dashboard details">
+                <article class="glass-card glass-card--span-8" id="month-card">
+                    <header class="glass-card__header">
+                        <div class="glass-card__heading">
+                            <span class="icon-badge icon-badge--violet"><i class="fas fa-chart-bar" aria-hidden="true"></i></span>
+                            <div>
+                                <h2 class="glass-card__title">Attendance this month</h2>
+                                <p class="glass-card__subtitle" id="month-chart-caption">Daily totals for the selected month</p>
+                            </div>
+                        </div>
+                        <div class="card-tools">
+                            <div class="segmented" role="group" aria-label="Attendance chart series">
+                                <button type="button" class="segmented__btn is-active" data-series="attendance" aria-pressed="true">Attendance</button>
+                                <button type="button" class="segmented__btn" data-series="absence" aria-pressed="false">Absence</button>
+                                <button type="button" class="segmented__btn" data-series="leave" aria-pressed="false">Leave</button>
+                            </div>
+                            <div class="glass-inline-field">
+                                <label for="month-select">Month</label>
+                                <input type="month" class="glass-input" id="month-select">
+                            </div>
+                        </div>
+                    </header>
+                    <div class="chart-box chart-box--tall">
+                        <canvas id="month-chart" aria-label="Attendance per day" role="img"></canvas>
+                    </div>
+                </article>
+
+                <article class="glass-card glass-card--span-4" id="departments-chart-card">
+                    <header class="glass-card__header">
+                        <div class="glass-card__heading">
+                            <span class="icon-badge icon-badge--mint"><i class="fas fa-building" aria-hidden="true"></i></span>
+                            <h2 class="glass-card__title">Active students by department</h2>
+                        </div>
+                    </header>
+                    <div class="chart-box">
+                        <canvas id="departments-chart" aria-label="Active students by department" role="img"></canvas>
+                    </div>
+                    <p class="glass-empty d-none" id="departments-chart-empty">No departments yet.</p>
+                </article>
+
+                <article class="glass-card glass-card--span-7" id="top-students-card">
+                    <header class="glass-card__header">
+                        <div class="glass-card__heading">
+                            <span class="icon-badge icon-badge--yellow"><i class="fas fa-trophy" aria-hidden="true"></i></span>
+                            <div>
+                                <h2 class="glass-card__title">Top students of the month</h2>
+                                <p class="glass-card__subtitle">Ranked by attendance score</p>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="glass-table-wrap" role="region" aria-label="Top students table" tabindex="0">
+                        <table class="dashboard-table">
+                            <caption class="sr-only">Top students of the selected month with their score and attendance counts</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">#</th>
+                                    <th scope="col">Student</th>
+                                    <th scope="col" class="text-center">Score</th>
+                                    <th scope="col" class="text-center">Present</th>
+                                    <th scope="col" class="text-center">Late</th>
+                                    <th scope="col" class="text-center">Absent</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-students-body">
+                                <tr><td colspan="6" class="text-center">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="glass-card__footnote">Score = present × 3 − late × 1 − absent × 2. Leave and vacation days are not counted.</p>
+                </article>
+
+                <article class="glass-card glass-card--span-5" id="year-card">
+                    <header class="glass-card__header">
+                        <div class="glass-card__heading">
+                            <span class="icon-badge icon-badge--blue"><i class="fas fa-chart-line" aria-hidden="true"></i></span>
+                            <div>
+                                <h2 class="glass-card__title">Year overview</h2>
+                                <p class="glass-card__subtitle">Attendance, absence and leave per month</p>
+                            </div>
+                        </div>
+                        <div class="glass-inline-field">
+                            <label for="year-select">Year</label>
+                            <input type="number" class="glass-input glass-input--sm" id="year-select" min="2000" max="2100" step="1">
+                        </div>
+                    </header>
+                    <div class="chart-box">
+                        <canvas id="year-chart" aria-label="Attendance, absence and leave per month" role="img"></canvas>
+                    </div>
+                </article>
+
+                <article class="glass-card glass-card--span-12" id="departments-table-card">
+                    <header class="glass-card__header">
+                        <div class="glass-card__heading">
+                            <span class="icon-badge icon-badge--coral"><i class="fas fa-table" aria-hidden="true"></i></span>
+                            <h2 class="glass-card__title">Departments</h2>
+                        </div>
+                    </header>
+                    <div class="glass-table-wrap" role="region" aria-label="Departments table" tabindex="0">
+                        <table class="dashboard-table">
+                            <caption class="sr-only">Active students per department and their share of the total</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Department</th>
+                                    <th scope="col" class="text-center">Active students</th>
+                                    <th scope="col">Share of students</th>
+                                </tr>
+                            </thead>
+                            <tbody id="departments-body">
+                                <tr><td colspan="3" class="text-center">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+            </section>
+            </div>
+        </main>
     </div>
 
     <script src="/vendor/jquery.min.js"></script>

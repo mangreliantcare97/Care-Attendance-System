@@ -14,14 +14,19 @@
     <link rel="stylesheet" href="/vendor/adminlte.min.css">
     <link rel="stylesheet" href="/vendor/toastr/toastr.min.css">
     <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/dashboard-glass.css">
+    <link rel="stylesheet" href="/css/app-glass.css">
 
 </head>
-<body class="hold-transition sidebar-mini layout-fixed" data-page="attendance">
-    <div class="wrapper">
-        <div id="navbar-placeholder"></div>
-        <div id="sidebar-placeholder"></div>
+<body class="hrm-glass" data-page="attendance">
+    <div class="dashboard-shell">
+        <div id="glass-nav-placeholder"></div>
 
-        <div class="content-wrapper">
+        <main class="dashboard-main">
+            <div id="glass-header-placeholder"></div>
+
+            <div class="page-content">
+                <div class="content-wrapper">
             <section class="content">
                 <div class="container-fluid">
                     <div class="content-header">
@@ -116,11 +121,8 @@
                 </div>
             </section>
         </div>
-
-        <footer class="main-footer">
-            <strong>Human Resource</strong> — Lean HRM
-            <div class="float-right d-none d-sm-inline">Signed in as <span data-admin-name>Administrator</span></div>
-        </footer>
+            </div>
+        </main>
     </div>
 
     <div class="attendance-save-bar no-print" id="attendance-save-bar">

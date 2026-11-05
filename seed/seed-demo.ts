@@ -4,7 +4,7 @@
  *   npm run seed:demo
  *
  * The script refuses to run in production and refuses to touch a database that
- * already contains students. It creates five departments, 25 fake students,
+ * already contains students. It creates five departments, 20 fake students,
  * three months of attendance with roughly half of the team already marked
  * today, 14 approved leaves across different students, overtime for the
  * current and previous two months, and calendar events.
@@ -26,7 +26,7 @@ import { reconcileLeave } from '../src/services/attendanceSync.ts';
 import { addDays, eachDate, isWorkingDay, monthBounds, today } from '../src/utils/dates.ts';
 
 const SEED = 0x5eed1e;
-const STUDENT_COUNT = 25;
+const STUDENT_COUNT = 20;
 
 /** Small deterministic PRNG (mulberry32). */
 function mulberry32(seed: number): () => number {

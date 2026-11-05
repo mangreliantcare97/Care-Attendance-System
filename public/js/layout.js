@@ -1,85 +1,49 @@
 /**
  * Shared layout.
  *
- * The app is a multi-page site: every module is its own HTML file. The
- * sidebar and the navbar are shared partials that are fetched once and
- * injected into the page, so the navigation only exists in one place.
+ * Every authenticated page is its own HTML file. The glass navigation rail and
+ * header live in shared partials, fetched once and injected into the page, so
+ * the shell and its behaviour only exist in one place.
  *
- * The partials are injected *before* AdminLTE is loaded, so that the vendored
- * AdminLTE plugins initialise against the finished DOM.
+ * When the partials and session are ready the script dispatches
+ * `hrm:layout-ready`; every page module waits for that event before it looks
+ * up elements inside the injected header.
  */
 (function () {
   var PARTIALS = {
-    navbar: 'navbar-placeholder',
-    sidebar: 'sidebar-placeholder',
+    header: { target: 'glass-header-placeholder', url: '/partials/navbar.html' },
+    nav: { target: 'glass-nav-placeholder', url: '/partials/sidebar.html' },
   };
 
-  var SIDEBAR_KEY = 'hrm.sidebar';
-  var mobileQuery = window.matchMedia ? window.matchMedia('(max-width: 991.98px)') : null;
+  var NAV_ALIASES = {
+    'attendance-report': 'reports',
+    overtime: 'reports',
+  };
 
-  function isMobile() {
-    return mobileQuery ? mobileQuery.matches : window.innerWidth < 992;
+  var SEARCH_COPY = {
+    dashboard: 'Search students or departments…',
+    students: 'Search students…',
+    departments: 'Search departments…',
+    attendance: 'Search attendance…',
+    'attendance-report': 'Search attendance records…',
+    reports: 'Search reports…',
+    overtime: 'Search overtime…',
+    leaves: 'Search leave records…',
+    calendar: 'Search events…',
+    admins: 'Search admins…',
+  };
+
+  function pageName() {
+    return (document.body && document.body.getAttribute('data-page')) || '';
   }
 
-  function readSidebarState() {
-    try {
-      return window.localStorage.getItem(SIDEBAR_KEY);
-    } catch (error) {
-      return null;
-    }
-  }
-
-  function writeSidebarState(state) {
-    try {
-      window.localStorage.setItem(SIDEBAR_KEY, state);
-    } catch (error) {
-      /* storage disabled — the state simply will not persist */
-    }
-  }
-
-  function syncSidebarToggle() {
-    var toggles = document.querySelectorAll('[data-widget="pushmenu"]');
-    var expanded = isMobile()
-      ? document.body.classList.contains('sidebar-open')
-      : !document.body.classList.contains('sidebar-collapse');
-
-    for (var index = 0; index < toggles.length; index += 1) {
-      toggles[index].setAttribute('aria-expanded', expanded ? 'true' : 'false');
-      toggles[index].setAttribute('aria-label', expanded ? 'Close navigation' : 'Open navigation');
-    }
-  }
-
-  function applySidebarState() {
-    if (isMobile()) {
-      document.body.classList.remove('sidebar-collapse');
-      document.body.classList.remove('sidebar-open');
-    } else {
-      document.body.classList.remove('sidebar-open');
-      document.body.classList.toggle('sidebar-collapse', readSidebarState() === 'collapsed');
-    }
-    syncSidebarToggle();
-  }
-
-  function closeMobileSidebar() {
-    if (!isMobile()) return;
-    document.body.classList.remove('sidebar-open');
-    syncSidebarToggle();
-  }
-
-  /**
-   * Replace the placeholder with the partial.
-   *
-   * `outerHTML` is used on purpose: the sidebar and the navbar have to become
-   * direct children of `.wrapper`, otherwise AdminLTE's fixed layout does not
-   * calculate the correct offsets.
-   */
-  function inject(targetId, url) {
-    var target = document.getElementById(targetId);
+  function inject(placeholder) {
+    var target = document.getElementById(placeholder.target);
     if (!target) return Promise.resolve();
 
-    return fetch(url, { credentials: 'same-origin' })
+    return fetch(placeholder.url, { credentials: 'same-origin' })
       .then(function (response) {
-        if (!response.ok) throw new Error('Could not load ' + url);
+        if (!response.ok) throw new Error('Could not load ' + placeholder.url);
         return response.text();
       })
       .then(function (html) {
@@ -87,38 +51,105 @@
       });
   }
 
-  function loadScript(src) {
-    return new Promise(function (resolve, reject) {
-      var script = document.createElement('script');
-      script.src = src;
-      script.onload = resolve;
-      script.onerror = function () {
-        reject(new Error('Could not load ' + src));
-      };
-      document.head.appendChild(script);
-    });
-  }
-
-  function setActiveNav(page) {
+  function setActiveNav() {
+    var activePage = NAV_ALIASES[pageName()] || pageName();
     var links = document.querySelectorAll('[data-nav-link]');
+
     for (var index = 0; index < links.length; index += 1) {
       var link = links[index];
-      if (link.getAttribute('data-nav-link') === page) {
-        link.classList.add('active');
+      var active = link.getAttribute('data-nav-link') === activePage;
+      link.classList.toggle('is-active', active);
+      if (active) {
         link.setAttribute('aria-current', 'page');
+      } else {
+        link.removeAttribute('aria-current');
       }
     }
   }
 
   function fillAdmin(admin) {
+    if (!admin) return;
+
     var names = document.querySelectorAll('[data-admin-name]');
     for (var index = 0; index < names.length; index += 1) {
-      names[index].textContent = admin.name;
+      names[index].textContent = admin.name || 'Administrator';
     }
 
     var emails = document.querySelectorAll('[data-admin-email]');
     for (var emailIndex = 0; emailIndex < emails.length; emailIndex += 1) {
-      emails[emailIndex].textContent = admin.email;
+      emails[emailIndex].textContent = admin.email || '';
+    }
+  }
+
+  function longDate(value) {
+    var date = value instanceof Date ? value : new Date(value);
+    if (isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString(undefined, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  function setHeaderDate() {
+    var summaryDate = document.getElementById('summary-date');
+    if (summaryDate) summaryDate.textContent = longDate(new Date());
+  }
+
+  function setGreeting() {
+    var greeting = document.getElementById('dashboard-greeting');
+    if (!greeting) return;
+
+    var hour = new Date().getHours();
+    greeting.textContent =
+      hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  }
+
+  function setSearchCopy() {
+    var input = document.getElementById('dashboard-search');
+    if (!input) return;
+
+    var copy = SEARCH_COPY[pageName()] || 'Search this page…';
+    input.setAttribute('placeholder', copy);
+    input.setAttribute('aria-label', copy);
+  }
+
+  function filterPageRows(query) {
+    var needle = String(query || '').trim().toLowerCase();
+    var rows = document.querySelectorAll('.page-content table tbody tr');
+
+    for (var index = 0; index < rows.length; index += 1) {
+      var row = rows[index];
+      if (!needle) {
+        row.hidden = false;
+      } else {
+        row.hidden = row.textContent.toLowerCase().indexOf(needle) === -1;
+      }
+    }
+  }
+
+  function bindHeaderControls() {
+    var input = document.getElementById('dashboard-search');
+    var refresh = document.getElementById('refresh-dashboard');
+    if (pageName() === 'dashboard') return;
+
+    if (input) {
+      input.addEventListener('input', function () {
+        filterPageRows(input.value);
+      });
+
+      input.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        input.value = '';
+        filterPageRows('');
+      });
+    }
+
+    if (refresh) {
+      refresh.addEventListener('click', function () {
+        window.location.reload();
+      });
     }
   }
 
@@ -138,20 +169,9 @@
 
   async function init() {
     try {
-      await Promise.all([
-        inject(PARTIALS.navbar, '/partials/navbar.html'),
-        inject(PARTIALS.sidebar, '/partials/sidebar.html'),
-      ]);
+      await Promise.all([inject(PARTIALS.nav), inject(PARTIALS.header)]);
     } catch (error) {
       console.error('[layout] the shell could not be loaded', error);
-    }
-
-    applySidebarState();
-
-    try {
-      await loadScript('/vendor/adminlte.min.js');
-    } catch (error) {
-      console.error('[layout] AdminLTE could not be loaded', error);
     }
 
     // Confirm the session and pick up the CSRF token.
@@ -166,51 +186,24 @@
       return;
     }
 
-    setActiveNav(document.body.getAttribute('data-page'));
+    setActiveNav();
+    setHeaderDate();
+    setGreeting();
+    setSearchCopy();
+    bindHeaderControls();
 
     document.addEventListener('click', function (event) {
       if (event.target.closest('[data-logout]')) {
         event.preventDefault();
         void logout();
-        return;
-      }
-
-      if (event.target.closest('[data-widget="pushmenu"]')) {
-        window.setTimeout(function () {
-          // On mobile the open state is transient; only the desktop collapse
-          // preference is remembered.
-          if (!isMobile()) {
-            writeSidebarState(
-              document.body.classList.contains('sidebar-collapse') ? 'collapsed' : 'expanded',
-            );
-          }
-          syncSidebarToggle();
-        }, 0);
-        return;
-      }
-
-      var sidebarLink = event.target.closest('.main-sidebar a[href]');
-      if (sidebarLink) {
-        var href = sidebarLink.getAttribute('href') || '';
-        if (href && href.charAt(0) !== '#') closeMobileSidebar();
       }
     });
-
-    document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape') closeMobileSidebar();
-    });
-
-    if (mobileQuery) {
-      if (typeof mobileQuery.addEventListener === 'function') {
-        mobileQuery.addEventListener('change', applySidebarState);
-      } else if (typeof mobileQuery.addListener === 'function') {
-        mobileQuery.addListener(applySidebarState);
-      }
-    }
 
     if (window.HrmTheme) window.HrmTheme.syncControls();
 
-    document.dispatchEvent(new CustomEvent('hrm:layout-ready', { detail: { page: document.body.getAttribute('data-page') } }));
+    document.dispatchEvent(
+      new CustomEvent('hrm:layout-ready', { detail: { page: pageName() } }),
+    );
   }
 
   document.addEventListener('hrm:unauthenticated', redirectToLogin);

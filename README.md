@@ -435,7 +435,7 @@ MONGODB_URI=mongodb://127.0.0.1:27017/lean-hrm-demo npm run seed:demo
 ```
 
 `seed:demo` refuses to run when `NODE_ENV=production` and refuses to touch a
-database that already contains students. It creates five departments, 25 fake
+database that already contains students. It creates five departments, 20 fake
 students, roughly three months of attendance up to yesterday (mostly present,
 with some late, absent and unmarked days), six approved leaves through the real
 leave reconcile, 30 overtime entries and a few calendar events. The random
